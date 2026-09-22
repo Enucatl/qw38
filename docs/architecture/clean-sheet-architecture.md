@@ -16,8 +16,8 @@ instances). Language-only is a secondary row.
 If any occupancy, MAC/byte, node type, stage kind, recipe, mapping, or id
 would disagree with TASK-01–19 or sitting `text_config`, the earlier document
 wins and this synthesis is wrong. Claims are labelled `OBSERVED` (sitting
-`text_config` / inventory already established; TASK-16 \(N_w=32\),
-\(N_{\text{bank}}=32\)), `MEASURED` (TASK-05 citations only), `DERIVED`
+`text_config` / inventory already established; TASK-16 $N_w=32$,
+$N_{\text{bank}}=32$), `MEASURED` (TASK-05 citations only), `DERIVED`
 (chain membership, occupancy/MAC citations, experiment DAG), `HYPOTHESIS`
 (every remaining alternative usefulness; every experiment hypothesis), or
 `UNKNOWN` (sitting-SKU numeric limits; vision-encoder internals; unselected
@@ -58,12 +58,12 @@ Numeric ranks instantiate sitting `text_config` OBSERVED: `hidden_size` 5120,
 `intermediate_size` 17408, `vocab_size` 248320, 64 decoder layers, 48 linear +
 16 full at indices `[3, 7, 11, 15, 19, 23, 27, 31, 35, 39, 43, 47, 51, 55, 59, 63]`,
 `mtp_num_hidden_layers` 1, `dtype` `"bfloat16"`, `mamba_ssm_dtype` `"float32"`,
-`max_position_embeddings` \(T_{\text{ctx max}}=262144\). Language+MTP occupancy
+`max_position_embeddings` $T_{\text{ctx max}}=262144$. Language+MTP occupancy
 is 27320697856 parameters / 54641395712 BF16 bytes (OBSERVED). Unique non-embed
 weight bytes are 52098598912 (TASK-06). Complete map: 135 node instances.
-MAC citations (DERIVED, TASK-06): \(C_\text{complete}=27433238528\),
-\(A_\text{complete}=208896\); T=1 decode = T=1 prefill MAC \(27433447424\);
-T=4096 decode \(28288876544\); T=4096 prefill \(114119319486464\).
+MAC citations (DERIVED, TASK-06): $C_\text{complete}=27433238528$,
+$A_\text{complete}=208896$; T=1 decode = T=1 prefill MAC $27433447424$;
+T=4096 decode $28288876544$; T=4096 prefill $114119319486464$.
 
 ## Synthesis convention
 
@@ -168,7 +168,7 @@ Cite, do not retabulate as new studies. Occupancy OBSERVED/DERIVED from sitting 
 
 Counts (locked; ids live in the JSON fence and TASK-01–19 documents): 6 node types / 135 instances (2 `embed`, 17 `gated_attn`, 48 `gated_delta_net`, 65 `mlp`, 2 `lm_head`, 1 `mtp_mix`); 9 stage kinds; 22 candidate recipes / 16 policy families; 6 compiler stages / 3 compiler profiles plus identity `control`; 4 artifact approaches / 7 consumer sequences / `none` vs `checksum` integrity; 22 fusion + 5 hoist hypotheses; 4 representation + 2 mode hypotheses; 14 orderings / 9 tile families / 9 parallel decompositions / 4 conversion hypotheses; 18 mappings; 17 SKU-UNKNOWN symbols; 20 sensitive ops.
 
-Algebraic equivalents in TASK-02 remain the same real map. Chunkwise GDN is not zero \(S\) traffic. At \(T=1\), MAC prefill = decode; C/S physical reads still differ. Unique weight bytes are a TASK-06 lower bound, not measured HBM traffic.
+Algebraic equivalents in TASK-02 remain the same real map. Chunkwise GDN is not zero $S$ traffic. At $T=1$, MAC prefill = decode; C/S physical reads still differ. Unique weight bytes are a TASK-06 lower bound, not measured HBM traffic.
 
 What remain unselected (all false except catalogue/methodology flags): `pareto_frontier_selected`, `compiler_profile_selected`, `artifact_boundary_selected`, `ideal_byte_sequence_selected`, `integrity_algorithm_selected`, `fusion_winner_selected`, `decode_prefill_distinct_views_selected`, `layout_winner_selected`, `ordering_selected`, `tile_size_selected`, `mapping_winner_selected`, `hardware_selected`, `prompt_matrix_selected`, `reproducibility_protocol_selected`, `calibration_corpus_selected`, `eval_corpus_selected`, `acceptance_frontier_selected`, `sku_table_filled`, `hypothesis_survival_selected`. JSON `n_mappings_selected` 0; `n_fusion_hypotheses_selected` 0; `n_alternatives_selected` 0.
 
@@ -187,23 +187,23 @@ flowchart TB
   QUANT[custom quantization]
   LAYOUT[custom physical layouts]
   COMPILER[offline model compiler]
-  GRAPH[semantic graph]
+  semantic_graph["GRAPH: semantic graph"]
   DECODE[decode plan]
   PREFILL[prefill plan]
   CUDA[CUDA mappings]
   BACKLOG[experiment backlog]
   ALTS[catalogued alternatives]
   OPENQ[remaining open questions]
-  MATH --> DATAFLOW --> LIFETIME --> SENS --> QUANT --> LAYOUT --> COMPILER --> GRAPH
-  GRAPH --> DECODE
-  GRAPH --> PREFILL
+  MATH --> DATAFLOW --> LIFETIME --> SENS --> QUANT --> LAYOUT --> COMPILER --> semantic_graph
+  semantic_graph --> DECODE
+  semantic_graph --> PREFILL
   DECODE --> CUDA
   PREFILL --> CUDA
   CUDA --> BACKLOG
   ALTS --> QUANT
   ALTS --> LAYOUT
   ALTS --> CUDA
-  ALTS --> GRAPH
+  ALTS --> semantic_graph
   BACKLOG --> OPENQ
 ```
 

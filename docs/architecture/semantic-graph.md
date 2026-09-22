@@ -9,7 +9,7 @@ contracts for language + MTP. Equations, ranks, and algebraic equivalents come
 from [`docs/architecture/model-semantics.md`](model-semantics.md) (TASK-02).
 Catalog IDs, fan-out, live-across, and model-region names come from
 [`docs/architecture/dataflow.md`](dataflow.md) (TASK-03). Lifetime classes,
-must-survive boundaries, and \(K,V,C,S\) bytes come from
+must-survive boundaries, and $K,V,C,S$ bytes come from
 [`docs/architecture/lifetime-and-state.md`](lifetime-and-state.md) (TASK-04).
 Region MAC and traffic identities are **cited** from
 [`docs/architecture/work-and-traffic.md`](work-and-traffic.md) (TASK-06), not
@@ -18,8 +18,8 @@ from [`docs/architecture/numerical-sensitivity.md`](numerical-sensitivity.md)
 (TASK-07), not re-ranked.
 
 This document specifies hardware-independent execution contracts, not kernels.
-Prefill and decode share one semantic graph. Only \(T\) (stored KV length after
-append) and whether incoming \((K,V,C,S)\) is zeros versus populated change.
+Prefill and decode share one semantic graph. Only $T$ (stored KV length after
+append) and whether incoming $(K,V,C,S)$ is zeros versus populated change.
 Primary instance counts include MTP. If a node I/O, state kind, catalog ID,
 layer count, or cited MAC/byte would disagree with TASK-02/03/04/06/07 or
 sitting `text_config`, the earlier document / config wins and this one is wrong.
@@ -50,9 +50,9 @@ or CUDA mapping is chosen here.
 
 Numeric ranks instantiate sitting `text_config` OBSERVED: `hidden_size` 5120,
 `intermediate_size` 17408, `vocab_size` 248320, 64 decoder layers, 48 linear +
-16 full at \(\ell \bmod 4 = 3\), `mtp_num_hidden_layers` 1, `head_dim` 256,
+16 full at $\ell \bmod 4 = 3$, `mtp_num_hidden_layers` 1, `head_dim` 256,
 `num_attention_heads` 24, `num_key_value_heads` 4, linear widths
-\(d_\text{qkv}=10240\), `linear_key_head_dim` / `linear_value_head_dim` 128,
+$d_\text{qkv}=10240$, `linear_key_head_dim` / `linear_value_head_dim` 128,
 `dtype` `"bfloat16"`, `mamba_ssm_dtype` `"float32"`. Node cuts, instance counts,
 and catalog partition are DERIVED. Fusion/split usefulness and bottleneck
 **class** labels remain HYPOTHESIS.
@@ -90,7 +90,7 @@ materialization edges) by DERIVED cuts, not by picking a fusion.
 
 | id | Cut | Evidence | Why it is a node type |
 | --- | --- | --- | --- |
-| `cut_mixer_kind` | Gated Attention vs Gated DeltaNet | TASK-02 `(6)`–`(12)` vs `(13)`–`(20)`; state KV vs \(C,S\); TASK-06 \(A T\) vs \(T\)-free GDN; TASK-07 softmax/RoPE/KV vs recurrent \(S\) | Different equations, state, work class, and precision risks. One “attention” node would hide Qwen’s hybrid contract. |
+| `cut_mixer_kind` | Gated Attention vs Gated DeltaNet | TASK-02 `(6)`–`(12)` vs `(13)`–`(20)`; state KV vs $C,S$; TASK-06 $A T$ vs $T$-free GDN; TASK-07 softmax/RoPE/KV vs recurrent $S$ | Different equations, state, work class, and precision risks. One “attention” node would hide Qwen’s hybrid contract. |
 | `cut_mixer_mlp` | Mixer vs MLP | TASK-02 `(4)` vs `(5)`; TASK-04 `h_mid` residual-add; TASK-06 distinct MAC | `h_mid` must survive between Mix add and MLP add. Different work (attn/GDN vs SwiGLU). |
 | `cut_embed_gather` | Embed vs contractions | TASK-02 `(1)`; TASK-06 0 MAC gather 10240 B | Gather is not a GEMM. Distinct traffic class. |
 | `cut_vocab` | `lm_head` vs hidden GEMMs | TASK-02 `(22)` `(24)`; TASK-06 `1271398400` MAC and `vocab_memory` | Vocabulary projection is a distinct contraction and traffic outlier. |
@@ -120,7 +120,7 @@ JSON `ledger_open_question_boundaries_closed` true.
 
 JSON array `node_type_ids` in this exact order (6 ids). JSON `n_node_types` = 6.
 Complete primary = language + MTP: 135 instances. Language-only: 130.
-`primary_includes_mtp` true. Omitting MTP when only \(\ell^{(0)}\) is required
+`primary_includes_mtp` true. Omitting MTP when only $\ell^{(0)}$ is required
 is a TASK-02 algebraic equivalent (`mtp_omission_is_algebraic_equivalent`
 true), not a second graph and not the primary contract.
 
@@ -136,11 +136,11 @@ true), not a second graph and not the primary contract.
 JSON instance counts: `n_embed_instances` 2, `n_gated_attn_instances` 17,
 `n_gated_delta_net_instances` 48, `n_mlp_instances` 65, `n_lm_head_instances` 2,
 `n_mtp_mix_instances` 1, `n_node_instances_complete` 135
-(\(2+17+48+65+2+1\)), `n_node_instances_language` 130 (\(1+16+48+64+1+0\)).
+($2+17+48+65+2+1$), `n_node_instances_language` 130 ($1+16+48+64+1+0$).
 
-Layer mixer xor: language layer \(\ell\) uses `gated_attn` iff
-\(\ell\in\mathcal{L}_\text{full}\) (`full_attention_indices`
-\(\{3,7,\ldots,63\}\)), else `gated_delta_net`. Then `mlp`. Do not unroll 64
+Layer mixer xor: language layer $\ell$ uses `gated_attn` iff
+$\ell\in\mathcal{L}_\text{full}$ (`full_attention_indices`
+$\{3,7,\ldots,63\}$), else `gated_delta_net`. Then `mlp`. Do not unroll 64
 layers beyond this rule. JSON `mixer_xor_by_layer_types` true.
 
 Locks: `decode_prefill_share_graph`, `residual_add_inside_mixer`,
@@ -163,7 +163,7 @@ inside the producing node.
 
 ### `embed`
 
-- Ops: gather row of shared \(E\); 0 MAC (TASK-06). No RMS. No residual add.
+- Ops: gather row of shared $E$; 0 MAC (TASK-06). No RMS. No residual add.
 - Inputs: `token_id`. Outputs: `e` (language) or `e_next` (MTP instance).
 - State: none. Internals: none (`embed` internal list empty).
 - Weights: shared `E` (`shared_weight_ids` includes `E`).
@@ -173,24 +173,24 @@ inside the producing node.
 
 ### `gated_attn`
 
-- Ops: residual-stream RMSNorm `(2)` of `h` → `h_tilde`; projections `(6)`–`(7)` including `q\|g` split; QK-RMSNorm `(8)` then partial mRoPE `(11)`–`(12)` (order required); causal GQA softmax `(9)` against stored \(K,V\) plus current `k_rope`/`v_full`; sigmoid gate `(10)` (**not** SiLU); `W_o`; residual add `(4)` into `h_mid`.
+- Ops: residual-stream RMSNorm `(2)` of `h` → `h_tilde`; projections `(6)`–`(7)` including `q\|g` split; QK-RMSNorm `(8)` then partial mRoPE `(11)`–`(12)` (order required); causal GQA softmax `(9)` against stored $K,V$ plus current `k_rope`/`v_full`; sigmoid gate `(10)` (**not** SiLU); `W_o`; residual add `(4)` into `h_mid`.
 - Inputs: `h` (MTP block: `mtp_u` identified as residual `h`). Outputs: `h_mid`.
-- State RW: `K_state`, `V_state` (append `k_rope`, `v_full`; RoPE baked into stored \(K\); 17 instances including MTP). Reads past \(T-1\) then attends length \(T\) (TASK-04).
+- State RW: `K_state`, `V_state` (append `k_rope`, `v_full`; RoPE baked into stored $K$; 17 instances including MTP). Reads past $T-1$ then attends length $T$ (TASK-04).
 - Internals (`gated_attn_internal_ids`, this order): `h_tilde`, `u_q`, `q_prime`, `g`, `k_raw`, `v_full`, `q_n`, `k_n`, `q_rope`, `k_rope`, `attn`, `y_gate`, `mix_full`. Live-across internal: `g`. High-fan-out internals: `k_rope`, `v_full` (attn + KV write).
 - Contract: `h` remains available until the residual add. `g` remains available from the `q_proj` split until `(10)`.
-- Flexibilities: `algebraic_equivalent` (exact SDPA; GQA-as-repeat; RoPE complex form; text mRoPE vs ordinary RoPE when \(p^T=p^H=p^W\)); `fuse_internals`; `split_at_internal` candidates `g`, `h_tilde`, `k_rope`, `v_full` (TASK-12 HYPOTHESIS cuts, not extra types); `recompute_ephemeral` of all internals and of output `h_mid` from `h` plus state.
+- Flexibilities: `algebraic_equivalent` (exact SDPA; GQA-as-repeat; RoPE complex form; text mRoPE vs ordinary RoPE when $p^T=p^H=p^W$); `fuse_internals`; `split_at_internal` candidates `g`, `h_tilde`, `k_rope`, `v_full` (TASK-12 HYPOTHESIS cuts, not extra types); `recompute_ephemeral` of all internals and of output `h_mid` from `h` plus state.
 - TASK-06 cite: T-free proj MAC `104857600` per instance; T-coefficient `12288`; KV 4096 B/token/instance.
 - TASK-07 cite: `param_bf16`, `residual_stream`, `live_across_gates`, `silu_sigmoid` (sigmoid gate), `rms_hidden`, `rms_head`, `softmax_over_T`, `attn_av_over_T`, `gemm_k5120`, `rope_phase`, `state_kv_bf16`.
 
 ### `gated_delta_net`
 
-- Ops: residual-stream RMSNorm `(2)` of `h` → `h_tilde`; projections `(13)` (`W_qkv`, `W_z`, `W_a`, `W_b`); depthwise causal conv `(14)` reading `C_state`; SiLU and QKV split; \(\alpha/\beta\) `(15)`; L2 `(16)`; recurrence `(17)`–`(18)` as **definition** (not dense `(19)` as extra work); GatedRMSNorm `(3)` with `z`; `W_out`; residual add `(4)` into `h_mid`. Write `qkv` into `C_state`; write `S_t`.
+- Ops: residual-stream RMSNorm `(2)` of `h` → `h_tilde`; projections `(13)` (`W_qkv`, `W_z`, `W_a`, `W_b`); depthwise causal conv `(14)` reading `C_state`; SiLU and QKV split; $\alpha/\beta$ `(15)`; L2 `(16)`; recurrence `(17)`–`(18)` as **definition** (not dense `(19)` as extra work); GatedRMSNorm `(3)` with `z`; `W_out`; residual add `(4)` into `h_mid`. Write `qkv` into `C_state`; write `S_t`.
 - Inputs: `h`. Outputs: `h_mid`.
 - State RW: `C_state` (3×10240), `S` (48×128×128 conceptual F32).
 - Internals (`gated_delta_net_internal_ids`, this order): `h_tilde`, `qkv`, `z`, `a`, `b`, `c_tilde`, `c`, `q_lin`, `k_lin`, `v_lin`, `q_hat`, `k_hat`, `alpha`, `beta`, `o`, `u_gdn`, `mix_lin`. Live-across internal: `z`. Intra-equation reuse: `k_hat` (not a second catalog consumer; not a split candidate).
 - Contract: `h` live until residual add; `z` live from `W_z` until `(20)`; GDN eval primary is left-to-right `(17)`–`(18)`.
-- Flexibilities: `algebraic_equivalent` (chunkwise/WY of the **same** map; FIR vs delay-line conv; \(S\) vs \(S^\top\)); `fuse_internals`; `split_at_internal` candidates `z`, `h_tilde`, `qkv`; `recompute_ephemeral`. Chunkwise FP gap stays HYPOTHESIS; do not treat chunkwise as a second node or as zero \(S\) traffic (TASK-06).
-- TASK-06 cite: `mac_lin_token_per_layer` `118235136` (includes conv `40960`, GDN `2359296`, projs, `out_proj`); \(S\) 3145728 B/instance F32; \(C\) 61440 B/instance; GDN vs \(S\) \(I=0.75\) identity cited, class `state_memory` remains HYPOTHESIS.
+- Flexibilities: `algebraic_equivalent` (chunkwise/WY of the **same** map; FIR vs delay-line conv; $S$ vs $S^\top$); `fuse_internals`; `split_at_internal` candidates `z`, `h_tilde`, `qkv`; `recompute_ephemeral`. Chunkwise FP gap stays HYPOTHESIS; do not treat chunkwise as a second node or as zero $S$ traffic (TASK-06).
+- TASK-06 cite: `mac_lin_token_per_layer` `118235136` (includes conv `40960`, GDN `2359296`, projs, `out_proj`); $S$ 3145728 B/instance F32; $C$ 61440 B/instance; GDN vs $S$ $I=0.75$ identity cited, class `state_memory` remains HYPOTHESIS.
 - TASK-07 cite: `param_bf16`, `residual_stream`, `live_across_gates`, `silu_sigmoid`, `rms_hidden`, `rms_head`, `l2_gdn`, `gemm_k5120`, `gdn_S_recurrent`, `gdn_inner_d128`, `gdn_alpha_beta`, `state_c_bf16`, `s_below_f32`, `conv_fir`.
 
 ### `mlp`
@@ -200,21 +200,21 @@ inside the producing node.
 - State: none. Internals (`mlp_internal_ids`, this order): `h_post`, `g_mlp`, `up`, `swiglu`, `mlp_out`.
 - Contract: `h_mid` live until the residual add.
 - Flexibilities: `fuse_internals`; `split_at_internal` candidates `h_post`, `swiglu`; `recompute_ephemeral`. No GDN/SDPA equivalent.
-- TASK-06 cite: `mac_mlp_per_layer` `267386880`; \(I=1\) vs weights (DERIVED identity); class `weight_memory` remains HYPOTHESIS.
+- TASK-06 cite: `mac_mlp_per_layer` `267386880`; $I=1$ vs weights (DERIVED identity); class `weight_memory` remains HYPOTHESIS.
 - TASK-07 cite: `param_bf16`, `residual_stream`, `silu_sigmoid`, `rms_hidden`, `gemm_k5120`, `gemm_k17408`.
 
 ### `lm_head`
 
-- Ops: residual-stream RMSNorm `(2)` (`model.language_model.norm` or `mtp.norm`) then \(W_\text{lm}\) `(22)` or `(24)`. Shared weight `W_lm`. Sampling softmax over \(V\) is **out of scope**.
+- Ops: residual-stream RMSNorm `(2)` (`model.language_model.norm` or `mtp.norm`) then $W_\text{lm}$ `(22)` or `(24)`. Shared weight `W_lm`. Sampling softmax over $V$ is **out of scope**.
 - Inputs: `h_64` (primary) or `h_mtp` (MTP). Outputs: `logits_0` or `logits_1`.
 - State: none. Internals (`lm_head_internal_ids`): `h_final` for the primary instance. The MTP instance’s post-`mtp.norm` vector has **no extra catalog ID**; do not invent one. JSON `mtp_norm_has_no_extra_catalog_id` true.
 - Flexibilities: `shared_weight_reuse` (one `W_lm` payload; a second physical read for `logits_1` is TASK-06 HYPOTHESIS traffic, not DERIVED unique bytes); `fuse_internals`; `split_at_internal` candidate `h_final`; `recompute_ephemeral`.
-- TASK-06 cite: `mac_lm_head` `1271398400`; weight bytes `2542796800`; \(I=1\) vs weights.
+- TASK-06 cite: `mac_lm_head` `1271398400`; weight bytes `2542796800`; $I=1$ vs weights.
 - TASK-07 cite: `param_bf16`, `rms_hidden`, `gemm_lm_head`.
 
 ### `mtp_mix`
 
-- Ops: RMSNorm of `e_next` and of `h_64`; concat embed-then-hidden; \(W_\text{fc}\) `(23)` → `mtp_u` (MTP block residual input).
+- Ops: RMSNorm of `e_next` and of `h_64`; concat embed-then-hidden; $W_\text{fc}$ `(23)` → `mtp_u` (MTP block residual input).
 - Inputs: `h_64`, `e_next`. Outputs: `mtp_u`.
 - State: none. Internals (`mtp_mix_internal_ids`, this order): `e_next_n`, `h64_n`, `mtp_cat`.
 - Flexibilities: `fuse_internals`; `split_at_internal` candidate `mtp_cat`; `recompute_ephemeral`.
@@ -251,7 +251,7 @@ JSON array `sync_edge_ids` in this exact order (14 ids). JSON `n_sync_edges` =
 
 | id | Class | From → to | Catalog IDs |
 | --- | --- | --- | --- |
-| `identity_e_h0` | `identity` | `embed` → first mixer | `e` identified as \(h^{(0)}\) |
+| `identity_e_h0` | `identity` | `embed` → first mixer | `e` identified as $h^{(0)}$ |
 | `residual_h` | `residual` | `mlp` → next mixer or `h_64` | `h` / `h_64` |
 | `residual_h_mid` | `residual` | mixer → `mlp` | `h_mid` |
 | `fanout_h64` | `fanout` | last language `mlp` → `lm_head` and `mtp_mix` | `h_64` |
@@ -269,10 +269,10 @@ JSON array `sync_edge_ids` in this exact order (14 ids). JSON `n_sync_edges` =
 These 14 edges **are** the synchronization/materialization edges named by the
 ledger. TASK-12 may fuse **across** a non-state, non-output edge only as a
 HYPOTHESIS that merges or bypasses node types; this document does not authorize
-that merge. State edges cannot be dropped: omitting a KV/\(C\)/\(S\) write
+that merge. State edges cannot be dropped: omitting a KV/$C$/$S$ write
 changes the map.
 
-Optional vision replace into \(h^{(0)}\) annotates `identity_e_h0`; it is not a
+Optional vision replace into $h^{(0)}$ annotates `identity_e_h0`; it is not a
 15th edge type and not a node (`vision_interface_is_not_a_node` true).
 
 Diagram 1 of 1. Six semantic node types, residual / MTP / output edges, and
@@ -321,26 +321,26 @@ flowchart TB
 
 Cite; do not recopy TASK-06 tables or TASK-07’s 20-row severity table. MAC
 integers are TASK-06 identities recomputed from `text_config` (full proj
-\(12288\cdot5120+2\cdot1024\cdot5120+5120\cdot6144\); linear token sum; MLP
-\(3IH\); `lm_head` \(VH\); GDN \(3\cdot48\cdot128\cdot128\); `mtp.fc`
-\(H\cdot 2H\)).
+$12288\cdot5120+2\cdot1024\cdot5120+5120\cdot6144$; linear token sum; MLP
+$3IH$; `lm_head` $VH$; GDN $3\cdot48\cdot128\cdot128$; `mtp.fc`
+$H\cdot 2H$).
 
 | JSON key | Value | Cite |
 | --- | ---: | --- |
 | `mac_embed` | 0 | gather, not a contraction |
 | `mac_full_proj_per_layer` | 104857600 | T-free full proj including `q\|g` |
-| `mac_attn_coeff_per_full_layer` | 12288 | \(A\) per full layer |
+| `mac_attn_coeff_per_full_layer` | 12288 | $A$ per full layer |
 | `mac_lin_token_per_layer` | 118235136 | projs + conv 40960 + GDN 2359296 + `out_proj` |
-| `mac_mlp_per_layer` | 267386880 | \(3IH\) |
-| `mac_lm_head` | 1271398400 | \(VH\) |
-| `mac_mtp_fc` | 52428800 | \(H\cdot 2H\) |
-| `weight_gather_bytes_per_row` | 10240 | BF16 row of \(E\) |
+| `mac_mlp_per_layer` | 267386880 | $3IH$ |
+| `mac_lm_head` | 1271398400 | $VH$ |
+| `mac_mtp_fc` | 52428800 | $H\cdot 2H$ |
+| `weight_gather_bytes_per_row` | 10240 | BF16 row of $E$ |
 | `kv_bytes_per_full_layer_per_token` | 4096 | one full/MTP KV instance |
 | `kv_bytes_all_per_token` | 69632 | 17 instances |
-| `c_bytes_per_layer` | 61440 | \(C\) delay line |
-| `s_bytes_per_layer` | 3145728 | conceptual F32 \(S\) |
+| `c_bytes_per_layer` | 61440 | $C$ delay line |
+| `s_bytes_per_layer` | 3145728 | conceptual F32 $S$ |
 | `s_bytes_all` | 150994944 | 48 linear layers |
-| `weight_bytes_lm_head` | 2542796800 | shared \(W_\text{lm}\) |
+| `weight_bytes_lm_head` | 2542796800 | shared $W_\text{lm}$ |
 
 Intensities (DERIVED identities, not SKU rankings): `i_mlp_weight_only` 1,
 `i_lm_head_weight_only` 1, `i_gdn_vs_s_rw` 0.75, `i_attn_core_vs_kv` 6.

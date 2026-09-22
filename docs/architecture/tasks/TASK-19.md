@@ -14,9 +14,9 @@ Produce `docs/architecture/performance-validation.md` as the Phase 1 **performan
 
 - Constraints:
   - `docs/architecture/plan.md` is authoritative for study scope; do not modify it.
-  - Work/traffic minima, decode \(W=C+AT\), prefill \(W=TC+AT(T+1)/2\), unique-weight / state / activation channels, and example horizons come from `docs/architecture/work-and-traffic.md` (TASK-06). Decode one-token schedule, stage kinds, and GEMV consumers come from `docs/architecture/decode-plan.md` (TASK-13). Prefill many-token schedule, five fundamental differences, and GEMM consumers come from `docs/architecture/prefill-plan.md` (TASK-14). Eighteen unselected mappings, six node types, seven evaluation criteria, and SKU-UNKNOWN instantiation come from `docs/architecture/cuda-design-space.md` (TASK-17). TASK-16 SKU symbols and F1–F14 are cited through TASK-17 / `cuda-hardware-model.md`; do not recopy the hardware-model catalog as a new vocabulary study. TASK-18 tok/s-is-not-quality is cited; do not rewrite NLL methodology.
-  - Label claims `OBSERVED` (sitting `text_config` / inventory already established; TASK-16 \(N_w=32\), \(N_{\text{bank}}=32\)), `DERIVED` (MAC/byte citations, tok/s and latency **formulas**, identity/coverage contracts), `HYPOTHESIS` (every methodology-risk severity), or `UNKNOWN` (sitting-SKU numeric limits; vision-encoder internals). No new `MEASURED` tok/s, occupancy, bandwidth, latency, or NLL. Protocol limits are **methodology contracts**, not measured tables.
-  - GitHub Markdown math. Cite TASK-06 MAC/byte integers, TASK-13/14 stage kinds and \(T\) convention, TASK-11 node types via TASK-17, TASK-16 SKU JSON ids, TASK-18 `toks_is_not_quality_axis`. Do not rewrite forward math, recopy TASK-06 MAC tables as a new work study, recopy TASK-13/14 schedules, or recopy TASK-17’s eighteen mappings as a new design space.
+  - Work/traffic minima, decode $W=C+AT$, prefill $W=TC+AT(T+1)/2$, unique-weight / state / activation channels, and example horizons come from `docs/architecture/work-and-traffic.md` (TASK-06). Decode one-token schedule, stage kinds, and GEMV consumers come from `docs/architecture/decode-plan.md` (TASK-13). Prefill many-token schedule, five fundamental differences, and GEMM consumers come from `docs/architecture/prefill-plan.md` (TASK-14). Eighteen unselected mappings, six node types, seven evaluation criteria, and SKU-UNKNOWN instantiation come from `docs/architecture/cuda-design-space.md` (TASK-17). TASK-16 SKU symbols and F1–F14 are cited through TASK-17 / `cuda-hardware-model.md`; do not recopy the hardware-model catalog as a new vocabulary study. TASK-18 tok/s-is-not-quality is cited; do not rewrite NLL methodology.
+  - Label claims `OBSERVED` (sitting `text_config` / inventory already established; TASK-16 $N_w=32$, $N_{\text{bank}}=32$), `DERIVED` (MAC/byte citations, tok/s and latency **formulas**, identity/coverage contracts), `HYPOTHESIS` (every methodology-risk severity), or `UNKNOWN` (sitting-SKU numeric limits; vision-encoder internals). No new `MEASURED` tok/s, occupancy, bandwidth, latency, or NLL. Protocol limits are **methodology contracts**, not measured tables.
+  - GitHub Markdown math. Cite TASK-06 MAC/byte integers, TASK-13/14 stage kinds and $T$ convention, TASK-11 node types via TASK-17, TASK-16 SKU JSON ids, TASK-18 `toks_is_not_quality_axis`. Do not rewrite forward math, recopy TASK-06 MAC tables as a new work study, recopy TASK-13/14 schedules, or recopy TASK-17’s eighteen mappings as a new design space.
   - Allowed evidence: TASK-06 work-and-traffic, TASK-13 decode-plan, TASK-14 prefill-plan, TASK-17 cuda-design-space, sitting `config.json` `text_config`, plan evidence vocabulary, this dossier, and the performance-evidence identity/coverage/time-accounting **contracts** as methodology (not as executed traces). TASK-01/04/11/16 integers and ids already cited by those documents may be **cited** through them. TASK-18 is cited only for the tok/s-is-not-quality split. No Quartz, llama.cpp/GGML Qwen, or `models/Qwen3.8-27B-Q4_K_M.gguf`. No `deviceQuery`, Nsight, CUPTI, SASS, or `*.cu` / `*.cuh` kernel bodies.
 - Non-goals:
   - No implementation benchmarks (`benchmarks_run` false, `toks_measured_here` false). No Nsight, ncu, nsys, CUPTI, `deviceQuery`, occupancy dumps, or sitting-GPU clocks.
@@ -39,19 +39,19 @@ Produce `docs/architecture/performance-validation.md` as the Phase 1 **performan
 - `docs/architecture/plan.md:35-52` — BF16 checkpoint authority; GGUF is not an architectural constraint; Quartz/llama.cpp inspection forbidden until freeze; CUDA hardware documentation is allowed (consumed here via TASK-16/17 citations, not by inspecting kernels or running `deviceQuery`).
 - `docs/architecture/plan.md:54-74` — evidence labels; hypotheses remain hypotheses; GitHub Markdown math.
 - `docs/architecture/plan.md:93-96` — TASK-17 maps semantic nodes and layouts into CUDA experiment spaces; TASK-18 defines quality validation; TASK-19 defines end-to-end and kernel performance methodology.
-- `docs/architecture/task_ledger.md` TASK-06 established results — decode \(W=C+AT\); prefill \(W=TC+AT(T+1)/2\); \(C_\text{complete}=27433238528\), \(A_\text{complete}=208896\); unique non-embed `52098598912`; six HYPOTHESIS bottleneck labels; example horizons \(T\in\{1,4096\}\).
-- `docs/architecture/task_ledger.md` TASK-13 established results — nine stage kinds; decode GEMV; one-token \(T_\text{new}=1\) with populated \((K,V,C,S)\); unique-weight/state extra 0; fusion/packing unselected.
-- `docs/architecture/task_ledger.md` TASK-14 established results — nine stage kinds; prefill GEMM; five fundamental differences; incoming state zeros; distinct views unselected; at \(T=1\) MAC prefill = decode (traffic still differs).
-- `docs/architecture/task_ledger.md` TASK-16 established results — SKU-UNKNOWN table; \(N_w=32\), \(N_{\text{bank}}=32\); F1–F14; sitting limits remain UNKNOWN until a future measured SKU table (this task defines the fill **protocol**, not the numbers).
+- `docs/architecture/task_ledger.md` TASK-06 established results — decode $W=C+AT$; prefill $W=TC+AT(T+1)/2$; $C_\text{complete}=27433238528$, $A_\text{complete}=208896$; unique non-embed `52098598912`; six HYPOTHESIS bottleneck labels; example horizons $T\in\{1,4096\}$.
+- `docs/architecture/task_ledger.md` TASK-13 established results — nine stage kinds; decode GEMV; one-token $T_\text{new}=1$ with populated $(K,V,C,S)$; unique-weight/state extra 0; fusion/packing unselected.
+- `docs/architecture/task_ledger.md` TASK-14 established results — nine stage kinds; prefill GEMM; five fundamental differences; incoming state zeros; distinct views unselected; at $T=1$ MAC prefill = decode (traffic still differs).
+- `docs/architecture/task_ledger.md` TASK-16 established results — SKU-UNKNOWN table; $N_w=32$, $N_{\text{bank}}=32$; F1–F14; sitting limits remain UNKNOWN until a future measured SKU table (this task defines the fill **protocol**, not the numbers).
 - `docs/architecture/task_ledger.md` TASK-17 established results — 18 unselected mappings; seven criteria with UNKNOWN SKU; mapping winner remains open until TASK-19 **measurements** (this increment specifies the methodology and does not run those measurements or select a winner).
 - `docs/architecture/task_ledger.md` TASK-18 established results — teacher-forced NLL is the quality axis; `toks_is_not_quality_axis` true; `v_toks_as_quality` named.
 - `docs/architecture/task_ledger.md` TASK-19 row — produces `docs/architecture/performance-validation.md`; purpose is decode, prefill, kernel, memory, and end-to-end performance measurements; open question (exact hardware, prompt matrix, reproducibility protocol) is **not** closed here; completion is named decode/prefill/kernel metrics, e2e required alongside microbenchmarks, and no implementation benchmarks in this study task. Downstream: architectural experiments evaluated fairly.
-- `docs/architecture/work-and-traffic.md` — MAC identities; three traffic channels; \(T\) convention; bottleneck labels HYPOTHESIS.
+- `docs/architecture/work-and-traffic.md` — MAC identities; three traffic channels; $T$ convention; bottleneck labels HYPOTHESIS.
 - `docs/architecture/decode-plan.md` — decode consumers; serial one-token order; stage-cut vs unavoidable.
 - `docs/architecture/prefill-plan.md` — prefill consumers; `diff_matrix_matrix` / `diff_tiling` / `diff_reuse` / `diff_state` / `diff_temporary_storage`.
 - `docs/architecture/cuda-design-space.md` — six `node_type_ids`; 18 `mapping_ids` unselected; SKU still UNKNOWN; “TASK-19 owns measurements and the sitting SKU table.”
 - `docs/architecture/cuda-hardware-model.md` — `sku_unknown_symbols` (17 ids); theoretical occupancy F8; achieved occupancy out of scope **there**; this methodology names achieved occupancy as a future kernel metric without measuring it.
-- `docs/architecture/quantization-validation.md` — tok/s is not Pareto \(Y\); do not mix TASK-18 quality with TASK-19 performance.
+- `docs/architecture/quantization-validation.md` — tok/s is not Pareto $Y$; do not mix TASK-18 quality with TASK-19 performance.
 - `.cache/authorities/qwen3.8-27b-transformers/config.json` — live `text_config` for occupancy arithmetic. Do not read safetensor payloads. Do not read GGUF.
 - `scripts/check_work_and_traffic.py` / `check_decode_plan.py` / `check_prefill_plan.py` / `check_cuda_design_space.py` / `check_quantization_validation.py` — checker-style precedent. TASK-19’s checker is a sibling; do not import them.
 
@@ -74,17 +74,17 @@ N/A — performance **evaluation-methodology** documentation. No prefill/decode/
 
 ### Authority for performance-methodology claims
 
-If a MAC or byte total would disagree with TASK-06 / sitting `text_config`, or a stage kind / \(T\) convention would disagree with TASK-13/14, or a node type / mapping id / evaluation criterion / SKU symbol would disagree with TASK-17/16, the earlier document wins and this one is wrong.
+If a MAC or byte total would disagree with TASK-06 / sitting `text_config`, or a stage kind / $T$ convention would disagree with TASK-13/14, or a node type / mapping id / evaluation criterion / SKU symbol would disagree with TASK-17/16, the earlier document wins and this one is wrong.
 
 - Prefill and decode share **one** semantic graph (TASK-11) and **one** compiled artifact (TASK-09 via TASK-17). They do **not** share one performance metric identity. Decode-only tok/s is not prefill tok/s and not complete-request latency.
 - Primary object is language+MTP **complete map** (135 node instances). Language-only is a secondary row, not a substitute identity.
-- Algebraic equivalents in TASK-02 remain the same real map. Chunkwise GDN is not zero \(S\) traffic. At \(T=1\), MAC prefill = decode; C/S physical reads still differ (zeros vs populated). That equality does **not** license reporting T=1 prefill as decode-only.
+- Algebraic equivalents in TASK-02 remain the same real map. Chunkwise GDN is not zero $S$ traffic. At $T=1$, MAC prefill = decode; C/S physical reads still differ (zeros vs populated). That equality does **not** license reporting T=1 prefill as decode-only.
 - A named metric is not a measured table. Listing `dec_toks` does not produce a tok/s number.
 - Unique weight bytes are counted **once** per complete decode/prefill as a TASK-06 lower-bound **identity**, not as measured HBM traffic.
 - Do not inspect Quartz, llama.cpp, or GGUF kernels to “confirm” timers, graph capture, or tok/s harnesses.
 - Do not fill TASK-16 UNKNOWN symbols from a datasheet or sitting `cudaGetDeviceProperties`.
 - Do not select a mapping winner. Closing the three completion criteria does **not** close hardware, prompt matrix, reproducibility protocol, or TASK-17’s mapping-winner question.
-- TASK-18 quality remains disjoint: tok/s is not Pareto \(Y\).
+- TASK-18 quality remains disjoint: tok/s is not Pareto $Y$.
 
 ### Deliverable structure (`docs/architecture/performance-validation.md`)
 
@@ -94,8 +94,8 @@ Title: `# Qwen3.8-27B performance methodology (TASK-19)` (not `TASK-19` alone).
 
 1. **Authority** — this dossier, work-and-traffic, decode-plan, prefill-plan, cuda-design-space, cuda-hardware-model via TASK-17, config, checker; evidence labels; in-scope (language+MTP decode/prefill/kernel/memory/end-to-end methodology + identity/coverage/SKU-fill protocol) vs deferred (vision encoder; sitting SKU numbers; selected hardware/prompts/repro; mapping winner). State that the document specifies an **evaluation methodology**, not measurements, and not a selected mapping.
 2. **Measurement convention** — the five canonical sentences below plus the methodology sentence; five metric families; five metric classes; first-token convention; open question stays open.
-3. **Decode metrics** — four metric ids; decode-only identity; \(W=C+AT\) citation. Completes ledger checkbox 1 (decode).
-4. **Prefill metrics** — four metric ids; prefill identity; \(W=TC+AT(T+1)/2\) citation; T=1 MAC equality does not imply equal traffic. Completes ledger checkbox 1 (prefill).
+3. **Decode metrics** — four metric ids; decode-only identity; $W=C+AT$ citation. Completes ledger checkbox 1 (decode).
+4. **Prefill metrics** — four metric ids; prefill identity; $W=TC+AT(T+1)/2$ citation; T=1 MAC equality does not imply equal traffic. Completes ledger checkbox 1 (prefill).
 5. **Kernel metrics** — five metric ids; graph envelope ≠ leaf; coverage before ranking; microbenchmarks cannot pass a mapping. Completes ledger checkbox 1 (kernel).
 6. **Memory metrics** — five metric ids; three TASK-06 channels plus achieved HBM and working-set high-water; lower bounds are not measured bandwidth.
 7. **End-to-end metrics** — three metric ids; complete-request primary is latency; e2e required alongside microbenchmarks. Completes ledger checkbox 2.
@@ -135,7 +135,7 @@ Bullets required under that heading:
 - Decode-only tok/s is not prefill tok/s and not complete-request latency (`decode_is_not_prefill` true; `decode_is_not_complete_request` true).
 - Microbenchmarks (kernel + memory component windows) cannot pass a mapping (`microbenchmark_cannot_pass_mapping` true). End-to-end measurement is required alongside them (`e2e_required_alongside_microbenchmarks` true).
 - `example_T_values` `[1, 4096]` are illustration horizons for MAC/byte citations, not a selected prompt matrix (`example_T_is_not_prompt_matrix` true).
-- Model context horizon is `max_position_embeddings` \(T_{\text{ctx max}}=262144\). Do not confuse it with TASK-16 SKU `T_max` (max threads per SM). JSON `model_T_max` = 262144. JSON SKU id `T_max` remains a `sku_unknown_symbols` entry.
+- Model context horizon is `max_position_embeddings` $T_{\text{ctx max}}=262144$. Do not confuse it with TASK-16 SKU `T_max` (max threads per SM). JSON `model_T_max` = 262144. JSON SKU id `T_max` remains a `sku_unknown_symbols` entry.
 - Primary coverage includes MTP (135 instances). Language-only is secondary.
 - Fan-out ≠ must-store still holds; naming a metric is not a CUDA timer and not a measured table.
 - No MEASURED tok/s, occupancy, or bandwidth in this document (`toks_measured_here` false; `benchmarks_run` false; `experiments_run` false).
@@ -166,24 +166,24 @@ JSON array `decode_metric_ids` in this exact order (4 ids). JSON `n_decode_metri
 
 | ID | Class | Meaning |
 | --- | --- | --- |
-| `dec_toks` | decode_only | \((N_{\mathrm{gen}}-1)/t_{\mathrm{decode}}\) with \(N_{\mathrm{gen}}\ge 2\); \(t_{\mathrm{decode}}\) excludes setup, graph creation, warmup, prefill/TTFT, and checkpoint restore |
+| `dec_toks` | decode_only | $(N_{\mathrm{gen}}-1)/t_{\mathrm{decode}}$ with $N_{\mathrm{gen}}\ge 2$; $t_{\mathrm{decode}}$ excludes setup, graph creation, warmup, prefill/TTFT, and checkpoint restore |
 | `dec_step_ms` | decode_only | Mean GPU time per subsequent generated token in the decode-only window |
 | `dec_p50_step_ms` | decode_only | Median per-step GPU time in that window |
 | `dec_p99_step_ms` | decode_only | 99th-percentile per-step GPU time in that window |
 
-Decode-only formula (DERIVED methodology; not measured here). After a length-\(T\) prompt with incoming \((K,V,C,S)\) **populated** (TASK-13), \(T_{\text{new}}=1\) per step:
+Decode-only formula (DERIVED methodology; not measured here). After a length-$T$ prompt with incoming $(K,V,C,S)$ **populated** (TASK-13), $T_{\text{new}}=1$ per step:
 
-\[
+$$
 \mathrm{tok/s}_{\mathrm{dec}}=\frac{N_{\mathrm{gen}}-1}{t_{\mathrm{decode}}},\qquad N_{\mathrm{gen}}\ge 2.
-\]
+$$
 
 Cite TASK-06 decode work as the **bound identity**, not a timer:
 
-\[
+$$
 W_{\mathrm{decode}}=C+AT,
-\]
+$$
 
-with \(C_\text{complete}=27433238528\), \(A_\text{complete}=208896\) (DERIVED citation). JSON `mac_C_complete` = 27433238528. JSON `mac_A_complete` = 208896. JSON `decode_work_identity` = `"C+AT"`. JSON `decode_T_new` = 1. JSON `decode_incoming_state` = `"populated"`.
+with $C_\text{complete}=27433238528$, $A_\text{complete}=208896$ (DERIVED citation). JSON `mac_C_complete` = 27433238528. JSON `mac_A_complete` = 208896. JSON `decode_work_identity` = `"C+AT"`. JSON `decode_T_new` = 1. JSON `decode_incoming_state` = `"populated"`.
 
 Prose required: setup, graph creation, warmup, and checkpoint restore stay outside the decode-only denominator. TTFT is not decode-only. Do not report a single-token “decode” as `dec_toks`.
 
@@ -193,26 +193,26 @@ JSON array `prefill_metric_ids` in this exact order (4 ids). JSON `n_prefill_met
 
 | ID | Class | Meaning |
 | --- | --- | --- |
-| `pre_toks` | prefill | \(T/t_{\mathrm{prefill}}\) for a length-\(T\) prompt with incoming \((K,V,C,S)\) **zeros** (TASK-14) |
+| `pre_toks` | prefill | $T/t_{\mathrm{prefill}}$ for a length-$T$ prompt with incoming $(K,V,C,S)$ **zeros** (TASK-14) |
 | `pre_ms` | prefill | Prefill-window wall (same exclusions as decode-only: setup, graph create, warmup, restore) |
 | `pre_ttft_ms` | prefill | Time to first generated token; equals the prefill window under `ttft_in_prefill` |
-| `pre_mac_cite` | prefill | TASK-06 \(W=TC+AT(T+1)/2\) citation for the same \(T\); not a timer |
+| `pre_mac_cite` | prefill | TASK-06 $W=TC+AT(T+1)/2$ citation for the same $T$; not a timer |
 
 Prefill formula (DERIVED methodology; not measured here):
 
-\[
+$$
 \mathrm{tok/s}_{\mathrm{pre}}=\frac{T}{t_{\mathrm{prefill}}}.
-\]
+$$
 
 Prefill work identity:
 
-\[
+$$
 W_{\mathrm{prefill}}=TC+\frac{AT(T+1)}{2}.
-\]
+$$
 
 JSON `prefill_work_identity` = `"TC+AT(T+1)/2"`. JSON `prefill_incoming_state` = `"zeros"`. JSON `t1_mac_equal_does_not_imply_equal_traffic` true. JSON `mac_decode_complete_T1` = 27433447424. JSON `mac_prefill_complete_T1` = 27433447424 (TASK-06; T=1 MAC equality). JSON `mac_decode_complete_T4096` = 28288876544. JSON `mac_prefill_complete_T4096` = 114119319486464.
 
-Prose required: at \(T=1\), MAC prefill equals MAC decode; C/S physical reads still differ. Do not report T=1 `pre_toks` as `dec_toks`. Prefill numerator is prompt length \(T\), not \(T+1\) first-token padding.
+Prose required: at $T=1$, MAC prefill equals MAC decode; C/S physical reads still differ. Do not report T=1 `pre_toks` as `dec_toks`. Prefill numerator is prompt length $T$, not $T+1$ first-token padding.
 
 ### Kernel metrics (lock)
 
@@ -242,15 +242,15 @@ JSON array `memory_metric_ids` in this exact order (5 ids). JSON `n_memory_metri
 
 | ID | Class | Meaning |
 | --- | --- | --- |
-| `mem_hbm_gbps` | memory | Achieved device-global bandwidth in a covered window; compare later to SKU \(\Beta\) only after SKU fill |
+| `mem_hbm_gbps` | memory | Achieved device-global bandwidth in a covered window; compare later to SKU $\Beta$ only after SKU fill |
 | `mem_weight_bytes` | memory | Unique weight bytes moved in the window; TASK-06 unique non-embed `52098598912` is the lower-bound **identity**, not measured traffic |
-| `mem_state_bytes` | memory | \(K,V,C,S\) traffic versus TASK-04/06 decode-read / triangular-prefill identities |
+| `mem_state_bytes` | memory | $K,V,C,S$ traffic versus TASK-04/06 decode-read / triangular-prefill identities |
 | `mem_act_bytes` | memory | Activation traffic versus TASK-06 forced / region-cut / GEMM-IO views |
 | `mem_working_set` | memory | Allocated high-water with an explicit identity; not a proven live-set without coverage |
 
 JSON `weight_bytes_unique_non_embed` = 52098598912. JSON `weight_bytes_language_mtp_excl_vision` = 54641395712. JSON `lower_bound_is_not_measured_bandwidth` true. JSON `peak_memory_is_not_live_set` true. JSON `n_traffic_channels` = 3. JSON `traffic_channel_ids` = `["weight","state","activation"]`.
 
-Prose required: TASK-06 bytes are DERIVED minima. Bytes divided by assumed \(\Beta\) is a conditional estimate, not measured `mem_hbm_gbps`. Do not fill \(\Beta\) (`Beta_HBM`) here.
+Prose required: TASK-06 bytes are DERIVED minima. Bytes divided by assumed $\Beta$ is a conditional estimate, not measured `mem_hbm_gbps`. Do not fill $\Beta$ (`Beta_HBM`) here.
 
 ### End-to-end metrics (lock)
 
@@ -259,12 +259,12 @@ JSON array `e2e_metric_ids` in this exact order (3 ids). JSON `n_e2e_metrics` = 
 | ID | Class | Primary? | Meaning |
 | --- | --- | --- | --- |
 | `e2e_latency_ms` | complete_request | **primary** | Wall from first in-window prompt ingest to last generated token; setup/graph-create/warmup/restore excluded |
-| `e2e_output_toks` | complete_request | secondary | \(N_{\mathrm{gen}}/t_{\mathrm{e2e}}\); **not** decode-only; **not** \((T+N_{\mathrm{gen}})/t_{\mathrm{e2e}}\) unless that mixed identity is declared separately and never compared to `dec_toks` |
+| `e2e_output_toks` | complete_request | secondary | $N_{\mathrm{gen}}/t_{\mathrm{e2e}}$; **not** decode-only; **not** $(T+N_{\mathrm{gen}})/t_{\mathrm{e2e}}$ unless that mixed identity is declared separately and never compared to `dec_toks` |
 | `e2e_ttft_ms` | complete_request | diagnostic | Same window as `pre_ttft_ms` under `ttft_in_prefill`; still complete-request family when reported beside `e2e_latency_ms` |
 
 JSON `e2e_primary_id` = `"e2e_latency_ms"`. JSON `e2e_mixed_toks_is_not_decode_only` true. JSON `e2e_required_alongside_microbenchmarks` true. JSON `complete_request_vs_decode_only_forbidden` true.
 
-Prose required: refuse a complete-request versus decode-only comparison. Mixed \((T+N_{\mathrm{gen}})/t_{\mathrm{e2e}}\) is not `dec_toks` and is not `pre_toks`. End-to-end measurement is **required alongside** kernel and memory microbenchmarks; it is not optional colour. This document still selects no winner (`mapping_winner_selected` false).
+Prose required: refuse a complete-request versus decode-only comparison. Mixed $(T+N_{\mathrm{gen}})/t_{\mathrm{e2e}}$ is not `dec_toks` and is not `pre_toks`. End-to-end measurement is **required alongside** kernel and memory microbenchmarks; it is not optional colour. This document still selects no winner (`mapping_winner_selected` false).
 
 ### Identity, coverage, and time accounting (lock)
 
@@ -281,7 +281,7 @@ JSON array `identity_field_ids` in this exact order (15 ids). JSON `n_identity_f
 | `output_eval_counts` | Output / eval counts |
 | `first_token_convention` | Must equal `ttft_in_prefill` unless a later task records a different declared convention |
 | `allocated_capacity` | Allocated KV/state capacity |
-| `populated_length` | Populated length \(T\) |
+| `populated_length` | Populated length $T$ |
 | `sampling_output_policy` | Sampling / output policy (unselected here) |
 | `graph_mode` | Graph / eager mode |
 | `clocks_residents` | Clock and residency policy |
@@ -340,14 +340,14 @@ JSON array `methodology_risk_ids` in this exact order (8 ids). JSON `n_methodolo
 
 | ID | Deferred or pair | Severity | Why it can mislead |
 | --- | --- | --- | --- |
-| `v_mixed_identity` | class mismatch | high | Comparing decode-only tok/s to complete-request latency (or mixed \((T+N)/t\)) |
+| `v_mixed_identity` | class mismatch | high | Comparing decode-only tok/s to complete-request latency (or mixed $(T+N)/t$) |
 | `v_envelope_as_leaf` | `k_graph_envelope_ms` | high | Ranking sinks from graph envelopes without leaf / node tracing |
 | `v_micro_as_winner` | kernel/memory only | high | Declaring a TASK-17 mapping winner from microbenchmarks without e2e |
 | `v_missing_coverage_zero` | coverage | high | Treating unclassified work as zero excess |
 | `v_bound_as_measured` | TASK-06 | medium | Treating MAC/byte lower bounds as measured traffic or tok/s |
 | `v_datasheet_sku` | SKU table | medium | Filling `sku_unknown_symbols` from a datasheet without sitting identity |
-| `v_t1_prefill_as_decode` | \(T=1\) | medium | Equating T=1 prefill with decode because MAC matches |
-| `v_toks_as_quality` | TASK-18 | low | Using tok/s as Pareto \(Y\) |
+| `v_t1_prefill_as_decode` | $T=1$ | medium | Equating T=1 prefill with decode because MAC matches |
+| `v_toks_as_quality` | TASK-18 | low | Using tok/s as Pareto $Y$ |
 
 JSON `n_methodology_high` = 4. JSON `n_methodology_medium` = 3. JSON `n_methodology_low` = 1. JSON `methodology_risk_usefulness_label` exactly `HYPOTHESIS`. JSON `methodology_risk_severities` = `["high","high","high","high","medium","medium","medium","low"]`.
 
@@ -359,7 +359,7 @@ Vision-encoder internals remain `UNKNOWN` and out of the primary map. Residual-s
 
 ### Non-decisions (prose under SKU heading or a short paragraph at end of heading 9)
 
-TASK-19 owns the **methodology** for measurements and for filling the sitting SKU table; it does not own a filled table in this increment. TASK-17 still owns mapping **selection** after future measurements (`ledger_open_question_mapping_winner_closed` false). TASK-15 still owns layout selection. TASK-12/13/14 still own fusion winners. TASK-14 still owns decode/prefill view selection. TASK-09 still owns artifact-boundary and ideal-sequence selection. TASK-08 still owns recipe winners. TASK-18 still owns quality/NLL. TASK-16 published identities \(N_w=32\), \(N_{\text{bank}}=32\) remain the only numeric SKU constants. State writes are not optional. Chunkwise GDN is not zero \(S\) traffic.
+TASK-19 owns the **methodology** for measurements and for filling the sitting SKU table; it does not own a filled table in this increment. TASK-17 still owns mapping **selection** after future measurements (`ledger_open_question_mapping_winner_closed` false). TASK-15 still owns layout selection. TASK-12/13/14 still own fusion winners. TASK-14 still owns decode/prefill view selection. TASK-09 still owns artifact-boundary and ideal-sequence selection. TASK-08 still owns recipe winners. TASK-18 still owns quality/NLL. TASK-16 published identities $N_w=32$, $N_{\text{bank}}=32$ remain the only numeric SKU constants. State writes are not optional. Chunkwise GDN is not zero $S$ traffic.
 
 ### Additional locked booleans and integers
 
@@ -512,10 +512,10 @@ Locked document integers that must appear as decimal substrings in the markdown 
   - Selecting a GPU, prompt matrix, warmup count, or clock lock: rejected; ledger open question stays open.
   - Selecting a TASK-17 mapping winner from named metrics: rejected; metrics are not measurements; `microbenchmark_cannot_pass_mapping`; `mapping_winner_selected` false.
   - Treating kernel microbenchmarks as sufficient acceptance: rejected; ledger checkbox 2 requires e2e alongside microbenchmarks.
-  - Reporting mixed \((T+N_{\mathrm{gen}})/t\) as decode-only tok/s: rejected; `v_mixed_identity`; `complete_request_vs_decode_only_forbidden`.
+  - Reporting mixed $(T+N_{\mathrm{gen}})/t$ as decode-only tok/s: rejected; `v_mixed_identity`; `complete_request_vs_decode_only_forbidden`.
   - Equating T=1 prefill with decode: rejected; `t1_mac_equal_does_not_imply_equal_traffic`.
   - Ranking from graph envelopes without leaf coverage: rejected; `graph_envelope_is_not_leaf`.
-  - Using tok/s as TASK-18 Pareto \(Y\): rejected; `toks_is_not_quality_axis`.
+  - Using tok/s as TASK-18 Pareto $Y$: rejected; `toks_is_not_quality_axis`.
   - Recopying TASK-06 MAC tables or TASK-17 eighteen mapping definitions as new studies: rejected; cite, do not replace.
   - Opening GGUF or inspecting Quartz/llama.cpp timers: forbidden by plan.md.
   - uv / Ruff / pytest for this increment: rejected; stdlib checker matches TASK-01–18.

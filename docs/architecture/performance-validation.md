@@ -13,7 +13,7 @@ many-token schedule and GEMM consumers come from
 [`docs/architecture/prefill-plan.md`](prefill-plan.md) (TASK-14). Eighteen
 unselected mappings, six node types, and seven evaluation criteria come from
 [`docs/architecture/cuda-design-space.md`](cuda-design-space.md) (TASK-17).
-TASK-16 SKU symbols and \(N_w=32\), \(N_{\text{bank}}=32\) are cited through
+TASK-16 SKU symbols and $N_w=32$, $N_{\text{bank}}=32$ are cited through
 TASK-17 / [`docs/architecture/cuda-hardware-model.md`](cuda-hardware-model.md).
 TASK-18 tok/s-is-not-quality is cited from
 [`docs/architecture/quantization-validation.md`](quantization-validation.md);
@@ -27,12 +27,12 @@ false). The primary object is language+MTP **complete map** (135 node
 instances). Language-only is a secondary row, not a substitute identity.
 
 If a MAC or byte total would disagree with TASK-06 / sitting `text_config`, or
-a stage kind / \(T\) convention would disagree with TASK-13/14, or a node type
+a stage kind / $T$ convention would disagree with TASK-13/14, or a node type
 / mapping id / evaluation criterion / SKU symbol would disagree with
 TASK-17/16, the earlier document wins and this one is wrong.
 
 Claims are labelled `OBSERVED` (sitting `text_config` / inventory already
-established; TASK-16 \(N_w=32\), \(N_{\text{bank}}=32\)), `DERIVED` (MAC/byte
+established; TASK-16 $N_w=32$, $N_{\text{bank}}=32$), `DERIVED` (MAC/byte
 citations, tok/s and latency **formulas**, identity/coverage contracts),
 `HYPOTHESIS` (every methodology-risk severity), or `UNKNOWN` (sitting-SKU
 numeric limits; vision-encoder internals). No new `MEASURED` tok/s, occupancy,
@@ -44,11 +44,11 @@ measured tables. A named metric is not a measured table.
 | Item | Value | Label |
 | --- | --- | --- |
 | Dossier | [`docs/architecture/tasks/TASK-19.md`](tasks/TASK-19.md) | — |
-| Work and traffic | [`docs/architecture/work-and-traffic.md`](work-and-traffic.md) (TASK-06) | \(W=C+AT\); \(W=TC+AT(T+1)/2\); MAC/byte citations |
-| Decode plan | [`docs/architecture/decode-plan.md`](decode-plan.md) (TASK-13) | one-token GEMV; populated \((K,V,C,S)\) |
+| Work and traffic | [`docs/architecture/work-and-traffic.md`](work-and-traffic.md) (TASK-06) | $W=C+AT$; $W=TC+AT(T+1)/2$; MAC/byte citations |
+| Decode plan | [`docs/architecture/decode-plan.md`](decode-plan.md) (TASK-13) | one-token GEMV; populated $(K,V,C,S)$ |
 | Prefill plan | [`docs/architecture/prefill-plan.md`](prefill-plan.md) (TASK-14) | many-token GEMM; incoming zeros |
 | CUDA design space | [`docs/architecture/cuda-design-space.md`](cuda-design-space.md) (TASK-17) | 18 mappings unselected; six node types |
-| CUDA hardware model | [`docs/architecture/cuda-hardware-model.md`](cuda-hardware-model.md) (TASK-16) via TASK-17 | SKU-UNKNOWN; \(N_w=32\), \(N_{\text{bank}}=32\) |
+| CUDA hardware model | [`docs/architecture/cuda-hardware-model.md`](cuda-hardware-model.md) (TASK-16) via TASK-17 | SKU-UNKNOWN; $N_w=32$, $N_{\text{bank}}=32$ |
 | Config | [`.cache/authorities/qwen3.8-27b-transformers/config.json`](../../.cache/authorities/qwen3.8-27b-transformers/config.json) `text_config` | OBSERVED |
 | Checker | [`scripts/check_performance_validation.py`](../../scripts/check_performance_validation.py) | DERIVED |
 | Evidence policy | [`docs/architecture/plan.md`](plan.md) (OBSERVED / DERIVED / HYPOTHESIS / UNKNOWN) | OBSERVED |
@@ -60,13 +60,13 @@ Numeric ranks instantiate sitting `text_config` OBSERVED: `hidden_size` 5120,
 `intermediate_size` 17408, `vocab_size` 248320, 64 decoder layers, 48 linear +
 16 full at indices `[3, 7, 11, 15, 19, 23, 27, 31, 35, 39, 43, 47, 51, 55, 59, 63]`,
 `mtp_num_hidden_layers` 1, `dtype` `"bfloat16"`, `mamba_ssm_dtype` `"float32"`,
-`max_position_embeddings` \(T_{\text{ctx max}}=262144\). Language+MTP occupancy
+`max_position_embeddings` $T_{\text{ctx max}}=262144$. Language+MTP occupancy
 is 27320697856 parameters / 54641395712 BF16 bytes (OBSERVED). Unique non-embed
 weight bytes are 52098598912 (TASK-06). Complete map: 135 node instances
 (2 `embed`, 17 `gated_attn`, 48 `gated_delta_net`, 65 `mlp`, 2 `lm_head`,
-1 `mtp_mix`). MAC citations (DERIVED, TASK-06): \(C_\text{complete}=27433238528\),
-\(A_\text{complete}=208896\); T=1 decode = T=1 prefill MAC \(27433447424\);
-T=4096 decode \(28288876544\); T=4096 prefill \(114119319486464\).
+1 `mtp_mix`). MAC citations (DERIVED, TASK-06): $C_\text{complete}=27433238528$,
+$A_\text{complete}=208896$; T=1 decode = T=1 prefill MAC $27433447424$;
+T=4096 decode $28288876544$; T=4096 prefill $114119319486464$.
 
 ## Measurement convention
 
@@ -90,7 +90,7 @@ JSON: `canonical_sentence_logical` = sentence 1; `canonical_sentence_methodology
 - Decode-only tok/s is not prefill tok/s and not complete-request latency (`decode_is_not_prefill` true; `decode_is_not_complete_request` true).
 - Microbenchmarks (kernel + memory component windows) cannot pass a mapping (`microbenchmark_cannot_pass_mapping` true). End-to-end measurement is required alongside them (`e2e_required_alongside_microbenchmarks` true).
 - `example_T_values` `[1, 4096]` are illustration horizons for MAC/byte citations, not a prompt matrix (`example_T_is_not_prompt_matrix` true).
-- Model context horizon is `max_position_embeddings` \(T_{\text{ctx max}}=262144\). Do not confuse it with TASK-16 SKU `T_max` (max threads per SM). JSON `model_T_max` = 262144. JSON SKU id `T_max` remains a `sku_unknown_symbols` entry.
+- Model context horizon is `max_position_embeddings` $T_{\text{ctx max}}=262144$. Do not confuse it with TASK-16 SKU `T_max` (max threads per SM). JSON `model_T_max` = 262144. JSON SKU id `T_max` remains a `sku_unknown_symbols` entry.
 - Primary coverage includes MTP (135 instances). Language-only is secondary.
 - Fan-out ≠ must-store still holds; naming a metric is not a CUDA timer and not a measured table.
 - No MEASURED tok/s, occupancy, or bandwidth in this document (`toks_measured_here` false; `benchmarks_run` false; `experiments_run` false).
@@ -117,24 +117,24 @@ JSON array `decode_metric_ids` in this exact order (4 ids). JSON `n_decode_metri
 
 | ID | Class | Meaning |
 | --- | --- | --- |
-| `dec_toks` | decode_only | \((N_{\mathrm{gen}}-1)/t_{\mathrm{decode}}\) with \(N_{\mathrm{gen}}\ge 2\); \(t_{\mathrm{decode}}\) excludes setup, graph creation, warmup, prefill/TTFT, and checkpoint restore |
+| `dec_toks` | decode_only | $(N_{\mathrm{gen}}-1)/t_{\mathrm{decode}}$ with $N_{\mathrm{gen}}\ge 2$; $t_{\mathrm{decode}}$ excludes setup, graph creation, warmup, prefill/TTFT, and checkpoint restore |
 | `dec_step_ms` | decode_only | Mean GPU time per subsequent generated token in the decode-only window |
 | `dec_p50_step_ms` | decode_only | Median per-step GPU time in that window |
 | `dec_p99_step_ms` | decode_only | 99th-percentile per-step GPU time in that window |
 
-Decode-only formula (DERIVED methodology; not measured here). After a length-\(T\) prompt with incoming \((K,V,C,S)\) **populated** (TASK-13), \(T_{\text{new}}=1\) per step:
+Decode-only formula (DERIVED methodology; not measured here). After a length-$T$ prompt with incoming $(K,V,C,S)$ **populated** (TASK-13), $T_{\text{new}}=1$ per step:
 
-\[
+$$
 \mathrm{tok/s}_{\mathrm{dec}}=\frac{N_{\mathrm{gen}}-1}{t_{\mathrm{decode}}},\qquad N_{\mathrm{gen}}\ge 2.
-\]
+$$
 
 Cite TASK-06 decode work as the **bound identity**, not a timer:
 
-\[
+$$
 W_{\mathrm{decode}}=C+AT,
-\]
+$$
 
-with \(C_\text{complete}=27433238528\), \(A_\text{complete}=208896\) (DERIVED citation). JSON `mac_C_complete` = 27433238528. JSON `mac_A_complete` = 208896. JSON `decode_work_identity` = `"C+AT"`. JSON `decode_T_new` = 1. JSON `decode_incoming_state` = `"populated"`.
+with $C_\text{complete}=27433238528$, $A_\text{complete}=208896$ (DERIVED citation). JSON `mac_C_complete` = 27433238528. JSON `mac_A_complete` = 208896. JSON `decode_work_identity` = `"C+AT"`. JSON `decode_T_new` = 1. JSON `decode_incoming_state` = `"populated"`.
 
 Setup, graph creation, warmup, and checkpoint restore stay outside the decode-only denominator (`ta_setup_outside_rate`). TTFT is not decode-only. Do not report a single-token “decode” as `dec_toks`.
 
@@ -144,26 +144,26 @@ JSON array `prefill_metric_ids` in this exact order (4 ids). JSON `n_prefill_met
 
 | ID | Class | Meaning |
 | --- | --- | --- |
-| `pre_toks` | prefill | \(T/t_{\mathrm{prefill}}\) for a length-\(T\) prompt with incoming \((K,V,C,S)\) **zeros** (TASK-14) |
+| `pre_toks` | prefill | $T/t_{\mathrm{prefill}}$ for a length-$T$ prompt with incoming $(K,V,C,S)$ **zeros** (TASK-14) |
 | `pre_ms` | prefill | Prefill-window wall (same exclusions as decode-only: setup, graph create, warmup, restore) |
 | `pre_ttft_ms` | prefill | Time to first generated token; equals the prefill window under `ttft_in_prefill` |
-| `pre_mac_cite` | prefill | TASK-06 \(W=TC+AT(T+1)/2\) citation for the same \(T\); not a timer |
+| `pre_mac_cite` | prefill | TASK-06 $W=TC+AT(T+1)/2$ citation for the same $T$; not a timer |
 
 Prefill formula (DERIVED methodology; not measured here):
 
-\[
+$$
 \mathrm{tok/s}_{\mathrm{pre}}=\frac{T}{t_{\mathrm{prefill}}}.
-\]
+$$
 
 Prefill work identity:
 
-\[
+$$
 W_{\mathrm{prefill}}=TC+\frac{AT(T+1)}{2}.
-\]
+$$
 
 JSON `prefill_work_identity` = `"TC+AT(T+1)/2"`. JSON `prefill_incoming_state` = `"zeros"`. JSON `t1_mac_equal_does_not_imply_equal_traffic` true. JSON `mac_decode_complete_T1` = 27433447424. JSON `mac_prefill_complete_T1` = 27433447424 (TASK-06; T=1 MAC equality). JSON `mac_decode_complete_T4096` = 28288876544. JSON `mac_prefill_complete_T4096` = 114119319486464.
 
-At \(T=1\), MAC prefill equals MAC decode; C/S physical reads still differ (zeros vs populated). Do not report T=1 `pre_toks` as `dec_toks`. Prefill numerator is prompt length \(T\), not \(T+1\) first-token padding. Algebraic equivalents in TASK-02 remain the same real map. Chunkwise GDN is not zero \(S\) traffic.
+At $T=1$, MAC prefill equals MAC decode; C/S physical reads still differ (zeros vs populated). Do not report T=1 `pre_toks` as `dec_toks`. Prefill numerator is prompt length $T$, not $T+1$ first-token padding. Algebraic equivalents in TASK-02 remain the same real map. Chunkwise GDN is not zero $S$ traffic.
 
 ## Kernel metrics
 
@@ -191,15 +191,15 @@ JSON array `memory_metric_ids` in this exact order (5 ids). JSON `n_memory_metri
 
 | ID | Class | Meaning |
 | --- | --- | --- |
-| `mem_hbm_gbps` | memory | Achieved device-global bandwidth in a covered window; compare later to SKU \(\Beta\) only after SKU fill |
+| `mem_hbm_gbps` | memory | Achieved device-global bandwidth in a covered window; compare later to SKU $\Beta$ only after SKU fill |
 | `mem_weight_bytes` | memory | Unique weight bytes moved in the window; TASK-06 unique non-embed `52098598912` is the lower-bound **identity**, not measured traffic |
-| `mem_state_bytes` | memory | \(K,V,C,S\) traffic versus TASK-04/06 decode-read / triangular-prefill identities |
+| `mem_state_bytes` | memory | $K,V,C,S$ traffic versus TASK-04/06 decode-read / triangular-prefill identities |
 | `mem_act_bytes` | memory | Activation traffic versus TASK-06 forced / region-cut / GEMM-IO views |
 | `mem_working_set` | memory | Allocated high-water with an explicit identity; not a proven live-set without coverage |
 
 JSON `weight_bytes_unique_non_embed` = 52098598912. JSON `weight_bytes_language_mtp_excl_vision` = 54641395712. JSON `lower_bound_is_not_measured_bandwidth` true. JSON `peak_memory_is_not_live_set` true. JSON `n_traffic_channels` = 3. JSON `traffic_channel_ids` = `["weight","state","activation"]`.
 
-TASK-06 bytes are DERIVED minima on the three traffic channels `weight`, `state`, and `activation`. Bottleneck **labels** that name those channels remain TASK-06 HYPOTHESIS citations; this document does not retabulate the six bottleneck classes as new measurements. Unique weight bytes are counted **once** per complete decode/prefill as a TASK-06 lower-bound **identity**, not as measured HBM traffic. Bytes divided by assumed \(\Beta\) is a conditional estimate, not measured `mem_hbm_gbps`. Do not fill \(\Beta\) (`Beta_HBM`) here. A working-set high-water is a named metric identity, not a number in this document.
+TASK-06 bytes are DERIVED minima on the three traffic channels `weight`, `state`, and `activation`. Bottleneck **labels** that name those channels remain TASK-06 HYPOTHESIS citations; this document does not retabulate the six bottleneck classes as new measurements. Unique weight bytes are counted **once** per complete decode/prefill as a TASK-06 lower-bound **identity**, not as measured HBM traffic. Bytes divided by assumed $\Beta$ is a conditional estimate, not measured `mem_hbm_gbps`. Do not fill $\Beta$ (`Beta_HBM`) here. A working-set high-water is a named metric identity, not a number in this document.
 
 ## End-to-end metrics
 
@@ -208,12 +208,12 @@ JSON array `e2e_metric_ids` in this exact order (3 ids). JSON `n_e2e_metrics` = 
 | ID | Class | Primary? | Meaning |
 | --- | --- | --- | --- |
 | `e2e_latency_ms` | complete_request | **primary** | Wall from first in-window prompt ingest to last generated token; setup/graph-create/warmup/restore excluded |
-| `e2e_output_toks` | complete_request | secondary | \(N_{\mathrm{gen}}/t_{\mathrm{e2e}}\); **not** decode-only; **not** \((T+N_{\mathrm{gen}})/t_{\mathrm{e2e}}\) unless that mixed identity is declared separately and never compared to `dec_toks` |
+| `e2e_output_toks` | complete_request | secondary | $N_{\mathrm{gen}}/t_{\mathrm{e2e}}$; **not** decode-only; **not** $(T+N_{\mathrm{gen}})/t_{\mathrm{e2e}}$ unless that mixed identity is declared separately and never compared to `dec_toks` |
 | `e2e_ttft_ms` | complete_request | diagnostic | Same window as `pre_ttft_ms` under `ttft_in_prefill`; still complete-request family when reported beside `e2e_latency_ms` |
 
 JSON `e2e_primary_id` = `"e2e_latency_ms"`. JSON `e2e_mixed_toks_is_not_decode_only` true. JSON `e2e_required_alongside_microbenchmarks` true. JSON `complete_request_vs_decode_only_forbidden` true.
 
-Refuse a complete-request versus decode-only comparison. Mixed \((T+N_{\mathrm{gen}})/t_{\mathrm{e2e}}\) is not `dec_toks` and is not `pre_toks`. End-to-end measurement is **required alongside** kernel and memory microbenchmarks; it is not optional colour. This document still selects no mapping winner (`mapping_winner_selected` false).
+Refuse a complete-request versus decode-only comparison. Mixed $(T+N_{\mathrm{gen}})/t_{\mathrm{e2e}}$ is not `dec_toks` and is not `pre_toks`. End-to-end measurement is **required alongside** kernel and memory microbenchmarks; it is not optional colour. This document still selects no mapping winner (`mapping_winner_selected` false).
 
 ## Identity, coverage, and time accounting
 
@@ -230,7 +230,7 @@ JSON array `identity_field_ids` in this exact order (15 ids). JSON `n_identity_f
 | `output_eval_counts` | Output / eval counts |
 | `first_token_convention` | Must equal `ttft_in_prefill` unless a later task records a different declared convention |
 | `allocated_capacity` | Allocated KV/state capacity |
-| `populated_length` | Populated length \(T\) |
+| `populated_length` | Populated length $T$ |
 | `sampling_output_policy` | Sampling / output policy (unselected here) |
 | `graph_mode` | Graph / eager mode |
 | `clocks_residents` | Clock and residency policy |
@@ -267,13 +267,13 @@ JSON array `sku_unknown_symbols` equals the TASK-16 17-id list. JSON `n_sku_unkn
 | `W_max` | max warps / SM | declared sitting device | UNKNOWN |
 | `S_reg` | register file | declared sitting device | UNKNOWN |
 | `C_smem` | shared memory | declared sitting device | UNKNOWN |
-| `T_max` | max threads / SM (not model \(T_{\text{ctx max}}\)) | declared sitting device | UNKNOWN |
+| `T_max` | max threads / SM (not model $T_{\text{ctx max}}$) | declared sitting device | UNKNOWN |
 | `B_max` | max CTAs / SM | declared sitting device | UNKNOWN |
 | `N_bar` | barrier capacity | declared sitting device | UNKNOWN |
 | `N_sched` | scheduler capacity | declared sitting device | UNKNOWN |
 | `G_reg` | register granularity | declared sitting device | UNKNOWN |
 | `G_smem` | smem granularity | declared sitting device | UNKNOWN |
-| `Beta_HBM` | peak HBM \(\Beta\) | identity-matched microbenchmark | UNKNOWN |
+| `Beta_HBM` | peak HBM $\Beta$ | identity-matched microbenchmark | UNKNOWN |
 | `Pi_FMA` | FMA peak | identity-matched microbenchmark | UNKNOWN |
 | `Pi_TC` | tensor-core peak | identity-matched microbenchmark | UNKNOWN |
 | `L_issue` | issue latency | identity-matched microbenchmark | UNKNOWN |
@@ -291,7 +291,7 @@ SKU-fill protocol (future; not executed here):
 
 `example_T_values` `[1, 4096]` remain illustration horizons. Do not name WikiText, ShareGPT, or any other corpus as **the** prompt matrix. Do not name a GPU SKU as **the** hardware. Do not lock warmup counts or clock locks. JSON `example_T_values` = `[1, 4096]`. JSON `example_T_is_not_prompt_matrix` true.
 
-TASK-19 owns the **methodology** for measurements and for filling the sitting SKU table; it does not own a filled table in this increment. TASK-17 still owns mapping **selection** after future measurements (`ledger_open_question_mapping_winner_closed` false). TASK-15 still owns layout selection. TASK-12/13/14 still own fusion winners. TASK-14 still owns decode/prefill view selection. TASK-09 still owns artifact-boundary and ideal-sequence selection. TASK-08 still owns recipe winners. TASK-18 still owns quality/NLL. TASK-16 published identities \(N_w=32\), \(N_{\text{bank}}=32\) remain the only numeric SKU constants. State writes are not optional. Chunkwise GDN is not zero \(S\) traffic. Activations remain out of layout scope here (`activations_in_layout_scope` false). `device_query_run` false; `nsight_run` false.
+TASK-19 owns the **methodology** for measurements and for filling the sitting SKU table; it does not own a filled table in this increment. TASK-17 still owns mapping **selection** after future measurements (`ledger_open_question_mapping_winner_closed` false). TASK-15 still owns layout selection. TASK-12/13/14 still own fusion winners. TASK-14 still owns decode/prefill view selection. TASK-09 still owns artifact-boundary and ideal-sequence selection. TASK-08 still owns recipe winners. TASK-18 still owns quality/NLL. TASK-16 published identities $N_w=32$, $N_{\text{bank}}=32$ remain the only numeric SKU constants. State writes are not optional. Chunkwise GDN is not zero $S$ traffic. Activations remain out of layout scope here (`activations_in_layout_scope` false). `device_query_run` false; `nsight_run` false.
 
 Diagram 1 of 1: decode, prefill, kernel, and memory families feed the identity protocol, then end-to-end; SKU-fill and e2e both leave OPENQ — the unselected hardware / prompt matrix / reproducibility protocol, not a selected winner. JSON `n_diagrams` is 1. `diagram_ids` is `["decode","prefill","kernel","memory","identity","e2e","sku","openq"]`.
 
@@ -320,14 +320,14 @@ JSON array `methodology_risk_ids` in this exact order (8 ids). JSON `n_methodolo
 
 | ID | Deferred or pair | Severity | Why it can mislead |
 | --- | --- | --- | --- |
-| `v_mixed_identity` | class mismatch | high | Comparing decode-only tok/s to complete-request latency (or mixed \((T+N)/t\)) |
+| `v_mixed_identity` | class mismatch | high | Comparing decode-only tok/s to complete-request latency (or mixed $(T+N)/t$) |
 | `v_envelope_as_leaf` | `k_graph_envelope_ms` | high | Ranking sinks from graph envelopes without leaf / node tracing |
 | `v_micro_as_winner` | kernel/memory only | high | Declaring a TASK-17 mapping winner from microbenchmarks without e2e |
 | `v_missing_coverage_zero` | coverage | high | Treating unclassified work as zero excess |
 | `v_bound_as_measured` | TASK-06 | medium | Treating MAC/byte lower bounds as measured traffic or tok/s |
 | `v_datasheet_sku` | SKU table | medium | Filling `sku_unknown_symbols` from a datasheet without sitting identity |
-| `v_t1_prefill_as_decode` | \(T=1\) | medium | Equating T=1 prefill with decode because MAC matches |
-| `v_toks_as_quality` | TASK-18 | low | Using tok/s as Pareto \(Y\) |
+| `v_t1_prefill_as_decode` | $T=1$ | medium | Equating T=1 prefill with decode because MAC matches |
+| `v_toks_as_quality` | TASK-18 | low | Using tok/s as Pareto $Y$ |
 
 JSON `n_methodology_high` = 4. JSON `n_methodology_medium` = 3. JSON `n_methodology_low` = 1. JSON `methodology_risk_severities` = `["high","high","high","high","medium","medium","medium","low"]`.
 

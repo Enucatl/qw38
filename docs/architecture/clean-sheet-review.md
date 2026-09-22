@@ -18,8 +18,8 @@ mapping, recipe map, or layout.
 If any occupancy, MAC/byte, catalog id, node type, stage kind, recipe, mapping,
 or selected-flag would disagree with TASK-01–20 or sitting `text_config`, the
 earlier document wins and this review is wrong. Claims are labelled `OBSERVED`
-(sitting `text_config` / inventory already established; TASK-16 \(N_w=32\),
-\(N_{\text{bank}}=32\)), `MEASURED` (TASK-05 citations only:
+(sitting `text_config` / inventory already established; TASK-16 $N_w=32$,
+$N_{\text{bank}}=32$), `MEASURED` (TASK-05 citations only:
 `pooled_all.absmax=25.5`, `pooled_language_mtp.absmax=19.25`,
 `pooled_vision.absmax=25.5`; no new payload stats), `DERIVED` (cross-document
 key agreement, equation-tag presence, alias classification, freeze membership),
@@ -63,13 +63,13 @@ Numeric ranks instantiate sitting `text_config` OBSERVED: `hidden_size` 5120,
 `intermediate_size` 17408, `vocab_size` 248320, 64 decoder layers, 48 linear +
 16 full at indices `[3, 7, 11, 15, 19, 23, 27, 31, 35, 39, 43, 47, 51, 55, 59, 63]`,
 `mtp_num_hidden_layers` 1, `dtype` `"bfloat16"`, `mamba_ssm_dtype` `"float32"`,
-`max_position_embeddings` \(T_{\text{ctx max}}=262144\). Inventory OBSERVED:
+`max_position_embeddings` $T_{\text{ctx max}}=262144$. Inventory OBSERVED:
 1199 tensors, 27781427952 parameters, 55562855904 bytes. Language+MTP occupancy
 is 27320697856 parameters / 54641395712 BF16 bytes (OBSERVED). Unique non-embed
 weight bytes are 52098598912 (TASK-06). Complete map: 135 node instances.
-MAC citations (DERIVED, TASK-06): \(C_\text{complete}=27433238528\),
-\(A_\text{complete}=208896\); T=1 decode = T=1 prefill MAC \(27433447424\);
-T=4096 decode \(28288876544\); T=4096 prefill \(114119319486464\).
+MAC citations (DERIVED, TASK-06): $C_\text{complete}=27433238528$,
+$A_\text{complete}=208896$; T=1 decode = T=1 prefill MAC $27433447424$;
+T=4096 decode $28288876544$; T=4096 prefill $114119319486464$.
 
 ## Review convention
 
@@ -136,7 +136,7 @@ JSON array `check_family_ids` in this exact order (6 ids). JSON `n_check_familie
 | `equations` | `\tag{1}` … `\tag{24}` in `model-semantics.md`; TASK-06/07 cite TASK-02 | TASK-02 |
 | `dimensions` | occupancy integers and `full_attention_indices` vs sitting `text_config` and across fences | TASK-01 / config |
 | `totals` | parameter/byte/MAC/MEASURED absmax integers across fences | TASK-01 / TASK-05 / TASK-06 |
-| `state` | catalog ids, KV/\(C\)/\(S\) bytes, \(B_\text{store}\) coefficients | TASK-03 / TASK-04 |
+| `state` | catalog ids, KV/$C$/$S$ bytes, $B_\text{store}$ coefficients | TASK-03 / TASK-04 |
 | `contracts` | node types, stage kinds, 135 instances, selected-flags false | TASK-11 / TASK-13 / TASK-14 |
 | `proposals` | 22 recipes, 22 fusions, 18 mappings, 17 SKU symbols, 12 `oq_*` still open | TASK-08 / TASK-12 / TASK-16 / TASK-17 / TASK-20 |
 
@@ -166,7 +166,7 @@ flowchart TB
   EQ[equations]
   DIM[dimensions]
   TOT[totals]
-  STATE[state]
+  persistent_state["STATE: state"]
   CONTRACT[contracts]
   PROP[proposals]
   ALIAS[7 notation aliases]
@@ -175,7 +175,7 @@ flowchart TB
   CORPUS --> EQ
   CORPUS --> DIM
   CORPUS --> TOT
-  CORPUS --> STATE
+  CORPUS --> persistent_state
   CORPUS --> CONTRACT
   CORPUS --> PROP
   ALIAS --> DIM
@@ -183,7 +183,7 @@ flowchart TB
   EQ --> FREEZE
   DIM --> FREEZE
   TOT --> FREEZE
-  STATE --> FREEZE
+  persistent_state --> FREEZE
   CONTRACT --> FREEZE
   PROP --> FREEZE
 ```

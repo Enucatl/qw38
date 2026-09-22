@@ -15,16 +15,16 @@ ownership of recipe maps / corpora come from
 
 This document specifies an **evaluation methodology**, not measurements, not a
 selected quantizer, and not a selected Pareto hull. Prefill and decode share
-**one** quality methodology. Only \(T\) (context horizon) and whether incoming
-\((K,V,C,S)\) is zeros versus populated change. The primary object is
+**one** quality methodology. Only $T$ (context horizon) and whether incoming
+$(K,V,C,S)$ is zeros versus populated change. The primary object is
 language+MTP checkpoint parameters after a TASK-08 recipe (still unselected)
 versus control `keep_source`. The secondary object is token-persistent state
-\(K,V,C,S\) when a state recipe is under test. Activations are reconstruction
+$K,V,C,S$ when a state recipe is under test. Activations are reconstruction
 **probes**, not family policies. Algebraic equivalents in TASK-02 are the same
-real map; quantization acts on stored elements. Log-softmax over \(V\) is an
-**evaluation readout** of \(\ell^{(0)}\) / \(\ell^{(1)}\), not a new graph node
+real map; quantization acts on stored elements. Log-softmax over $V$ is an
+**evaluation readout** of $\ell^{(0)}$ / $\ell^{(1)}$, not a new graph node
 and not a sampling policy. If an occupancy product would disagree with
-TASK-01 / sitting `text_config`, or a sensitive-op / residual-add / \(T\)
+TASK-01 / sitting `text_config`, or a sensitive-op / residual-add / $T$
 citation would disagree with TASK-07, or a recipe/family/quality-risk /
 metadata lower bound would disagree with TASK-08, or a profile/calibration /
 ownership flag would disagree with TASK-10, the earlier document wins and this
@@ -49,7 +49,7 @@ capability benchmarks, or acceptance numbers.
 | Item | Value | Label |
 | --- | --- | --- |
 | Dossier | [`docs/architecture/tasks/TASK-18.md`](tasks/TASK-18.md) | — |
-| Numerical sensitivity | [`docs/architecture/numerical-sensitivity.md`](numerical-sensitivity.md) (TASK-07) | HYPOTHESIS sensitive-op ids; DERIVED residual-add / \(T\) |
+| Numerical sensitivity | [`docs/architecture/numerical-sensitivity.md`](numerical-sensitivity.md) (TASK-07) | HYPOTHESIS sensitive-op ids; DERIVED residual-add / $T$ |
 | Quantization space | [`docs/architecture/quantization-design-space.md`](quantization-design-space.md) (TASK-08) | 22 recipes / 16 families / quality-risk ids / byte illustrations |
 | Compiler plan | [`docs/architecture/model-compiler-plan.md`](model-compiler-plan.md) (TASK-10) | control `keep_source`; calibration ownership; profiles unselected |
 | Config | [`.cache/authorities/qwen3.8-27b-transformers/config.json`](../../.cache/authorities/qwen3.8-27b-transformers/config.json) `text_config` | OBSERVED |
@@ -63,12 +63,12 @@ Numeric ranks instantiate sitting `text_config` OBSERVED: `hidden_size` 5120,
 `intermediate_size` 17408, `vocab_size` 248320, 64 decoder layers, 48 linear +
 16 full at indices `[3, 7, 11, 15, 19, 23, 27, 31, 35, 39, 43, 47, 51, 55, 59, 63]`,
 `mtp_num_hidden_layers` 1, `dtype` `"bfloat16"`, `mamba_ssm_dtype` `"float32"`,
-`max_position_embeddings` \(T_{\max}=\) 262144. Language+MTP occupancy is 866
+`max_position_embeddings` $T_{\max}=$ 262144. Language+MTP occupancy is 866
 tensors / 27320697856 parameters / 54641395712 BF16 bytes (OBSERVED). Unique
 non-embed weight bytes are 52098598912 (TASK-06/08). Embeddings are
-\(248320\times 5120\) (`embed_n` 1271398400). MLP occupancy is
-\(3\times 64\times 17408\times 5120=\) 17112760320 elements /
-34225520640 BF16 bytes (DERIVED). Conceptual \(S\) F32 bytes are 150994944
+$248320\times 5120$ (`embed_n` 1271398400). MLP occupancy is
+$3\times 64\times 17408\times 5120=$ 17112760320 elements /
+34225520640 BF16 bytes (DERIVED). Conceptual $S$ F32 bytes are 150994944
 (TASK-04/06/07). Authority path is
 `.cache/authorities/qwen3.8-27b-transformers`.
 
@@ -118,9 +118,9 @@ JSON array `reconstruction_diagnostic_ids` in this exact order (8 ids). JSON `n_
 | `r_param_cosine` | param | source | Cosine of flattened dequant versus source, per family |
 | `r_clip_frac` | param | source | Fraction of elements/groups saturating under a `clip` recipe |
 | `r_act_residual` | activation | control forward | MSE at residual-add catalog points versus `keep_source` |
-| `r_act_logits` | activation | control forward | MSE / max-abs of \(\ell^{(0)}\) (and \(\ell^{(1)}\) when MTP is in the map) versus control; **not** NLL |
-| `r_state_kv` | state | conceptual BF16 \(K,V\) | Store/load versus control conceptual KV (RoPE-baked \(K\)) |
-| `r_state_s` | state | conceptual F32 \(S\) | Store/load versus control conceptual \(S\) (`s_below_f32` screen) |
+| `r_act_logits` | activation | control forward | MSE / max-abs of $\ell^{(0)}$ (and $\ell^{(1)}$ when MTP is in the map) versus control; **not** NLL |
+| `r_state_kv` | state | conceptual BF16 $K,V$ | Store/load versus control conceptual KV (RoPE-baked $K$) |
+| `r_state_s` | state | conceptual F32 $S$ | Store/load versus control conceptual $S$ (`s_below_f32` screen) |
 
 JSON `reconstruction_diagnostic_roles` = `["param","param","param","param","activation","activation","state","state"]`.
 
@@ -132,9 +132,9 @@ JSON array `reconstruction_limit_ids` in this exact order (6 ids). JSON `n_recon
 | --- | --- |
 | `lim_local_not_nll` | Family MSE / cosine / max-abs does not determine teacher-forced NLL; the forward map from local error to logits is nonlinear |
 | `lim_residual_accum` | Residual-path families (`attn_out`, `mlp_down`) can accumulate across `n_residual_adds_language` 128 language adds (130 complete); a small per-layer MSE can be large at logits |
-| `lim_gdn_horizon` | GDN \(S\) error can grow with \(T\); pairs TASK-07 `gdn_S_recurrent` / `s_below_f32` |
+| `lim_gdn_horizon` | GDN $S$ error can grow with $T$; pairs TASK-07 `gdn_S_recurrent` / `s_below_f32` |
 | `lim_identity_control` | `keep_source` reconstruction is identity (error ~0 up to exact dequant of source); that is not a ranking |
-| `lim_gguf_not_target` | Reconstruction target is the BF16 (F32 \(S\)) **source**, never Q4_K_M codes or GGUF grouping |
+| `lim_gguf_not_target` | Reconstruction target is the BF16 (F32 $S$) **source**, never Q4_K_M codes or GGUF grouping |
 | `lim_single_family` | Screening one family in isolation can miss interactions with other families on the same residual stream |
 
 Reconstruction **may** reject a candidate that is catastrophically wrong (non-finite codes, near-zero cosine, huge max-abs). Reconstruction **must not** accept a candidate onto `axis_quality`. Survival of TASK-07/08 rows is not decided by these screens alone. TASK-07 integers cited here: `n_residual_adds_language` 128, `n_residual_adds_complete` 130, `example_T_values` `[1, 4096]`, `T_max` 262144.
@@ -145,36 +145,36 @@ JSON array `teacher_forced_metric_ids` in this exact order (5 ids). JSON `n_teac
 
 | ID | Primary? | Meaning |
 | --- | --- | --- |
-| `tf_nll_language` | secondary | Mean NLL of \(\ell^{(0)}\) versus teacher token \(x_{t+1}\) |
-| `tf_nll_mtp` | secondary | Mean NLL of \(\ell^{(1)}\) versus teacher token \(x_{t+2}\) |
+| `tf_nll_language` | secondary | Mean NLL of $\ell^{(0)}$ versus teacher token $x_{t+1}$ |
+| `tf_nll_mtp` | secondary | Mean NLL of $\ell^{(1)}$ versus teacher token $x_{t+2}$ |
 | `tf_nll_complete` | **primary absolute** | Event-count mixture of language and MTP NLL |
 | `tf_delta_vs_control` | **primary quality axis** | Candidate `tf_nll_complete` minus `keep_source` `tf_nll_complete` on the **same** token sequence |
-| `tf_kl_vs_control` | diagnostic | Mean \(\mathrm{KL}(p_{\text{control}}\Vert p_{\text{candidate}})\) over teacher positions; does not replace ΔNLL |
+| `tf_kl_vs_control` | diagnostic | Mean $\mathrm{KL}(p_{\text{control}}\Vert p_{\text{candidate}})$ over teacher positions; does not replace ΔNLL |
 
-NLL (DERIVED methodology; not measured here). For a teacher token sequence \(x_{1:T}\) with \(T\ge 3\):
+NLL (DERIVED methodology; not measured here). For a teacher token sequence $x_{1:T}$ with $T\ge 3$:
 
-\[
+$$
 \mathrm{NLL}_{\mathrm{lang}}=\frac{1}{T-1}\sum_{t=1}^{T-1}-\log p_{\theta}(x_{t+1}\mid x_{1:t})
 \quad\text{from }\ell^{(0)},
-\]
+$$
 
-\[
+$$
 \mathrm{NLL}_{\mathrm{mtp}}=\frac{1}{T-2}\sum_{t=1}^{T-2}-\log p_{\theta}^{(1)}(x_{t+2}\mid \ldots)
 \quad\text{from }\ell^{(1)},
-\]
+$$
 
-\[
+$$
 \mathrm{NLL}_{\mathrm{complete}}=\frac{(T-1)\,\mathrm{NLL}_{\mathrm{lang}}+(T-2)\,\mathrm{NLL}_{\mathrm{mtp}}}{(T-1)+(T-2)}.
-\]
+$$
 
-JSON: `n_language_nll_events_offset` 1 (events = \(T-1\)); `n_mtp_nll_events_offset` 2 (events = \(T-2\)); `min_eval_tokens_language` 2; `min_eval_tokens_mtp` 3; `min_eval_tokens_complete` 3; `mtp_in_primary_nll` true; `sampling_out_of_nll` true; `log_softmax_is_eval_readout` true.
+JSON: `n_language_nll_events_offset` 1 (events = $T-1$); `n_mtp_nll_events_offset` 2 (events = $T-2$); `min_eval_tokens_language` 2; `min_eval_tokens_mtp` 3; `min_eval_tokens_complete` 3; `mtp_in_primary_nll` true; `sampling_out_of_nll` true; `log_softmax_is_eval_readout` true.
 
-JSON `example_T_values` = `[1, 4096]` matching TASK-07 context horizons (decode-style \(T=1\) means one new token with populated state **and** a teacher target, not a 1-token corpus). JSON `T_max` = 262144. JSON `example_T_is_not_prompt_matrix` true.
+JSON `example_T_values` = `[1, 4096]` matching TASK-07 context horizons (decode-style $T=1$ means one new token with populated state **and** a teacher target, not a 1-token corpus). JSON `T_max` = 262144. JSON `example_T_is_not_prompt_matrix` true.
 
 Identity for `tf_delta_vs_control` (protocol, not executed):
 
-- Same tokenizer and same teacher token ids (including MTP next-ids \(t+1\) as graph inputs).
-- Same \(T\) horizon class and same empty-versus-populated incoming state convention.
+- Same tokenizer and same teacher token ids (including MTP next-ids $t+1$ as graph inputs).
+- Same $T$ horizon class and same empty-versus-populated incoming state convention.
 - Control = TASK-10 control emission (`keep_source` on every defined family).
 - Candidate = a legal TASK-08 recipe per family; this document assigns none.
 - Prefill and decode share the metric; do not report decode-only tok/s as NLL.
@@ -191,9 +191,9 @@ Every window starts reset and reconstructs its declared left context. Complete-m
 MTP behavior inherited here remains conditional on TASK-02's unverified analysis
 model.
 
-Omitting MTP from the primary number is methodology risk `v_nll_without_mtp`. Language-only NLL may be tabulated as a **secondary** row, not the Pareto \(Y\) value.
+Omitting MTP from the primary number is methodology risk `v_nll_without_mtp`. Language-only NLL may be tabulated as a **secondary** row, not the Pareto $Y$ value.
 
-Softmax over \(V\) for sampling remains out of the TASK-02 forward map. Log-softmax used here is an evaluation readout of logits already specified by TASK-02 `(22)`/`(24)` and MTP \(\ell^{(1)}\). Language logits \(\ell^{(0)}_t\) predict token \(t+1\); MTP \(\ell^{(1)}_t\) consumes the embedding of \(t+1\) and predicts token \(t+2\). The complete map includes MTP.
+Softmax over $V$ for sampling remains out of the TASK-02 forward map. Log-softmax used here is an evaluation readout of logits already specified by TASK-02 `(22)`/`(24)` and MTP $\ell^{(1)}$. Language logits $\ell^{(0)}_t$ predict token $t+1$; MTP $\ell^{(1)}_t$ consumes the embedding of $t+1$ and predicts token $t+2$. The complete map includes MTP.
 
 ## Behavioral comparisons
 
@@ -213,8 +213,8 @@ JSON array `pareto_axis_ids` in this exact order (3 ids). JSON `n_pareto_axes` =
 
 | ID | Axis | What is plotted | Selected? |
 | --- | --- | --- | --- |
-| `axis_quality` | \(Y\) | `tf_delta_vs_control` (primary); behavioral only as a later secondary overlay | method locked; values unmeasured |
-| `axis_compression` | \(X\) | TASK-08 payload+metadata **lower bound** bytes for a **declared** legal recipe map, not a packed TASK-09 layout | method locked; no map declared |
+| `axis_quality` | $Y$ | `tf_delta_vs_control` (primary); behavioral only as a later secondary overlay | method locked; values unmeasured |
+| `axis_compression` | $X$ | TASK-08 payload+metadata **lower bound** bytes for a **declared** legal recipe map, not a packed TASK-09 layout | method locked; no map declared |
 | `axis_reference_q4km` | reference point | Future black-box Q4_K_M (file size + quality metric with explicit identity) | not a recipe; not required |
 
 JSON booleans (lock): `gguf_is_not_a_recipe` true; `gguf_is_not_a_requirement` true; `gguf_is_pareto_reference` true; `gguf_is_not_the_runtime_format` true; `gguf_is_not_compiler_input` true; `gguf_payload_inspected` false; `q4km_must_be_beaten` false; `q4km_must_be_matched` false; `q4km_file_required_now` false; `q4km_nll_required` false; `q4km_nll_identity_matched_when_logits_available` true; `pareto_frontier_selected` false; `compiler_profile_selected` false.
@@ -229,7 +229,7 @@ Q4_K_M protocol (future, after freeze; not run here):
 - Custom profiles are **not** required to beat or match Q4_K_M quality or size.
 - Control point: `keep_source` at unique-non-embed BF16 bytes `52098598912`, `tf_delta_vs_control` = 0 by definition.
 
-Compression-axis **illustration** (DERIVED citation from TASK-08, **not** a selected map): unique-non-embed int4 \(g=128\) total `13431670032` B, ratio `0.2578125`; MLP \(n=17112760320\), MLP BF16 `34225520640`. This is an **example**, not a selected winner.
+Compression-axis **illustration** (DERIVED citation from TASK-08, **not** a selected map): unique-non-embed int4 $g=128$ total `13431670032` B, ratio `0.2578125`; MLP $n=17112760320$, MLP BF16 `34225520640`. This is an **example**, not a selected winner.
 
 Do not rank decode-complexity risks on this plot. Tok/s is TASK-19 (`toks_is_not_quality_axis` true).
 
@@ -251,7 +251,7 @@ Protocol (lock, no datasets named as winners):
 - Calibration ∩ eval = empty. Using eval tokens in `optional_calibration_hook` is `v_calib_eval_leak`.
 - GPTQ/AWQ/Hessian remain **not** a TASK-08 scale id. They may only produce scale **values** attached to an existing integer recipe via the hook (`gptq_is_not_a_scale_id` true, `activation_aware_scale_id_added` false, `gptq_required` false).
 - Do not name a numeric ΔNLL / perplexity / match-rate threshold. The acceptance frontier remains unselected.
-- Candidate corpus **shapes** may be described as `held_out_text` and `long_context_text` in prose (horizon \(T\) up to `T_max`) without selecting a named dataset.
+- Candidate corpus **shapes** may be described as `held_out_text` and `long_context_text` in prose (horizon $T$ up to `T_max`) without selecting a named dataset.
 
 JSON `calibration_eval_must_be_disjoint` true.
 
@@ -281,12 +281,12 @@ JSON array `methodology_risk_ids` in this exact order (6 ids). Parallel `methodo
 
 | ID | Ties to | Severity | Claim (must remain HYPOTHESIS) |
 | --- | --- | --- | --- |
-| `v_recon_as_quality` | `reconstruction` layer | high | Treating reconstruction MSE/cosine as sufficient for Pareto \(Y\) would freeze selection without model-level evidence |
+| `v_recon_as_quality` | `reconstruction` layer | high | Treating reconstruction MSE/cosine as sufficient for Pareto $Y$ would freeze selection without model-level evidence |
 | `v_gguf_as_requirement` | `axis_reference_q4km` | high | Requiring custom profiles to match or beat Q4_K_M would turn a black-box reference into a design constraint |
 | `v_calib_eval_leak` | `corpus_calibration` / `corpus_eval_nll` | high | Calibrating on eval tokens would inflate teacher-forced comparisons |
 | `v_control_as_winner` | `keep_source` | medium | Treating identity control as a quality ranking would confuse ΔNLL with a selected profile |
 | `v_nll_without_mtp` | `tf_nll_complete` | medium | Omitting MTP from the primary NLL would drop the complete map |
-| `v_toks_as_quality` | TASK-19 | low | Using tok/s as a quality axis would mix TASK-19 performance into TASK-18 Pareto \(Y\) |
+| `v_toks_as_quality` | TASK-19 | low | Using tok/s as a quality axis would mix TASK-19 performance into TASK-18 Pareto $Y$ |
 
 JSON `methodology_risk_severities` = `["high","high","high","medium","medium","low"]`. JSON `methodology_high_ids`: `v_recon_as_quality`, `v_gguf_as_requirement`, `v_calib_eval_leak`. `methodology_medium_ids`: `v_control_as_winner`, `v_nll_without_mtp`. `methodology_low_ids`: `v_toks_as_quality`. JSON `n_methodology_high` = 3, `n_methodology_medium` = 2, `n_methodology_low` = 1.
 

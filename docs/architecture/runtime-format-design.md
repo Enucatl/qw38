@@ -21,7 +21,7 @@ not a selected file format, kernel, or layout. Prefill and decode share
 are a `view_binding` capability, not a decode/prefill split (TASK-14).
 The primary object is language+MTP checkpoint parameters after a TASK-08
 recipe (role `param`). The secondary object is token-persistent **state
-schema** for \(K,V,C,S\) (role `state`). Activations and accumulators are
+schema** for $K,V,C,S$ (role `state`). Activations and accumulators are
 not artifact payloads. Algebraic equivalents in TASK-02 are the same real
 map; packing acts on stored elements. If an occupancy product would
 disagree with TASK-01 / sitting `text_config`, or a cited weight/state
@@ -107,7 +107,7 @@ JSON array `artifact_kinds` in this order; JSON `n_artifact_kinds` = 6.
 | `metadata_blob` | Per-group scales and optional zero-points. |
 | `sidecar` | `extract_high` sparse BF16 values plus indices; `mixed_group` width map. |
 | `view` | One portable and/or one-or-more specialized projections of the same logical tensor. |
-| `schema_state` | Ranks and conceptual dtypes for \(K,V,C,S\) allocation; not a cache layout. |
+| `schema_state` | Ranks and conceptual dtypes for $K,V,C,S$ allocation; not a cache layout. |
 
 JSON booleans (lock): `activations_in_artifact` false,
 `kernels_in_artifact` false, `tokenizer_in_artifact` false,
@@ -120,7 +120,7 @@ true, `embed_lm_head_tied` false, `decode_prefill_share_artifact` true,
 `learned_codebooks_required` false, `payloads_restreamed` false.
 
 In the artifact: packed `param` payloads after a TASK-08 recipe, plus
-required `schema_state` for \(K,V,C,S\). Out of the artifact: activation
+required `schema_state` for $K,V,C,S$. Out of the artifact: activation
 working-dtype payloads, CUDA kernels, tokenizer tables, vision-encoder
 internals, and TASK-15 physical tiles. Whether zero-filled state
 **payloads** live in the artifact stays unselected; the **schema** is
@@ -158,7 +158,7 @@ that family's TASK-08 `family_candidates`.
 | `mixed_width_map` | Per-group wider/narrower integer width for `mixed_group` | TASK-08 |
 | `shared_binding` | Single payload with multiple catalog consumers (`E`, `W_lm`) | TASK-03 |
 | `access_class` | Consumer access class per family (table below) | TASK-03/06 |
-| `state_schema` | \(K,V\) rank \((4,T,256)\) BF16 conceptual; \(C\) \(3\times 10240\) BF16; \(S\) \((48,128,128)\) F32 conceptual; 17 KV instances including MTP; 48 C/S instances | TASK-03/04/06 |
+| `state_schema` | $K,V$ rank $(4,T,256)$ BF16 conceptual; $C$ $3\times 10240$ BF16; $S$ $(48,128,128)$ F32 conceptual; 17 KV instances including MTP; 48 C/S instances | TASK-03/04/06 |
 
 The first JSON fence contains parseable `logical_descriptors` for
 `i8_row_asym`, `extract_high`, and `mixed_group`, plus `view_descriptor`.
@@ -202,7 +202,7 @@ weights or state: `embed`, `full_attn`, `linear_attn`, `mlp`,
 
 JSON array `packing_capability_ids` in this exact order (8 ids). JSON
 `n_packing_capabilities` = 8. Scale-storage/placement/align/bit-order
-remain unselected. Illustration packing uses \(A=1\), \(s=2\), \(z=0\),
+remain unselected. Illustration packing uses $A=1$, $s=2$, $z=0$,
 sidecar scales (`scale_storage_illustration_bytes` 2,
 `alignment_illustration_grain` 1, `scale_placement_illustration`
 `"sidecar_array"`), so **tight packed totals equal TASK-08 lower bounds**
@@ -212,7 +212,7 @@ for the named MLP / unique-non-embed / embed-gather illustrations. JSON
 (`portable_payload_little_endian` true); specialized views may swizzle
 (TASK-15). JSON `outlier_sidecar_bytes_instantiated` false: sidecar
 `extract_high` packed size is data-dependent
-(\(n_{\text{out}}\times(2+\text{index bytes})\)); TASK-05 fractions
+($n_{\text{out}}\times(2+\text{index bytes})$); TASK-05 fractions
 shaped TASK-08 candidates, not packed layouts.
 
 | id | Must express | Selected here? |
@@ -226,43 +226,43 @@ shaped TASK-08 candidates, not packed layouts.
 | `integrity_record` | Per-payload checksum/version slots in the manifest | Algorithm open (`integrity_algorithm_candidates` `["none","checksum"]`) |
 | `view_binding` | Same logical tensor may have a portable view and zero or more specialized views | Which views exist is open |
 
-Packed payload at integer bit-width \(b\) on \(n\) elements:
+Packed payload at integer bit-width $b$ on $n$ elements:
 
-\[
+$$
 B_{\text{payload,pack}}=\Bigl\lceil\frac{n\,b}{8}\Bigr\rceil.
-\]
+$$
 
-Group grain: for grouping size \(g\), pack each group with
-\(\lceil g_{\text{eff}} b/8\rceil\) then concatenate; last group may be
+Group grain: for grouping size $g$, pack each group with
+$\lceil g_{\text{eff}} b/8\rceil$ then concatenate; last group may be
 ragged (`ragged_last_group` true, inherited from TASK-08). IEEE-like:
-\(B_{\text{payload,pack}}=n\times\) element bytes (`bytes_bf16` = 2,
+$B_{\text{payload,pack}}=n\times$ element bytes (`bytes_bf16` = 2,
 `bytes_f32` = 4, `bytes_fp8` = 1).
 
 Align:
 
-\[
+$$
 B_{\text{aligned}}=\Bigl\lceil B_{\text{payload,pack}}/A\Bigr\rceil A.
-\]
+$$
 
-Metadata lower bound unchanged from TASK-08: \(n_g=\lceil n/g\rceil\),
-\(B_{\text{meta}}=n_g(s+z)\).
+Metadata lower bound unchanged from TASK-08: $n_g=\lceil n/g\rceil$,
+$B_{\text{meta}}=n_g(s+z)$.
 
 **Grain identities** (DERIVED):
 
 | JSON key | Value | Meaning |
 | --- | ---: | --- |
-| `int3_g32_group_payload_bytes` | 12 | \(32\times 3/8=12\) exact; TASK-08 `d_3bit_pack` layout grain |
-| `int2_g32_group_payload_bytes` | 8 | \(32\times 2/8=8\) |
-| `int6_row_hidden_payload_bytes` | 3840 | \(5120\times 6/8=3840\) one hidden-width row |
-| `int4_row_hidden_payload_bytes` | 2560 | \(5120\times 4/8=2560\) |
+| `int3_g32_group_payload_bytes` | 12 | $32\times 3/8=12$ exact; TASK-08 `d_3bit_pack` layout grain |
+| `int2_g32_group_payload_bytes` | 8 | $32\times 2/8=8$ |
+| `int6_row_hidden_payload_bytes` | 3840 | $5120\times 6/8=3840$ one hidden-width row |
+| `int4_row_hidden_payload_bytes` | 2560 | $5120\times 4/8=2560$ |
 | `embed_gather_int4_row_bytes` | 2562 | 2560 + one 2-byte scale (TASK-08 illustration C) |
 | `embed_gather_bf16_bytes` | 10240 | TASK-06 gather row |
 
 **Illustration A — language MLP** (same as TASK-08, now labelled
-packed-tight; DERIVED): \(n=17112760320\), int4, \(s=2\), \(A=1\),
-\(B_{\text{bf16}}=34225520640\). Payload \(B_{\text{payload,pack}}=8556380160\).
+packed-tight; DERIVED): $n=17112760320$, int4, $s=2$, $A=1$,
+$B_{\text{bf16}}=34225520640$. Payload $B_{\text{payload,pack}}=8556380160$.
 
-| \(g\) | \(B_{\text{payload,pack}}\) | \(B_{\text{meta}}\) | \(B\) | \(B/B_{\text{bf16}}\) |
+| $g$ | $B_{\text{payload,pack}}$ | $B_{\text{meta}}$ | $B$ | $B/B_{\text{bf16}}$ |
 | ---: | ---: | ---: | ---: | ---: |
 | 32 | 8556380160 | 1069547520 | 9625927680 | 0.28125 |
 | 128 | 8556380160 | 267386880 | 8823767040 | 0.2578125 |
@@ -273,8 +273,8 @@ JSON keys match TASK-08: `mlp_n`, `mlp_bf16_bytes`,
 `mlp_int4_g128_over_bf16`.
 
 **Illustration B — unique non-embed language+MTP** (DERIVED, not a
-selected profile): \(n=26049299456\), \(B_{\text{bf16}}=52098598912\),
-int4 \(g=128\) \(s=2\) \(A=1\): \(B=13431670032\), ratio \(0.2578125\).
+selected profile): $n=26049299456$, $B_{\text{bf16}}=52098598912$,
+int4 $g=128$ $s=2$ $A=1$: $B=13431670032$, ratio $0.2578125$.
 JSON keys `unique_non_embed_n`, `unique_non_embed_bf16_bytes`,
 `unique_non_embed_int4_g128_total_bytes`,
 `unique_non_embed_int4_g128_over_bf16`.
@@ -283,11 +283,11 @@ JSON keys `unique_non_embed_n`, `unique_non_embed_bf16_bytes`,
 `gather_row` requires `row_addressable` packing so decode need not stream
 2542796800 B.
 
-**Illustration D — \(S\):** conceptual F32 150994944 B/step; BF16 store
+**Illustration D — $S$:** conceptual F32 150994944 B/step; BF16 store
 75497472 B; FP8 37748736 B. JSON `s_f32_bytes`, `s_bf16_bytes`,
 `s_fp8_bytes`. Schema required; payload-in-artifact unselected. Related
 TASK-06 `state_memory` identity; KV 69632 B/token across 17 instances;
-\(C\) 2949120 B across 48 instances.
+$C$ 2949120 B across 48 instances.
 
 **Illustration E — manifest header overhead:** 64 bytes/tensor × 866
 language+MTP tensors = 55424 B. JSON `n_language_mtp_tensors` 866,
@@ -296,7 +296,7 @@ language+MTP tensors = 55424 B. JSON `n_language_mtp_tensors` 866,
 constant, not a selected header size.
 
 **Illustration F — dual-view store amplification:** two copies of
-illustration B = \(2\times 13431670032=26863340064\) B, still below BF16
+illustration B = $2\times 13431670032=26863340064$ B, still below BF16
 unique-non-embed 52098598912. JSON
 `dual_view_int4_g128_unique_non_embed_bytes` 26863340064. DERIVED size
 only; **not** a recommendation to store two views.
@@ -314,12 +314,12 @@ class remains `dense_gemm` meaning “specialized view of a dense family”.
 
 | id | Access | Sequence (capability, not a winner) |
 | --- | --- | --- |
-| `seq_gemm_codes_then_scales` | `dense_gemm` | Read packed codes for a contraction, then sidecar scales (TASK-06 \(I=1\) MLP/`lm_head` vs weights) |
+| `seq_gemm_codes_then_scales` | `dense_gemm` | Read packed codes for a contraction, then sidecar scales (TASK-06 $I=1$ MLP/`lm_head` vs weights) |
 | `seq_gemm_interleaved_group` | `dense_gemm` | For each group: scale then codes |
 | `seq_gather_row` | `gather_row` | One vocab row of codes + one scale (10240 B BF16 or 2562 B int4-row illustration) |
 | `seq_lm_head_full` | `dense_gemm` | Entire `lm_head` unique 2542796800 B-class table every decode (TASK-06 `vocab_memory`; TASK-08 `d_lm_head_unpack`) |
 | `seq_outlier_extra` | any `extract_high` | Additional irregular BF16 sidecar gathers (TASK-08 `d_outlier_gather`) |
-| `seq_state_s_dense` | `state_s` | Dense \(S\) 150994944 B/step conceptual F32 (TASK-06 `state_memory`) |
+| `seq_state_s_dense` | `state_s` | Dense $S$ 150994944 B/step conceptual F32 (TASK-06 `state_memory`) |
 | `seq_specialized_tile` | specialized view | Backend tile/swizzle order; **layout is TASK-15**; named only as a sequence the format must be able to store |
 
 ## Portable versus backend-specific artifacts
@@ -399,19 +399,19 @@ flowchart TB
     specialized[specialized]
     gather[gather]
     gemm[gemm]
-    state[state]
+    persistent_state[state]
     open[open]
     representation --> packing
     packing --> portable
     packing --> specialized
     packing --> gather
     packing --> gemm
-    packing --> state
+    packing --> persistent_state
     portable --> open
     specialized --> open
     gather --> open
     gemm --> open
-    state --> open
+    persistent_state --> open
 ```
 
 ## Deferred vision

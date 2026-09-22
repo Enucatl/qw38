@@ -299,8 +299,8 @@ Fusing kernels raises register and shared-memory live ranges. Occupancy $O$ may 
 | `roofline` | $\Pi\le\min(\Pi_{\text{peak}},I\cdot\Beta)$ | Upper bound used as a TASK-17 criterion. $\Pi_{\text{peak}}$ and $\Beta$ stay `UNKNOWN`. |
 
 Register allocation is SKU-scoped:
-\(R_\text{alloc,cta}=A_\text{reg}(R_t,T_\text{cta},G_\text{reg},\text{scope}_\text{reg})\),
-and \(B_\text{reg}=\lfloor S_\text{reg}/R_\text{alloc,cta}\rfloor\).
+$R_\text{alloc,cta}=A_\text{reg}(R_t,T_\text{cta},G_\text{reg},\text{scope}_\text{reg})$,
+and $B_\text{reg}=\lfloor S_\text{reg}/R_\text{alloc,cta}\rfloor$.
 Both allocation granularity and `scope_reg` are `UNKNOWN` until SKU fill.
 
 Fused register footprint (F11), `DERIVED` only when constituent live

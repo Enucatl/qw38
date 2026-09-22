@@ -37,9 +37,9 @@ Numeric ranks instantiate sitting `text_config` OBSERVED: `hidden_size` 5120,
 `max_position_embeddings` 262144. Language+MTP occupancy is 27320697856
 parameters / 54641395712 BF16 bytes. Unique non-embed weight bytes are
 52098598912. Complete map: 135 node instances. MAC citations (TASK-06):
-\(C_\text{complete}=27433238528\), \(A_\text{complete}=208896\); T=1 MAC
+$C_\text{complete}=27433238528$, $A_\text{complete}=208896$; T=1 MAC
 27433447424; T=4096 decode 28288876544; T=4096 prefill 114119319486464.
-Catalogue: 125 alternatives, 0 selected. Warp/bank: \(N_w=32\), \(N_{\text{bank}}=32\).
+Catalogue: 125 alternatives, 0 selected. Warp/bank: $N_w=32$, $N_{\text{bank}}=32$.
 Nineteen synthesized tasks; twelve chain steps; sixteen experiments.
 
 ## Backlog convention
@@ -58,7 +58,7 @@ JSON: `canonical_sentence_logical` = sentence 1; `canonical_sentence_backlog` = 
 
 - Sixteen experiments, twelve requested fields, listed order is a valid topological order (`experiment_order_is_topological` true).
 - Every `status` is `unrun` (`n_experiments_run` 0; `experiments_run` false).
-- Quality experiments use TASK-18 metrics; performance experiments use TASK-19 metrics; tok/s is not Pareto \(Y\).
+- Quality experiments use TASK-18 metrics; performance experiments use TASK-19 metrics; tok/s is not Pareto $Y$.
 - `exp_mapping_micro` cannot declare `mapping_winner_selected`; only a later measured `exp_mapping_e2e` may, and this study does not run it.
 - Hardware, corpora, prompt matrix, and reproducibility remain unselected blocking unknowns, not extra experiments that select them.
 - Control `keep_source` is the identity compile, not a quality winner.

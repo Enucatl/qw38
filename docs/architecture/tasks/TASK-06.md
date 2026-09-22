@@ -17,7 +17,7 @@ Produce `docs/architecture/work-and-traffic.md` as the Phase 1 decode/prefill **
   - Equations, ranks, and operator definitions come from `docs/architecture/model-semantics.md` (TASK-02). Catalog IDs and region cuts come from `docs/architecture/dataflow.md` (TASK-03). Persistent-state bytes come from `docs/architecture/lifetime-and-state.md` (TASK-04). Weight byte totals instantiate TASK-01 inventory / sitting `text_config` shapes × BF16.
   - Label claims `OBSERVED` (config/inventory already established), `DERIVED` (MAC, bytes, identities from ranks), or `HYPOTHESIS` (bottleneck class vs an UNKNOWN SKU ridge). `UNKNOWN` only for vision-encoder internals deferred here.
   - GitHub Markdown math. Cite TASK-02 equation tags `(1)`–`(24)` and TASK-03 region / catalog IDs. Do not rewrite forward math, redraw the TASK-03 DAG, or recompute TASK-04 state ranks.
-  - Allowed evidence: TASK-01 inventory, TASK-02 semantics, TASK-03 dataflow, TASK-04 lifetime/state, sitting `config.json` `text_config`, plan evidence vocabulary, and TASK-16 intensity identity \(I=F/B\) (F13) as a **formula citation only** (SKU \(\Pi_\text{peak}\) and \(\Beta\) stay UNKNOWN). No Quartz, llama.cpp/GGML Qwen, or `models/Qwen3.8-27B-Q4_K_M.gguf`.
+  - Allowed evidence: TASK-01 inventory, TASK-02 semantics, TASK-03 dataflow, TASK-04 lifetime/state, sitting `config.json` `text_config`, plan evidence vocabulary, and TASK-16 intensity identity $I=F/B$ (F13) as a **formula citation only** (SKU $\Pi_\text{peak}$ and $\Beta$ stay UNKNOWN). No Quartz, llama.cpp/GGML Qwen, or `models/Qwen3.8-27B-Q4_K_M.gguf`.
 - Non-goals:
   - No CUDA fusion, buffer reuse, or physical allocation (TASK-12). Activation bytes are catalog-rank materialization, not kernel traffic.
   - No semantic-graph execution contracts (TASK-11) or decode/prefill **schedules** (TASK-13/14).
@@ -38,9 +38,9 @@ Produce `docs/architecture/work-and-traffic.md` as the Phase 1 decode/prefill **
 - `docs/architecture/task_ledger.md` TASK-06 row — produces `docs/architecture/work-and-traffic.md`; completion is symbolic+instantiated work, unavoidable weight/state/activation traffic, bottleneck labels as hypotheses. Open question: region-level arithmetic intensity and bottleneck hypotheses.
 - `docs/architecture/model-semantics.md` — equations `(1)`–`(24)`; prefill = map from zeros; decode = same map with incoming state; GDN definition `(17)`–`(18)`; `(19)` is the same map, not extra work; optional MTP omission is an algebraic equivalent, not the primary complete map.
 - `docs/architecture/dataflow.md` — 52 catalog IDs, region IDs `embed`, `full_attn`, `linear_attn`, `mlp`, `primary_logits`, `mtp`; logical ≠ physical sentence.
-- `docs/architecture/lifetime-and-state.md` / TASK-04 dossier — \(T\) = stored KV length after append; decode \(T_\text{new}=1\); KV/C/S bytes; decode read/write table; “TASK-06 may” expand prefill triangular KV-read; no FLOP bounds there.
+- `docs/architecture/lifetime-and-state.md` / TASK-04 dossier — $T$ = stored KV length after append; decode $T_\text{new}=1$; KV/C/S bytes; decode read/write table; “TASK-06 may” expand prefill triangular KV-read; no FLOP bounds there.
 - `docs/architecture/model-inventory.md` — BF16 payload; language+MTP 27,320,697,856 parameters / 54,641,395,712 bytes; family byte totals below; vision excluded from primary.
-- `docs/architecture/cuda-hardware-model.md` F13 — \(I=F/B\); F14 roofline with UNKNOWN \(\Pi_\text{peak},\Beta\). Cite the identity; do not fill SKU peaks.
+- `docs/architecture/cuda-hardware-model.md` F13 — $I=F/B$; F14 roofline with UNKNOWN $\Pi_\text{peak},\Beta$. Cite the identity; do not fill SKU peaks.
 - `.cache/authorities/qwen3.8-27b-transformers/config.json` — live `text_config` only. Do not read safetensor payloads.
 - `scripts/check_lifetime_and_state.py` — checker-style precedent. TASK-06’s checker is a sibling; do not import it.
 
@@ -54,9 +54,9 @@ N/A — theoretical work and traffic documentation. No prefill/decode/component 
 
 If a MAC or byte total would disagree with a TASK-02 operator, TASK-03 catalog rank, TASK-04 state byte, or TASK-01 BF16 family total, the earlier document wins and this one is wrong.
 
-- Prefill and decode share **one** operator set. Only \(T\) and whether incoming \((K,V,C,S)\) is zeros versus populated change.
+- Prefill and decode share **one** operator set. Only $T$ and whether incoming $(K,V,C,S)$ is zeros versus populated change.
 - Primary totals **include MTP** (one full-attention block + `mtp.fc` + second `lm_head` contraction). Language-only is a secondary row.
-- Algebraic equivalents (chunkwise GDN, SDPA, fused eval, omitting MTP, skipping non-final `lm_head`) are **not** the primary map. A secondary `inference_last_logits` row may omit \(T-1\) vocabulary projections.
+- Algebraic equivalents (chunkwise GDN, SDPA, fused eval, omitting MTP, skipping non-final `lm_head`) are **not** the primary map. A secondary `inference_last_logits` row may omit $T-1$ vocabulary projections.
 - Do not inspect Quartz or llama.cpp to “confirm” FLOPs or traffic.
 
 ### Deliverable structure (`docs/architecture/work-and-traffic.md`)
@@ -64,13 +64,13 @@ If a MAC or byte total would disagree with a TASK-02 operator, TASK-03 catalog r
 Use these **level-2 headings in this order**. Compact tables + one Mermaid fence + short captions. Every numeric instantiation is `OBSERVED` or `DERIVED`. Bottleneck class columns are `HYPOTHESIS`. Do not leave `TBD`. The only `UNKNOWN` allowed is vision-encoder internals, isolated in Deferred vision.
 
 1. **Authority** — this dossier, semantics, dataflow, lifetime, inventory, config, checker; evidence labels; in-scope (language + MTP work + three traffic channels) vs deferred (vision encoder). State that the document specifies mathematical work and byte lower bounds, not kernels.
-2. **Work convention** — MAC/FLOP lock, decode vs prefill, \(T\) convention, complete vs language-only, both canonical sentences below plus the activation sentence.
+2. **Work convention** — MAC/FLOP lock, decode vs prefill, $T$ convention, complete vs language-only, both canonical sentences below plus the activation sentence.
 3. **Symbolic work** — per-region MAC formulas citing `(1)`–`(24)`.
-4. **Instantiated work** — \(C\), \(A\), \(T=1\) and \(T=4096\) tables; prefill identity; secondary last-logits row.
+4. **Instantiated work** — $C$, $A$, $T=1$ and $T=4096$ tables; prefill identity; secondary last-logits row.
 5. **Weight traffic** — BF16 inventory unique bytes; embed as gather; decode vs prefill.
 6. **State traffic** — TASK-04 decode volumes; prefill triangular KV; store after prefill.
 7. **Activation traffic** — forced vs region-cut vs GEMM-IO; catalog ranks; not fusion.
-8. **Intensity and bottleneck hypotheses** — \(I=F/B\) (TASK-16 F13); region table; labels as HYPOTHESIS.
+8. **Intensity and bottleneck hypotheses** — $I=F/B$ (TASK-16 F13); region table; labels as HYPOTHESIS.
 9. **Deferred vision** — residual-stream interface only.
 10. **Machine-checkable summary JSON** — one fenced `json` object copied from a fresh checker `--json` run.
 
@@ -86,7 +86,7 @@ JSON: `canonical_sentence_logical` = sentence 1; `canonical_sentence_hypothesis`
 
 Bullets required under that heading:
 
-- Mathematical work uses TASK-02 operator definitions; chunkwise GDN `(19)` as a dense \(128^3\) multiply is rejected as a work count.
+- Mathematical work uses TASK-02 operator definitions; chunkwise GDN `(19)` as a dense $128^3$ multiply is rejected as a work count.
 - Weight traffic uses TASK-01 BF16 inventory bytes (not GGUF Q4).
 - State traffic uses TASK-04 persistent-state bytes.
 - Fan-out ≠ must-store still holds; activation lower bounds are named catalog cuts, not a peak working set.
@@ -95,68 +95,68 @@ Bullets required under that heading:
 
 | Symbol | Meaning |
 | --- | --- |
-| MAC | One multiply-add in a **contraction**: GEMM / matvec \(y=Wx\), depthwise conv tap-sum `(14)`, GDN rank-1 update + state reads `(17)`–`(18)`, and attention \(QK^\top\) / \(AV\) `(9)`. No-bias maps add no extra MAC. |
-| FLOP (primary) | \(F=2\times\text{MAC}\) for those contractions (multiply and add). This \(F\) is the numerator of \(I=F/B\). |
+| MAC | One multiply-add in a **contraction**: GEMM / matvec $y=Wx$, depthwise conv tap-sum `(14)`, GDN rank-1 update + state reads `(17)`–`(18)`, and attention $QK^\top$ / $AV$ `(9)`. No-bias maps add no extra MAC. |
+| FLOP (primary) | $F=2\times\text{MAC}$ for those contractions (multiply and add). This $F$ is the numerator of $I=F/B$. |
 | Embed `(1)` | Gather; **0 MAC**. Cost is weight-gather traffic. |
-| Elementwise | RMSNorm `(2)`–`(3)`, SiLU, residual add `(4)`–`(5)`, softmax, RoPE `(12)`, \(\sigma\), \(\alpha/\beta\) `(15)`, L2 `(16)` are **not** in primary MAC and **not** in \(F\) for intensity. |
-| Outer product into \(S\) | Counted as MAC (\(d_k d_v\) per head) because it accumulates into \(S\). |
+| Elementwise | RMSNorm `(2)`–`(3)`, SiLU, residual add `(4)`–`(5)`, softmax, RoPE `(12)`, $\sigma$, $\alpha/\beta$ `(15)`, L2 `(16)` are **not** in primary MAC and **not** in $F$ for intensity. |
+| Outer product into $S$ | Counted as MAC ($d_k d_v$ per head) because it accumulates into $S$. |
 
-Primary work is contraction MAC (and \(F=2\times\text{MAC}\)). Elementwise is lower order: a documented ceiling of \(10^8\) FLOP for one complete decode at \(T=4096\) is enough to prove it is \(<1\%\) of \(2C_\text{complete}\). Do not publish a tight elementwise schedule; do not use elementwise for bottleneck labels.
+Primary work is contraction MAC (and $F=2\times\text{MAC}$). Elementwise is lower order: a documented ceiling of $10^8$ FLOP for one complete decode at $T=4096$ is enough to prove it is $<1\%$ of $2C_\text{complete}$. Do not publish a tight elementwise schedule; do not use elementwise for bottleneck labels.
 
-GQA: attention MAC uses \(n_h=24\) query heads, not \(n_\text{kv}=4\). Repeat-interleave of GDN Q/K is 0 MAC. GDN work uses definition `(17)`–`(18)`: \(3\,n_v^\ell d_k^\ell d_v^\ell\) MAC per token per linear layer. Do **not** count `(19)` as \(n_v^\ell (d_k^\ell)^3\).
+GQA: attention MAC uses $n_h=24$ query heads, not $n_\text{kv}=4$. Repeat-interleave of GDN Q/K is 0 MAC. GDN work uses definition `(17)`–`(18)`: $3\,n_v^\ell d_k^\ell d_v^\ell$ MAC per token per linear layer. Do **not** count `(19)` as $n_v^\ell (d_k^\ell)^3$.
 
 JSON: `flop_per_mac` = 2; `mac_embed` = 0; `elementwise_not_in_primary` = true; `elementwise_upper_bound_decode_T4096` = 100000000; `gdn_uses_rank1_eq_17_18` = true.
 
-### Decode vs prefill and \(T\) (lock)
+### Decode vs prefill and $T$ (lock)
 
-Let \(T\) be the stored KV length **after** appending the current token (TASK-04). Decode of one new token has incoming KV length \(T-1\) and attention contractions against **length \(T\)** (current token included). When \(T=1\), incoming KV is empty.
+Let $T$ be the stored KV length **after** appending the current token (TASK-04). Decode of one new token has incoming KV length $T-1$ and attention contractions against **length $T$** (current token included). When $T=1$, incoming KV is empty.
 
-- **Decode** = one position of the complete (or language-only) map at stored length \(T\).
-- **Prefill** of length \(T\) = the same map at \(t=1,\ldots,T\) from zero state. Causal full attention at step \(t\) contracts against length \(t\).
+- **Decode** = one position of the complete (or language-only) map at stored length $T$.
+- **Prefill** of length $T$ = the same map at $t=1,\ldots,T$ from zero state. Causal full attention at step $t$ contracts against length $t$.
 
 Identity (DERIVED):
 
-\[
+$$
 W_\text{decode}(T)=C+A T,\qquad
 W_\text{prefill}(T)=\sum_{t=1}^{T}(C+A t)=T C+A\frac{T(T+1)}{2}.
-\]
+$$
 
-At \(T=1\), prefill = decode. JSON: `T_is_stored_length_after_append` true; `decode_T_new` 1; `example_T` `[1, 4096]`.
+At $T=1$, prefill = decode. JSON: `T_is_stored_length_after_append` true; `decode_T_new` 1; `example_T` `[1, 4096]`.
 
-MTP KV uses the same \(T\) (TASK-02/04). Primary prefill therefore runs the MTP block at all \(T\) positions (teacher-forced \(e_{t+1}\)). Secondary **inference last-logits**: subtract \((T-1)\) times each evaluated `lm_head` contraction; mixers/MLP/MTP block still scale with \(T\) because MTP KV storage has rank \(T\).
+MTP KV uses the same $T$ (TASK-02/04). Primary prefill therefore runs the MTP block at all $T$ positions (teacher-forced $e_{t+1}$). Secondary **inference last-logits**: subtract $(T-1)$ times each evaluated `lm_head` contraction; mixers/MLP/MTP block still scale with $T$ because MTP KV storage has rank $T$.
 
 JSON: `primary_includes_mtp` true.
 
 ### Symbolic work by region (lock)
 
-Layer counts: \(n_\text{lin}=48\), \(n_\text{full}=16\), \(n_\text{mtp}=1\), \(L=64\). Instantiated GEMM MAC \(=d_\text{out}d_\text{in}\) for \(W\in\mathbb{R}^{d_\text{out}\times d_\text{in}}\).
+Layer counts: $n_\text{lin}=48$, $n_\text{full}=16$, $n_\text{mtp}=1$, $L=64$. Instantiated GEMM MAC $=d_\text{out}d_\text{in}$ for $W\in\mathbb{R}^{d_\text{out}\times d_\text{in}}$.
 
-| Region | Eqs | MAC per token (T-free) | T coefficient \(A\) (MAC / stored-length unit) |
+| Region | Eqs | MAC per token (T-free) | T coefficient $A$ (MAC / stored-length unit) |
 | --- | --- | --- | --- |
 | `embed` | (1) | 0 | 0 |
-| `linear_attn` (one layer) | (13)–(20) | \(W_\text{qkv}+W_z+W_a+W_b+W_\text{out}\) + \(d_\text{qkv}k_\text{conv}\) + \(3 n_v d_k d_v\) | 0 |
-| `full_attn` (one layer) | (6)–(10),(12) | \(W_q+W_k+W_v+W_o\) | \(2 n_h d_h=12288\) (QK + AV) |
-| `mlp` (one layer) | (21) | \(3\,I H\) | 0 |
-| `primary_logits` / `lm_head` | (22) | \(V H\) | 0 |
-| `mtp` extras | (23)–(24) plus one full+MLP | \(H\cdot 2H + (W_q+W_k+W_v+W_o) + 3IH + VH\) | \(12288\) (MTP attention) |
+| `linear_attn` (one layer) | (13)–(20) | $W_\text{qkv}+W_z+W_a+W_b+W_\text{out}$ + $d_\text{qkv}k_\text{conv}$ + $3 n_v d_k d_v$ | 0 |
+| `full_attn` (one layer) | (6)–(10),(12) | $W_q+W_k+W_v+W_o$ | $2 n_h d_h=12288$ (QK + AV) |
+| `mlp` (one layer) | (21) | $3\,I H$ | 0 |
+| `primary_logits` / `lm_head` | (22) | $V H$ | 0 |
+| `mtp` extras | (23)–(24) plus one full+MLP | $H\cdot 2H + (W_q+W_k+W_v+W_o) + 3IH + VH$ | $12288$ (MTP attention) |
 
 Instantiated per-layer MAC (must appear as these integers):
 
 | Quantity | MAC | How |
 | --- | ---: | --- |
-| Full proj one layer | 104857600 | \(12288\cdot5120+2\cdot1024\cdot5120+5120\cdot6144\) |
-| Linear proj \(W_\text{qkv,z,a,b}\) | 84377600 | \(10240\cdot5120+6144\cdot5120+2\cdot48\cdot5120\) |
-| Linear conv | 40960 | \(10240\cdot 4\) |
-| GDN `(17)`–`(18)` | 2359296 | \(3\cdot48\cdot128\cdot128\) |
-| Linear `out_proj` | 31457280 | \(5120\cdot6144\) |
+| Full proj one layer | 104857600 | $12288\cdot5120+2\cdot1024\cdot5120+5120\cdot6144$ |
+| Linear proj $W_\text{qkv,z,a,b}$ | 84377600 | $10240\cdot5120+6144\cdot5120+2\cdot48\cdot5120$ |
+| Linear conv | 40960 | $10240\cdot 4$ |
+| GDN `(17)`–`(18)` | 2359296 | $3\cdot48\cdot128\cdot128$ |
+| Linear `out_proj` | 31457280 | $5120\cdot6144$ |
 | Linear token total | 118235136 | sum of the four linear rows |
-| MLP one layer | 267386880 | \(3\cdot17408\cdot5120\) |
-| `lm_head` or one embed-table GEMM | 1271398400 | \(248320\cdot5120\) |
-| `mtp.fc` | 52428800 | \(5120\cdot10240\) |
+| MLP one layer | 267386880 | $3\cdot17408\cdot5120$ |
+| `lm_head` or one embed-table GEMM | 1271398400 | $248320\cdot5120$ |
+| `mtp.fc` | 52428800 | $5120\cdot10240$ |
 
 Stack coefficients (primary complete = language + MTP):
 
-\[
+$$
 \begin{aligned}
 C_\text{lin}&=48\cdot 118235136=5675286528,\\
 C_\text{full}&=16\cdot 104857600=1677721600,\\
@@ -168,22 +168,22 @@ C_\text{complete}=27433238528,\\
 A_\text{language}&=16\cdot 12288=196608,\qquad
 A_\text{complete}=208896.
 \end{aligned}
-\]
+$$
 
-\(C_\text{language}=C_\text{lin}+C_\text{full}+C_\text{mlp}+C_\text{lm}\). \(C_\text{complete}=C_\text{language}+C_\text{mtp}\). \(A_\text{complete}=A_\text{language}+12288\).
+$C_\text{language}=C_\text{lin}+C_\text{full}+C_\text{mlp}+C_\text{lm}$. $C_\text{complete}=C_\text{language}+C_\text{mtp}$. $A_\text{complete}=A_\text{language}+12288$.
 
-Prefill causal attention uses exact \(T(T+1)/2\), not \(T^2/2\).
+Prefill causal attention uses exact $T(T+1)/2$, not $T^2/2$.
 
 Secondary inference last-logits:
 
-\[
+$$
 W^\text{last}_\text{language}(T)=W_\text{language}(T)-(T-1)C_\text{lm},\qquad
 W^\text{last}_\text{complete}(T)=W_\text{complete}(T)-2(T-1)C_\text{lm}.
-\]
+$$
 
 ### Instantiated work (lock)
 
-| Mode | \(T=1\) MAC | \(T=4096\) MAC |
+| Mode | $T=1$ MAC | $T=4096$ MAC |
 | --- | ---: | ---: |
 | Decode language | 25737363456 | 26542473216 |
 | Decode complete | 27433447424 | 28288876544 |
@@ -192,7 +192,7 @@ W^\text{last}_\text{complete}(T)=W_\text{complete}(T)-2(T-1)C_\text{lm}.
 | Prefill last-logits language | 25737363456 | 101862729056256 |
 | Prefill last-logits complete | 27433447424 | 103706566590464 |
 
-Companion FLOP = \(2\times\) MAC. JSON arrays `mac_decode_language_at_example_T` etc. follow `example_T` order. Checker must recompute \(C+AT\) and \(TC+AT(T+1)/2\) from config shapes, not copy literals without asserts.
+Companion FLOP = $2\times$ MAC. JSON arrays `mac_decode_language_at_example_T` etc. follow `example_T` order. Checker must recompute $C+AT$ and $TC+AT(T+1)/2$ from config shapes, not copy literals without asserts.
 
 ### Weight traffic (lock)
 
@@ -210,13 +210,13 @@ Element size BF16 = 2 bytes OBSERVED. Unique parameter bytes = TASK-01 family to
 | Language+MTP excl. vision | 54641395712 | |
 | `embed` table (not streamed) | 2542796800 | gather instead |
 
-Decode/prefill **do not** stream the full embed table. Gather one row = \(H\cdot 2=10240\) bytes.
+Decode/prefill **do not** stream the full embed table. Gather one row = $H\cdot 2=10240$ bytes.
 
-- Unique non-embed (language+MTP minus \(E\)): \(52098598912\) bytes.
-- Decode gather: language \(10240\); complete \(20480\) (\(e_t\) and \(e_{t+1}\)).
-- Prefill gather: language \(T\cdot 10240\); complete \(2T\cdot 10240\) (prompt ids \(1\ldots T\) plus MTP next-ids \(2\ldots T+1\)).
-- Irreducible unique+gather decode complete: \(52098619392\) bytes.
-- A second physical read of shared \(W_\text{lm}\) for `logits_1` is **not** in the unique lower bound (same tensor). Label any double-read as HYPOTHESIS, not DERIVED traffic.
+- Unique non-embed (language+MTP minus $E$): $52098598912$ bytes.
+- Decode gather: language $10240$; complete $20480$ ($e_t$ and $e_{t+1}$).
+- Prefill gather: language $T\cdot 10240$; complete $2T\cdot 10240$ (prompt ids $1\ldots T$ plus MTP next-ids $2\ldots T+1$).
+- Irreducible unique+gather decode complete: $52098619392$ bytes.
+- A second physical read of shared $W_\text{lm}$ for `logits_1` is **not** in the unique lower bound (same tensor). Label any double-read as HYPOTHESIS, not DERIVED traffic.
 - Vision family bytes are excluded from primary. Do not use GGUF Q4 sizes.
 
 JSON: `weight_bytes_*` fields below; `weight_gather_bytes_per_row` = 10240.
@@ -225,70 +225,70 @@ JSON: `weight_bytes_*` fields below; `weight_gather_bytes_per_row` = 10240.
 
 Copy TASK-04 coefficients; do not re-derive ranks. Primary includes MTP KV (17 full layers).
 
-Decode (\(T_\text{new}=1\)):
+Decode ($T_\text{new}=1$):
 
 | Channel | Write bytes | Read bytes |
 | --- | ---: | --- |
-| KV | 69632 | \(69632(T-1)\) |
-| \(C\) | 983040 | 2949120 |
-| \(S\) (F32) | 150994944 | 150994944 |
-| Total | 152047616 | \(69632(T-1)+153944064\) |
+| KV | 69632 | $69632(T-1)$ |
+| $C$ | 983040 | 2949120 |
+| $S$ (F32) | 150994944 | 150994944 |
+| Total | 152047616 | $69632(T-1)+153944064$ |
 
-Instantiated decode read: \(T=1\) → \(153944064\); \(T=4096\) → \(439087104\). Storage after append: \(B_\text{store}(T)=69632T+153944064\) (`154013696` at \(T=1\), `439156736` at \(T=4096\)).
+Instantiated decode read: $T=1$ → $153944064$; $T=4096$ → $439087104$. Storage after append: $B_\text{store}(T)=69632T+153944064$ (`154013696` at $T=1$, `439156736` at $T=4096$).
 
 Prefill from zeros (this task expands the triangular KV schedule TASK-04 deferred):
 
-\[
+$$
 B^\text{KV,read}_\text{prefill}(T)=69632\cdot\frac{T(T-1)}{2},\qquad
 B^\text{KV,write}_\text{prefill}(T)=69632\,T.
-\]
+$$
 
-Instantiated KV read: \(T=1\) → \(0\); \(T=4096\) → \(583972945920\). KV write at \(T=4096\) → \(285212672\).
+Instantiated KV read: $T=1$ → $0$; $T=4096$ → $583972945920$. KV write at $T=4096$ → $285212672$.
 
-C/S mathematical per-step volumes scale as TASK-04 × \(T\) (recurrent definition). Initial-zero reads move 0 physical bytes; still list the mathematical TASK-04 per-token numbers. Surviving store after prefill is \(B_\text{store}(T)\), not \(T\times B_S\).
+C/S mathematical per-step volumes scale as TASK-04 × $T$ (recurrent definition). Initial-zero reads move 0 physical bytes; still list the mathematical TASK-04 per-token numbers. Surviving store after prefill is $B_\text{store}(T)$, not $T\times B_S$.
 
-Do not use chunkwise GDN to claim zero \(S\) traffic; the definition is recurrent `(17)`.
+Do not use chunkwise GDN to claim zero $S$ traffic; the definition is recurrent `(17)`.
 
 ### Activation traffic (lock)
 
-BF16 activations (not \(S\)). Three DERIVED views; **primary reported bound is region-cut**. None is a CUDA live-set or fusion claim.
+BF16 activations (not $S$). Three DERIVED views; **primary reported bound is region-cut**. None is a CUDA live-set or fusion claim.
 
 1. **Forced** (TASK-04 must-survive non-state): `h`, `h_mid`, `g`, `z`, `logits_0`, and for complete also MTP `h`/`h_mid`/`g`/`logits_1`.
-   - Decode language: \(64\cdot 10240\cdot 2 + 16\cdot 12288 + 48\cdot 12288 + 496640 = 2593792\) bytes (`h`+`h_mid` + `g` + `z` + `logits_0`).
-   - Decode complete: \(2593792 + 2\cdot 10240 + 12288 + 496640 = 3123200\).
+   - Decode language: $64\cdot 10240\cdot 2 + 16\cdot 12288 + 48\cdot 12288 + 496640 = 2593792$ bytes (`h`+`h_mid` + `g` + `z` + `logits_0`).
+   - Decode complete: $2593792 + 2\cdot 10240 + 12288 + 496640 = 3123200$.
 2. **Region-cut** (primary): forced plus catalog IDs at TASK-03 region boundaries: `e`, `h_tilde`, `mix_lin`/`mix_full`, `h_post`, `mlp_out`, `h_64`, `h_final`, and MTP `e_next`, `mtp_u`, `h_mtp`.
-   - Decode language: \(5245952\) bytes.
-   - Decode complete: \(5847040\) bytes.
-   - Prefill = \(T\) × decode region-cut (per-position map). \(T=4096\): language \(21487419392\); complete \(23949475840\).
-3. **GEMM-IO** (intensity denominator only, not the materialization floor): for each \(y=Wx\), count \((d_\text{in}+d_\text{out})\times 2\) bytes. Unfused; double-counts a residual vector that feeds several maps.
-   - One linear layer: \(96448\); one full proj: \(81920\); one MLP: \(135168\); `lm_head`: \(506880\); `mtp.fc`: \(30720\).
-   - Decode language all GEMMs: \(15097856\); complete: \(15852544\).
+   - Decode language: $5245952$ bytes.
+   - Decode complete: $5847040$ bytes.
+   - Prefill = $T$ × decode region-cut (per-position map). $T=4096$: language $21487419392$; complete $23949475840$.
+3. **GEMM-IO** (intensity denominator only, not the materialization floor): for each $y=Wx$, count $(d_\text{in}+d_\text{out})\times 2$ bytes. Unfused; double-counts a residual vector that feeds several maps.
+   - One linear layer: $96448$; one full proj: $81920$; one MLP: $135168$; `lm_head`: $506880$; `mtp.fc`: $30720$.
+   - Decode language all GEMMs: $15097856$; complete: $15852544$.
 
 Omit intra-region ephemerals (`qkv`, `attn`, `swiglu`, …) from views 1–2; TASK-12 may fuse them. Do not add GEMM-IO into region-cut. Softmax score matrices are not catalog IDs; their traffic is the KV **state** channel.
 
 ### Intensity and bottleneck hypotheses (lock)
 
-Use TASK-16 F13 \(I=F/B\) with \(F=2\times\text{MAC}\) and \(B=\) weight + (GEMM-IO or region-cut, named) + state bytes in that region. Ridge \(I_\text{ridge}=\Pi_\text{peak}/\Beta\) is UNKNOWN (no SKU fill-in). Every **class** below is HYPOTHESIS. Exact \(I\) identities that do not need a ridge are DERIVED.
+Use TASK-16 F13 $I=F/B$ with $F=2\times\text{MAC}$ and $B=$ weight + (GEMM-IO or region-cut, named) + state bytes in that region. Ridge $I_\text{ridge}=\Pi_\text{peak}/\Beta$ is UNKNOWN (no SKU fill-in). Every **class** below is HYPOTHESIS. Exact $I$ identities that do not need a ridge are DERIVED.
 
-Locked DERIVED intensities (decode, named \(B\)):
+Locked DERIVED intensities (decode, named $B$):
 
 | Region | Identity | Value |
 | --- | --- | ---: |
-| MLP vs weights only | \(2\cdot 267386880 / 534773760\) | \(1\) exactly |
-| `lm_head` vs weights only | \(2\cdot 1271398400 / 2542796800\) | \(1\) exactly |
-| GDN vs \(S\) read+write | \(2\cdot 2359296 / (2\cdot 3145728)\) | \(0.75\) exactly |
-| Full-attn core vs KV read\((T-1)\)+write | \(2\cdot 12288 T / (4096 T)\) | \(6\) exactly (\(T\ge 1\)) |
+| MLP vs weights only | $2\cdot 267386880 / 534773760$ | $1$ exactly |
+| `lm_head` vs weights only | $2\cdot 1271398400 / 2542796800$ | $1$ exactly |
+| GDN vs $S$ read+write | $2\cdot 2359296 / (2\cdot 3145728)$ | $0.75$ exactly |
+| Full-attn core vs KV read$(T-1)$+write | $2\cdot 12288 T / (4096 T)$ | $6$ exactly ($T\ge 1$) |
 
 Locked HYPOTHESIS labels (`bottleneck_labels` JSON, this order):
 
 | ID | Applies when | Claim (must remain HYPOTHESIS) |
 | --- | --- | --- |
-| `weight_memory` | Decode GEMM regions with \(I\approx 1\) FLOP/byte (MLP, projections, `lm_head`) | Memory-bound on any SKU whose ridge \(\gg 1\) |
+| `weight_memory` | Decode GEMM regions with $I\approx 1$ FLOP/byte (MLP, projections, `lm_head`) | Memory-bound on any SKU whose ridge $\gg 1$ |
 | `vocab_memory` | `lm_head` unique 2542796800 B | Vocabulary projection is a decode weight-traffic outlier |
-| `state_memory` | GDN \(I=0.75\) vs \(S\); C/S dominate TASK-04 decode bytes | Linear-attn state traffic, not MAC, is the linear-mixer limiter |
-| `kv_memory` | Full-attn core \(I=6\) vs KV | KV movement, not QK FLOPs, limits decode full-attn until a ridge is known |
-| `quadratic_attn` | Prefill \(A T(T+1)/2\) MAC and triangular KV read | Prefill full-attn is the only quadratic region; linear-attn stays linear in \(T\) |
-| `compute` | Prefill reuses weights across \(T\) tokens, \(I\sim T\) vs decode | Large-\(T\) prefill GEMMs may be compute-bound if \(T>I_\text{ridge}\) |
+| `state_memory` | GDN $I=0.75$ vs $S$; C/S dominate TASK-04 decode bytes | Linear-attn state traffic, not MAC, is the linear-mixer limiter |
+| `kv_memory` | Full-attn core $I=6$ vs KV | KV movement, not QK FLOPs, limits decode full-attn until a ridge is known |
+| `quadratic_attn` | Prefill $A T(T+1)/2$ MAC and triangular KV read | Prefill full-attn is the only quadratic region; linear-attn stays linear in $T$ |
+| `compute` | Prefill reuses weights across $T$ tokens, $I\sim T$ vs decode | Large-$T$ prefill GEMMs may be compute-bound if $T>I_\text{ridge}$ |
 
 Do not rank these by wall time. Do not name CUDA kernels. Do not claim a winner quantization or fusion.
 
@@ -319,7 +319,7 @@ python3 scripts/check_work_and_traffic.py \
 
 Behavior:
 
-- Read `text_config` from `--config`. Build the summary object (schema below). Live fields from config: `hidden_size`, `intermediate_size`, `vocab_size`, layer counts, head dims, linear widths, `full_attention_indices`. Derived: all MAC \(C,A\), example-\(T\) instantiations, weight bytes from shapes×2, activation bytes, triangular KV. Constant fields: canonical sentences, `flop_per_mac`, `example_T`, `n_diagrams`, bottleneck label list, booleans.
+- Read `text_config` from `--config`. Build the summary object (schema below). Live fields from config: `hidden_size`, `intermediate_size`, `vocab_size`, layer counts, head dims, linear widths, `full_attention_indices`. Derived: all MAC $C,A$, example-$T$ instantiations, weight bytes from shapes×2, activation bytes, triangular KV. Constant fields: canonical sentences, `flop_per_mac`, `example_T`, `n_diagrams`, bottleneck label list, booleans.
 - `--json`: print that object to stdout (pretty-printed, script key order); run internal asserts listed below; exit 0.
 - Default / `--work-traffic PATH`: also require PATH to contain (1) every required `##` heading listed above **in order**, (2) the first fenced `json` block equal to the live object, (3) exactly one ` ```mermaid ` fence containing `flowchart`, (4) all three canonical sentences verbatim, (5) every `catalog_ids` entry present as a substring, (6) the diagram’s required IDs present **inside that mermaid fence**, (7) none of `TBD`, `TODO`, `???`, (8) no `UNKNOWN` except inside the Deferred vision section, (9) every locked document integer below present as a decimal substring, (10) the six bottleneck label ids present as substrings. Exit 1 with a readable list on mismatch.
 - Missing config: exit 2 (blocked, not a content fail).
@@ -334,7 +334,7 @@ Do not read safetensor payloads. Do not require other architecture markdown JSON
 - `mac_full_proj_per_layer==104857600`, `mac_lin_token_per_layer==118235136`, `mac_mlp_per_layer==267386880`, `mac_lm_head==1271398400`
 - `mac_C_language==25737166848`, `mac_C_complete==27433238528`, `mac_A_language==196608`, `mac_A_complete==208896`
 - `mac_C_complete == mac_C_language + mac_C_mtp`
-- for each `example_T[i]`: decode \(=C+AT\), prefill \(=TC+AT(T+1)/2\), last-logits formulas, storage/decode-read match TASK-04 integers, prefill KV read \(=69632 T(T-1)/2\)
+- for each `example_T[i]`: decode $=C+AT$, prefill $=TC+AT(T+1)/2$, last-logits formulas, storage/decode-read match TASK-04 integers, prefill KV read $=69632 T(T-1)/2$
 - `weight_bytes_language_linear_attn==11124102144` and other family bytes in the schema (recomputed from shapes)
 - `weight_bytes_language_mtp_excl_vision==54641395712`
 - `i_mlp_weight_only==1`, `i_lm_head_weight_only==1`, `i_gdn_vs_s_rw==0.75`, `i_attn_core_vs_kv==6`
@@ -377,28 +377,28 @@ Integer JSON fields that are intensities may be JSON numbers `1`, `0.75`, `6` (n
 
 - **Implementation** writes `scripts/check_work_and_traffic.py` **and** `docs/architecture/work-and-traffic.md` (convention, symbolic+instantiated tables, three traffic channels, hypothesis labels, JSON fence). Runs `--json` and `--work-traffic` after the document exists. Records command outcomes in this dossier. Does not commit.
 - **Documentation** performs a mechanical pass only: draft-status `unverified` banner, Authority table links to this dossier / semantics / dataflow / lifetime / inventory / plan evidence policy, heading/JSON fence consistency. Must not change locked MAC integers, traffic integers, canonical sentences, bottleneck ids, or Mermaid node IDs. Does not edit TASK-02/03/04 artifacts.
-- **Verification** independently re-runs focused commands, recomputes \(C,A,W(T)\) and byte products from sitting `text_config` ranks (not from JSON echo), reads the document against this dossier, and confirms no Quartz/llama.cpp/GGUF evidence, no `plan.md` edit, and that bottleneck rows are labelled HYPOTHESIS.
+- **Verification** independently re-runs focused commands, recomputes $C,A,W(T)$ and byte products from sitting `text_config` ranks (not from JSON echo), reads the document against this dossier, and confirms no Quartz/llama.cpp/GGUF evidence, no `plan.md` edit, and that bottleneck rows are labelled HYPOTHESIS.
 
 - Invariants:
   - Ten level-2 headings in the locked order; 52 catalog IDs mentioned; six bottleneck ids; three canonical sentences verbatim.
-  - Prefill identity \(TC+AT(T+1)/2\); \(T\) after-append; primary includes MTP.
-  - \(F=2\times\text{MAC}\); GDN rank-1; embed 0 MAC; elementwise not in primary.
+  - Prefill identity $TC+AT(T+1)/2$; $T$ after-append; primary includes MTP.
+  - $F=2\times\text{MAC}$; GDN rank-1; embed 0 MAC; elementwise not in primary.
   - Weight BF16 inventory; state TASK-04; activation region-cut from catalog ranks.
   - Logical values do not imply allocation; bottlenecks are hypotheses.
   - Vision encoder remains unexpanded.
 - Rejected alternatives:
-  - Counting `(19)` as \(48\times 128^3\) MAC: rejected; definition is `(17)`–`(18)`.
-  - FLOP=MAC (not \(2\times\)): rejected; intensity needs add+mul.
+  - Counting `(19)` as $48\times 128^3$ MAC: rejected; definition is `(17)`–`(18)`.
+  - FLOP=MAC (not $2\times$): rejected; intensity needs add+mul.
   - Streaming the full embed table as decode weight traffic: rejected; gather only.
-  - GGUF Q4 or CUDA dtype sizes: rejected; BF16 inventory + conceptual F32 \(S\).
+  - GGUF Q4 or CUDA dtype sizes: rejected; BF16 inventory + conceptual F32 $S$.
   - Summing all 52 catalog tensors as activation traffic: rejected; that is not a minimum and contradicts logical ≠ physical.
   - Using CUDA fusion to cut activation bytes: TASK-12.
-  - Filling TASK-16 SKU \(\Pi_\text{peak}\) or measuring tok/s: forbidden; labels stay HYPOTHESIS.
+  - Filling TASK-16 SKU $\Pi_\text{peak}$ or measuring tok/s: forbidden; labels stay HYPOTHESIS.
   - Inspecting Quartz or llama.cpp for “real” FLOPs: forbidden by plan.md.
   - uv / Ruff / pytest for this increment: rejected; stdlib checker matches TASK-01–04.
   - Editing frozen TASK-01–04 docs or `plan.md`.
   - Omitting MTP from primary: rejected; complete map and TASK-04 MTP KV.
-  - Prefill attention \(T^2/2\) approximation: rejected; exact \(T(T+1)/2\).
+  - Prefill attention $T^2/2$ approximation: rejected; exact $T(T+1)/2$.
   - Importing other `check_*.py` as a library.
 - Discovered ledger work: `none`
 - Unresolved decisions: `none`
@@ -407,7 +407,7 @@ Integer JSON fields that are intensities may be JSON numbers `1`, `0.75`, `6` (n
 
 - Acceptance conditions:
   - `docs/architecture/work-and-traffic.md` exists and follows the heading list above.
-  - Symbolic MAC formulas per region cite TASK-02 tags; instantiated \(C,A\) and \(T=1,4096\) tables match the locked integers.
+  - Symbolic MAC formulas per region cite TASK-02 tags; instantiated $C,A$ and $T=1,4096$ tables match the locked integers.
   - Weight traffic uses TASK-01 BF16 family totals with embed-as-gather; state traffic uses TASK-04 bytes plus triangular prefill KV; activation traffic reports forced, region-cut (primary), and GEMM-IO with locked integers.
   - Bottleneck section lists the six labels as HYPOTHESIS and closes the ledger open question (not left UNKNOWN except vision).
   - Three canonical sentences verbatim; one Mermaid flowchart contains the required IDs.
@@ -454,19 +454,19 @@ Do not run Ruff, pytest, CMake, or CUDA; this increment does not introduce those
 
 - Agent/model: `cursor-grok-4.6-high` (this stage; parent/inherit mapping)
 - UTC/time/tokens/cost: `2026-09-20T12:49:00Z`; `telemetry_unavailable`
-- Outcome: Decision-complete dossier created at `docs/architecture/tasks/TASK-06.md`. Coupled IDs `none`. Document structure (10 headings), MAC/FLOP convention, decode/prefill \(T\) identity, region MAC formulas citing TASK-02, weight/state/activation traffic floors, six HYPOTHESIS bottleneck labels, stdlib checker `scripts/check_work_and_traffic.py`, JSON schema, and acceptance commands are closed. `docs/architecture/work-and-traffic.md` and the checker were **not** written in this stage.
+- Outcome: Decision-complete dossier created at `docs/architecture/tasks/TASK-06.md`. Coupled IDs `none`. Document structure (10 headings), MAC/FLOP convention, decode/prefill $T$ identity, region MAC formulas citing TASK-02, weight/state/activation traffic floors, six HYPOTHESIS bottleneck labels, stdlib checker `scripts/check_work_and_traffic.py`, JSON schema, and acceptance commands are closed. `docs/architecture/work-and-traffic.md` and the checker were **not** written in this stage.
 - Performance evidence applied: N/A — derived work/traffic documentation; bottleneck labels are hypotheses, not measured sink ranking
 
 ### Implementation
 
 - Agent/model: `cursor-grok-4.6-high` (this stage; parent/inherit mapping)
 - Changes:
-  - Created `scripts/check_work_and_traffic.py` (stdlib checker: `text_config` arithmetic for MAC \(C,A\), example-\(T\) instantiations, BF16 family bytes, TASK-04 state volumes + triangular prefill KV, activation forced/region-cut/GEMM-IO, F13 intensities; `--json` asserts; `--work-traffic` heading/JSON/mermaid/canonical/catalog/integer checks).
+  - Created `scripts/check_work_and_traffic.py` (stdlib checker: `text_config` arithmetic for MAC $C,A$, example-$T$ instantiations, BF16 family bytes, TASK-04 state volumes + triangular prefill KV, activation forced/region-cut/GEMM-IO, F13 intensities; `--json` asserts; `--work-traffic` heading/JSON/mermaid/canonical/catalog/integer checks).
   - Created `docs/architecture/work-and-traffic.md` (ten locked headings, three canonical sentences, symbolic+instantiated MAC tables, three traffic channels, six HYPOTHESIS bottleneck labels, one `flowchart TB` mermaid, JSON fence copied from live `--json`).
   - Did not edit `docs/architecture/plan.md`, `model-semantics.md`, `dataflow.md`, `lifetime-and-state.md`, or `model-inventory.md`. Did not commit.
 - Commands:
   - `python3 -m py_compile scripts/check_work_and_traffic.py` — pass (exit 0)
-  - `python3 scripts/check_work_and_traffic.py --config .cache/authorities/qwen3.8-27b-transformers/config.json --json` — pass (exit 0); live object matches locked \(C,A\), family bytes, example-\(T\) MAC/bytes, intensities \(1\), \(0.75\), \(6\)
+  - `python3 scripts/check_work_and_traffic.py --config .cache/authorities/qwen3.8-27b-transformers/config.json --json` — pass (exit 0); live object matches locked $C,A$, family bytes, example-$T$ MAC/bytes, intensities $1$, $0.75$, $6$
   - `python3 scripts/check_work_and_traffic.py --config .cache/authorities/qwen3.8-27b-transformers/config.json --work-traffic docs/architecture/work-and-traffic.md` — pass (exit 0)
 - UTC/time/tokens/cost: `2026-09-20T13:05:51Z`; `telemetry_unavailable`
 
@@ -493,10 +493,10 @@ Do not run Ruff, pytest, CMake, or CUDA; this increment does not introduce those
   - `UNKNOWN` appears only under **Deferred vision**; no `TBD` / `TODO` / `???`.
 - Independent raw-record checks (recomputed from sitting `text_config` ranks, not JSON echo):
   - Layer counts and `full_attention_indices` from `layer_types`: PASS.
-  - Per-layer MAC, \(C_\text{language}\), \(C_\text{complete}\), \(A_\text{language}\), \(A_\text{complete}\): PASS (locked integers).
-  - Decode \(C+AT\), prefill \(TC+AT(T+1)/2\), last-logits formulas at \(T\in\{1,4096\}\): PASS.
-  - TASK-04 state bytes (conv delay \(k-1\), F32 \(S\)), triangular prefill KV read, storage/decode-read at \(T=4096\): PASS.
-  - Intensities \(I=1\) (MLP/`lm_head`), \(0.75\) (GDN vs \(S\)), \(6\) (full-attn core vs KV); elementwise ceiling \(<1\%\) of complete decode FLOP at \(T=4096\): PASS.
+  - Per-layer MAC, $C_\text{language}$, $C_\text{complete}$, $A_\text{language}$, $A_\text{complete}$: PASS (locked integers).
+  - Decode $C+AT$, prefill $TC+AT(T+1)/2$, last-logits formulas at $T\in\{1,4096\}$: PASS.
+  - TASK-04 state bytes (conv delay $k-1$, F32 $S$), triangular prefill KV read, storage/decode-read at $T=4096$: PASS.
+  - Intensities $I=1$ (MLP/`lm_head`), $0.75$ (GDN vs $S$), $6$ (full-attn core vs KV); elementwise ceiling $<1\%$ of complete decode FLOP at $T=4096$: PASS.
   - JSON fence byte-identical to fresh `--json` stdout (key order included): PASS.
 - Commands:
   - `python3 -m py_compile scripts/check_work_and_traffic.py` — **pass** (exit 0)
@@ -515,7 +515,7 @@ none
 ### Final outcome
 
 - Status: `DONE`
-- Acceptance evidence: verification pass (attempt 1) — `docs/architecture/work-and-traffic.md` (10 locked headings, three canonical sentences, symbolic+instantiated MAC tables, three traffic channels, six HYPOTHESIS bottleneck labels, one `flowchart TB` mermaid, JSON fence); `scripts/check_work_and_traffic.py` stdlib checker; independent \(C,A\) and byte recomputation from sitting `text_config`; frozen upstream docs unchanged; open question closed with DERIVED intensities and HYPOTHESIS bottleneck classes
+- Acceptance evidence: verification pass (attempt 1) — `docs/architecture/work-and-traffic.md` (10 locked headings, three canonical sentences, symbolic+instantiated MAC tables, three traffic channels, six HYPOTHESIS bottleneck labels, one `flowchart TB` mermaid, JSON fence); `scripts/check_work_and_traffic.py` stdlib checker; independent $C,A$ and byte recomputation from sitting `text_config`; frozen upstream docs unchanged; open question closed with DERIVED intensities and HYPOTHESIS bottleneck classes
 - Candidate measured delta: N/A (no throughput work)
 - Shipping delta: N/A (diagnostics/documentation)
 - Quality result: not required

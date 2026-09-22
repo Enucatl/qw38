@@ -73,7 +73,7 @@ N/A — compiler **pipeline** documentation. No prefill/decode/component timing,
 If an occupancy product would disagree with TASK-01 / sitting `text_config`, or a cited absmax/zero count would disagree with TASK-05, or a recipe/family/metadata lower bound would disagree with TASK-08, or a capability/open-decision id would disagree with TASK-09, the earlier document wins and this one is wrong.
 
 - Prefill and decode share **one** compiled artifact (TASK-09). The compiler does not emit a second artifact per schedule.
-- Primary object is language+MTP **checkpoint parameters** after a TASK-08 recipe (role `param`). Secondary object is token-persistent **state schema** for \(K,V,C,S\) (role `state`). Activations and accumulators are **not** compiler payloads.
+- Primary object is language+MTP **checkpoint parameters** after a TASK-08 recipe (role `param`). Secondary object is token-persistent **state schema** for $K,V,C,S$ (role `state`). Activations and accumulators are **not** compiler payloads.
 - Algebraic equivalents in TASK-02 are the same real map; quantization and packing act on stored elements, not on a second mathematical model.
 - Logical values do not imply allocation; a compiled tensor is not a CUDA buffer.
 - Do not inspect Quartz, llama.cpp, or GGUF byte layouts to “confirm” compiler stages.
@@ -198,7 +198,7 @@ JSON array `analysis_output_ids` in this exact order (5 ids). JSON `n_analysis_o
 | `family_absmax` | Cited TASK-05 pooled family absmax / rms / percentiles | `model` |
 | `directional_ratios` | Cited TASK-05 row/col absmax ratios | `model` |
 | `outlier_fractions` | Cited TASK-05 `frac_out_6x` / `frac_out_10x` | `model` |
-| `group_local_stats` | Conceptual compile-time group absmax/rms/min/max/\(p_{99}\) / \(p_{50}\) for the declared recipe’s grouping | `model` |
+| `group_local_stats` | Conceptual compile-time group absmax/rms/min/max/$p_{99}$ / $p_{50}$ for the declared recipe’s grouping | `model` |
 | `optional_calibration_hook` | Optional activation / Hessian-like records; **no corpus selected** | `calibration` |
 
 JSON `analysis_cites_task05` true. JSON `analysis_group_local_at_compile` true (conceptual). JSON `calibration_hook_without_corpus` true.
@@ -224,17 +224,17 @@ Scale **values** for TASK-08 scale ids (`symmetric_absmax`, `symmetric_rms`, `as
 
 Control emission: every defined family `keep_source`. JSON `control_profile_is_keep_source` true. Do not call control a baseline quality winner.
 
-Prose required: an **example** assignment may name `mlp_up_gate` × `i4_g128` only with the words `example` and `not a selected winner`. Packed-size illustrations (MLP int4 \(g=128\) ratio 0.2578125; unique-non-embed 13431670032 B) are DERIVED citations from TASK-08/09, **not** a selected balanced-profile output.
+Prose required: an **example** assignment may name `mlp_up_gate` × `i4_g128` only with the words `example` and `not a selected winner`. Packed-size illustrations (MLP int4 $g=128$ ratio 0.2578125; unique-non-embed 13431670032 B) are DERIVED citations from TASK-08/09, **not** a selected balanced-profile output.
 
 Rank-1 families must not receive `per_row` / `per_col` recipes (TASK-08 validity). MTP rank-2 weights **mirror** the matching language family. `mtp.fc` is its own family.
 
 ### Packing, metadata, and integrity (lock)
 
-**Packing** must be able to express all eight TASK-09 `packing_capability_ids` in TASK-09 order: `bit_pack`, `scale_storage`, `scale_placement`, `alignment_pad`, `endian_le`, `row_addressable`, `integrity_record`, `view_binding`. JSON `n_packing_capabilities` = 8. Do not select among `scale_storage_bytes_candidates` `[2, 4]`, `scale_placement_candidates` `["sidecar_array","interleaved_group"]`, `alignment_grain_candidates` `[1, 16, 32, 128, 256]`, or `code_bit_order_candidates` `["lsb_first","msb_first"]`. Portable-view payloads remain little-endian (TASK-09 requirement, ownership `architecture`). Specialized-view tiles remain TASK-15 (ownership `backend`). Illustration packing may cite \(A=1\), \(s=2\), sidecar scales so tight totals match TASK-08 lower bounds; those constants are illustrations, not selected packing.
+**Packing** must be able to express all eight TASK-09 `packing_capability_ids` in TASK-09 order: `bit_pack`, `scale_storage`, `scale_placement`, `alignment_pad`, `endian_le`, `row_addressable`, `integrity_record`, `view_binding`. JSON `n_packing_capabilities` = 8. Do not select among `scale_storage_bytes_candidates` `[2, 4]`, `scale_placement_candidates` `["sidecar_array","interleaved_group"]`, `alignment_grain_candidates` `[1, 16, 32, 128, 256]`, or `code_bit_order_candidates` `["lsb_first","msb_first"]`. Portable-view payloads remain little-endian (TASK-09 requirement, ownership `architecture`). Specialized-view tiles remain TASK-15 (ownership `backend`). Illustration packing may cite $A=1$, $s=2$, sidecar scales so tight totals match TASK-08 lower bounds; those constants are illustrations, not selected packing.
 
 Embed gather remains `row_addressable` (access class `gather_row`, 10240 B BF16 / 2562 B int4-row illustration). `lm_head` remains `dense_gemm` despite matching embed shape. JSON `embed_gather_bf16_bytes` 10240, `embed_gather_int4_row_bytes` 2562.
 
-**Metadata** writes TASK-09 kinds: `manifest` (tensor identity, TASK-08 family, recipe id, shape, access class, view list, integrity records, **declared profile name**), `metadata_blob` (per-group scales and optional zero-points), `sidecar` (`extract_high` sparse BF16 + indices; `mixed_group` width map), `view` (portable and/or specialized projections), `schema_state` (\(K,V\) rank \((4,T,256)\) BF16 conceptual; \(C\) \(3\times 10240\) BF16; \(S\) \((48,128,128)\) F32 conceptual; 17 KV instances including MTP; 48 C/S instances). State **schema** is required; state **payload** inclusion remains unselected (TASK-09). JSON `state_schema_required` true. JSON `state_payload_in_artifact_selected` false.
+**Metadata** writes TASK-09 kinds: `manifest` (tensor identity, TASK-08 family, recipe id, shape, access class, view list, integrity records, **declared profile name**), `metadata_blob` (per-group scales and optional zero-points), `sidecar` (`extract_high` sparse BF16 + indices; `mixed_group` width map), `view` (portable and/or specialized projections), `schema_state` ($K,V$ rank $(4,T,256)$ BF16 conceptual; $C$ $3\times 10240$ BF16; $S$ $(48,128,128)$ F32 conceptual; 17 KV instances including MTP; 48 C/S instances). State **schema** is required; state **payload** inclusion remains unselected (TASK-09). JSON `state_schema_required` true. JSON `state_payload_in_artifact_selected` false.
 
 **Integrity** is the stage that **owns** TASK-09 open decision `integrity_algorithm` as a **slot-writing procedure**. JSON `integrity_algorithm_candidates` = `["none","checksum"]`. JSON `integrity_algorithm_selected` false. JSON `integrity_stage_emits_record` true. When a future close picks `checksum`, the record is per-payload over packed bytes and the algorithm identity is stored in the manifest; this document does **not** pick CRC versus SHA versus another digest. Integrity is not a quality metric (`c_integrity_as_quality`).
 
@@ -261,7 +261,7 @@ JSON array `decision_ids` in this exact order (16 ids). JSON `n_decisions` = 16.
 | `legal_recipe_set` | locked structure | `architecture` | 22 recipes and 16 `family_candidates` lists |
 | `family_access_class` | locked structure | `architecture` | TASK-09 access-class map (gather vs GEMM vs conv vs state) |
 | `shared_weight_binding` | locked structure | `architecture` | `E` and `W_lm` shared payloads; untied embed/`lm_head` |
-| `state_schema` | locked structure | `architecture` | \(K,V,C,S\) schema required |
+| `state_schema` | locked structure | `architecture` | $K,V,C,S$ schema required |
 | `profile_intent_axes` | locked structure | `architecture` | Names `quality`, `balanced`, `compression` exist |
 | `portable_encoding` | locked structure | `architecture` | Portable view little-endian when a portable view exists |
 | `source_weight_statistics` | locked structure | `model` | TASK-05 absmax/rms/outliers/zeros as analysis inputs |
@@ -296,7 +296,7 @@ JSON array `compiler_profile_ids` in this exact order (3 ids). JSON `n_compiler_
 | id | Intent (HYPOTHESIS, not a recipe map) | Must remain true |
 | --- | --- | --- |
 | `quality` | Prefer `keep_source` or wider integer candidates on TASK-08 `quality_high_ids` families (`q_norm_gamma`, `q_gdn_time`, `q_gdn_gate`, `q_attn_out`, `q_mlp_down`, `q_state_kv`, `q_state_s`, `q_int2_mass`) | Every assigned recipe, if/when TASK-18 selects a map, stays inside `family_candidates`; this document assigns none |
-| `balanced` | Mid-width integer **candidates** on mass GEMM families; size illustrations (int4 \(g=128\) ratio 0.2578125, unique-non-embed 13431670032 B) are DERIVED, not assignments | Same legality; no family column of recipes |
+| `balanced` | Mid-width integer **candidates** on mass GEMM families; size illustrations (int4 $g=128$ ratio 0.2578125, unique-non-embed 13431670032 B) are DERIVED, not assignments | Same legality; no family column of recipes |
 | `compression` | Include narrower **candidates** (`i3_g32`, and `i2_g32_extract` only where TASK-08 already lists them — `mlp_up_gate` mass) and accept higher quality/decode-risk **hypotheses** | Same legality; `q_int2_mass` remains HYPOTHESIS, not a selected compression recipe |
 
 JSON `quality_high_ids` copied from TASK-08 in TASK-08 order: `q_norm_gamma`, `q_gdn_time`, `q_gdn_gate`, `q_attn_out`, `q_mlp_down`, `q_state_kv`, `q_state_s`, `q_int2_mass`. JSON `n_quality_high` = 8.
@@ -557,7 +557,7 @@ Do not run Ruff, pytest, CMake, or CUDA; this increment does not introduce those
 - Diff review: Deliverables are new untracked files (`docs/architecture/model-compiler-plan.md`, `scripts/check_model_compiler_plan.py`, this dossier). `docs/architecture/plan.md`, TASK-05/08/09 deliverables unchanged. **Blocking:** `docs/architecture/task_ledger.md` has an uncommitted edit (`**Status:** TODO` → `**Status:** IN PROGRESS` only); acceptance requires no ledger edit before delivery.
 - Independent raw-record checks:
   - Recomputed `mlp_n = 3 × 64 × 17408 × 5120 = 17112760320` from sitting `text_config` (matches checker JSON, not echoed from fence).
-  - Recomputed `unique_non_embed_int4_g128_total_bytes = 13431670032` via int4 \(g=128\) packing formula on `weight_bytes_unique_non_embed // 2` (matches checker JSON).
+  - Recomputed `unique_non_embed_int4_g128_total_bytes = 13431670032` via int4 $g=128$ packing formula on `weight_bytes_unique_non_embed // 2` (matches checker JSON).
   - Spot-checked TASK-05 citations (`19.25`, `7528`, `0.1805953979492`) in `bf16-tensor-analysis.md`; TASK-08 packed illustrations (`0.2578125`, `17112760320`, `13431670032`) in `quantization-design-space.md`; TASK-09 occupancy/flags (`866`, `54641395712`, `integrity_algorithm_candidates`, `compiler_profile_selected` false) in `runtime-format-design.md` — all match prose and live JSON.
   - Ownership map `decision_ownership` matches locked 16-id classification; `n_unselected_winners_selected` = 0; `compiler_profile_selected` false; `integrity_algorithm_selected` false; Pareto and artifact-boundary booleans remain open.
   - Document: ten locked `##` headings in order; four canonical sentences verbatim; six compiler stages; ownership table closes open question; three conceptual profiles without recipe-map column; six compiler-risk rows under HYPOTHESIS header; one Mermaid flowchart with required IDs; JSON fence identical to live `--json`.

@@ -109,7 +109,7 @@ Computed from the signed 65,536-bin histogram and the LUT:
 
 #### Directional (rank-2+ weights only)
 
-Transformers / plan convention: \(W\in\mathbb{R}^{d_\text{out}\times d_\text{in}}\) stored as shape `[d_out, d_in]`, C-contiguous, axis 0 = rows = `d_out`, axis 1 = columns = `d_in`, `y = Wx`.
+Transformers / plan convention: $W\in\mathbb{R}^{d_\text{out}\times d_\text{in}}$ stored as shape `[d_out, d_in]`, C-contiguous, axis 0 = rows = `d_out`, axis 1 = columns = `d_in`, `y = Wx`.
 
 During the same sequential pass, maintain float64 vectors:
 

@@ -14,14 +14,14 @@ Produce `docs/architecture/materialization-and-fusion.md` as the Phase 1 **hardw
 
 - Constraints:
   - `docs/architecture/plan.md` is authoritative for study scope; do not modify it.
-  - Catalog IDs, fan-out, live-across, and high-fan-out ranking come from `docs/architecture/dataflow.md` (TASK-03). Lifetime classes, must-survive boundaries, recomputability, and \(K,V,C,S\) bytes come from `docs/architecture/lifetime-and-state.md` (TASK-04). Node types, internals, 14 sync edges, ten split candidates, and five flexibility kinds come from `docs/architecture/semantic-graph.md` (TASK-11). Do not add catalog IDs, node types, or sync edges as **required** contracts.
+  - Catalog IDs, fan-out, live-across, and high-fan-out ranking come from `docs/architecture/dataflow.md` (TASK-03). Lifetime classes, must-survive boundaries, recomputability, and $K,V,C,S$ bytes come from `docs/architecture/lifetime-and-state.md` (TASK-04). Node types, internals, 14 sync edges, ten split candidates, and five flexibility kinds come from `docs/architecture/semantic-graph.md` (TASK-11). Do not add catalog IDs, node types, or sync edges as **required** contracts.
   - Label claims `OBSERVED` (sitting `text_config` / inventory already established), `DERIVED` (physical-need class, byte identities from ranks × TASK-04 element size, extra-sync-edge counts), or `HYPOTHESIS` (every fusion/split/reuse/recompute **usefulness**, every “this fusion improves total behavior”). `UNKNOWN` only for vision-encoder internals deferred here. No `MEASURED` tok/s or NLL. No selected fusion, schedule, layout, or kernel.
   - GitHub Markdown math. Cite TASK-02 equation tags via TASK-11 contracts, TASK-03 catalog IDs, TASK-04 lifetime/state IDs, TASK-11 node types / sync-edge ids / split candidates. Do not rewrite forward math, redraw the eight TASK-03 DAGs, recompute TASK-04 persistent-state totals as a new lifetime study, or recopy TASK-06 MAC/traffic tables as a new work study (TASK-06 is not a dependency).
   - Allowed evidence: TASK-03 dataflow, TASK-04 lifetime/state, TASK-11 semantic-graph, sitting `config.json` `text_config`, plan evidence vocabulary, this dossier. Byte identities instantiate TASK-03 ranks × TASK-04 conceptual BF16/F32 widths. TASK-11 already-cited MAC/byte integers may be **cited** from `semantic-graph.md`, not recopied as a new ranking. No Quartz, llama.cpp/GGML Qwen, or `models/Qwen3.8-27B-Q4_K_M.gguf`. No TASK-16 occupancy/fusion-vs-occupancy algebra (not a dependency; this document is hardware-independent). No TASK-08/09/10 recipe, packing, or compiler-stage decisions. No TASK-13/14 schedules.
   - Hardware-independent: catalog IDs, node types, sync-edge ids, rank×dtype bytes. No thread geometry, warps, SMs, CUDA dtypes, kernel names, streams, shared-memory tiles, or sitting-GPU numbers.
 - Non-goals:
   - No fusion, split, reuse, or recomputation **winner**. Listing a hypothesis is not selecting it. `n_fusion_hypotheses_selected` = 0.
-  - No decode/prefill **schedules** (TASK-13/14). Prefill and decode share **one** physical-need taxonomy; only \(T\) and incoming \((K,V,C,S)\) change. Extra boundary traffic of a schedule is TASK-13/14.
+  - No decode/prefill **schedules** (TASK-13/14). Prefill and decode share **one** physical-need taxonomy; only $T$ and incoming $(K,V,C,S)$ change. Extra boundary traffic of a schedule is TASK-13/14.
   - No physical layouts (TASK-15) and no CUDA mapping alternatives (TASK-17). Working-set means catalog-rank × conceptual dtype bytes, not a CUDA live-set or occupancy limit.
   - No quantization recipes, runtime-format packing, or compiler stages (TASK-08/09/10).
   - No quality/NLL experiments (TASK-18) and no tok/s (TASK-19).
@@ -42,11 +42,11 @@ Produce `docs/architecture/materialization-and-fusion.md` as the Phase 1 **hardw
 - `docs/architecture/plan.md:89-92` — TASK-11 derives semantic regions; TASK-12 identifies materialization and fusion hypotheses; TASK-13/14 schedule the same nodes; TASK-17 CUDA-maps nodes.
 - `docs/architecture/task_ledger.md` TASK-12 row — produces `docs/architecture/materialization-and-fusion.md`; purpose is classify physical-materialization need and fusion experiment opportunities; open question is which apparent fusions improve total behavior after working-set and synchronization costs (**closed here by enumerating HYPOTHESIS proposals with cost identities, not by selecting a winner**); completion is classify important intermediates with required justification, list reuse/recompute/local-working-set/synchronization tradeoffs, label every fusion proposal as a hypothesis.
 - `docs/architecture/task_ledger.md` TASK-03 established results — 52-ID catalog; live-across `g`/`z`; sharing rank 1–11; logical ≠ physical; fan-out ≠ must-store.
-- `docs/architecture/task_ledger.md` TASK-04 established results — five lifetime classes; must-survive: token \(K,V,C,S\); residual-add `h`/`h_mid`; live-across `g`/`z`; \(B_\text{store}(T)=69632T+153944064\); high-fan-out ephemerals remain recomputable; physical materialization deferred to TASK-12.
+- `docs/architecture/task_ledger.md` TASK-04 established results — five lifetime classes; must-survive: token $K,V,C,S$; residual-add `h`/`h_mid`; live-across `g`/`z`; $B_\text{store}(T)=69632T+153944064$; high-fan-out ephemerals remain recomputable; physical materialization deferred to TASK-12.
 - `docs/architecture/task_ledger.md` TASK-11 established results — six node types; 14 sync edges; five flexibility kinds; ten unselected split candidates; `g`/`z` internal; fuse-across a non-state, non-output edge is allowed only as a HYPOTHESIS; state edges cannot be dropped.
 - `docs/architecture/task_ledger.md` TASK-13/14/17 — consumers of this classification; do not perform those designs here.
-- `docs/architecture/dataflow.md` — 52 catalog IDs in locked order; ranks; high-fan-out IDs `h`, `h_tilde`, `h_mid`, `h_post`, `h_64`, `k_rope`, `v_full`, `qkv`, `S`; live-across `g`/`z`; intra-equation `k_hat`; shared \(E\)/`W_\text{lm}`; canonical logical-≠-physical sentence.
-- `docs/architecture/lifetime-and-state.md` — lifetime taxonomy; recomputable vs requires-prior-state; residual vector 10240 B; conceptual BF16 \(K,V,C\) and F32 \(S\); semantic storage candidates are mathematical, not CUDA.
+- `docs/architecture/dataflow.md` — 52 catalog IDs in locked order; ranks; high-fan-out IDs `h`, `h_tilde`, `h_mid`, `h_post`, `h_64`, `k_rope`, `v_full`, `qkv`, `S`; live-across `g`/`z`; intra-equation `k_hat`; shared $E$/`W_\text{lm}`; canonical logical-≠-physical sentence.
+- `docs/architecture/lifetime-and-state.md` — lifetime taxonomy; recomputable vs requires-prior-state; residual vector 10240 B; conceptual BF16 $K,V,C$ and F32 $S$; semantic storage candidates are mathematical, not CUDA.
 - `docs/architecture/semantic-graph.md` — six node types; catalog partition 10/38/4; 14 sync edges; split candidates `g`, `z`, `h_tilde`, `k_rope`, `v_full`, `qkv`, `h_post`, `swiglu`, `h_final`, `mtp_cat` all unselected; `fuse_internals` not selected; residual add inside mixer/`mlp`; RMS inside consumer.
 - `.cache/authorities/qwen3.8-27b-transformers/config.json` — live `text_config` for layer counts, shapes, and byte products. Do not read safetensor payloads.
 - `scripts/check_dataflow.py` / `scripts/check_lifetime_and_state.py` / `scripts/check_semantic_graph.py` — checker-style precedent. TASK-12’s checker is a sibling; do not import them.
@@ -72,14 +72,14 @@ N/A — materialization **classification** and fusion-**hypothesis** documentati
 
 If a class, catalog ID, rank, byte identity, node type, or sync-edge id would disagree with TASK-03/04/11 or sitting `text_config`, the earlier document / config wins and this one is wrong.
 
-- Prefill and decode share **one** physical-need taxonomy and **one** hypothesis list. Only \(T\) (stored KV length after append) and whether incoming \((K,V,C,S)\) is zeros versus populated change. Do not duplicate tables per mode.
-- Primary classification **includes MTP**. Omitting MTP when only \(\ell^{(0)}\) is required is a TASK-02/11 algebraic equivalent, not a second taxonomy.
+- Prefill and decode share **one** physical-need taxonomy and **one** hypothesis list. Only $T$ (stored KV length after append) and whether incoming $(K,V,C,S)$ is zeros versus populated change. Do not duplicate tables per mode.
+- Primary classification **includes MTP**. Omitting MTP when only $\ell^{(0)}$ is required is a TASK-02/11 algebraic equivalent, not a second taxonomy.
 - TASK-04 mathematical must-survive is **not** a CUDA store. TASK-12 physical-need says which values **must** have a representation at a named boundary for the map to be evaluable without prefix replay or dropping I/O, versus which values may stay inside a node, be reused, be recomputed, or be promoted only under a HYPOTHESIS split.
 - Fan-out ≠ must-store and node I/O ≠ must-store still hold. Declaring a catalog ID as node I/O is not a CUDA store. High-fan-out is a reuse **opportunity**, not a store requirement.
 - Live-across `g` and `z` stay **internal** (TASK-11). They become hypothesized sync edges only under `split_g` / `split_z`. They are not required physical inter-node buffers.
-- State edges cannot be dropped: omitting a KV/\(C\)/\(S\) write changes the map. Output edges cannot be dropped: omitting `logits_0` / `logits_1` drops the forward result. Shared-weight edges name required payload sharing, not node-type merges.
+- State edges cannot be dropped: omitting a KV/$C$/$S$ write changes the map. Output edges cannot be dropped: omitting `logits_0` / `logits_1` drops the forward result. Shared-weight edges name required payload sharing, not node-type merges.
 - TASK-12 may fuse **across** a non-state, non-output data edge only as a HYPOTHESIS that merges or bypasses node types. That hypothesis does not delete residual-add liveness, RMS-inside-consumer, or mixer xor.
-- Algebraic equivalents (chunkwise GDN, SDPA, GQA-as-repeat, omitting MTP) are the same real map **inside** the owning node. They are not extra fusion hypotheses and not extra node types. Chunkwise FP gap stays TASK-11 HYPOTHESIS; GDN primary stays `(17)`–`(18)`; do not treat chunkwise as zero \(S\) traffic.
+- Algebraic equivalents (chunkwise GDN, SDPA, GQA-as-repeat, omitting MTP) are the same real map **inside** the owning node. They are not extra fusion hypotheses and not extra node types. Chunkwise FP gap stays TASK-11 HYPOTHESIS; GDN primary stays `(17)`–`(18)`; do not treat chunkwise as zero $S$ traffic.
 - Do not inspect Quartz or llama.cpp to “confirm” fusions or buffers.
 - Do not select a fusion, split, schedule, tile, or CUDA mapping. Do not import TASK-16 occupancy algebra.
 
@@ -185,7 +185,7 @@ Implementation copies these rows; do not add/remove IDs or reorder.
 | ID | Physical need | Default tactic | Justification |
 | --- | --- | --- | --- |
 | `token_id` | `forced_input` | `must_present` | Graph input. |
-| `e` | `boundary_tradeoff` | `keep_live_or_fuse` | TASK-11 `identity_e_h0`; identified as \(h^{(0)}\). |
+| `e` | `boundary_tradeoff` | `keep_live_or_fuse` | TASK-11 `identity_e_h0`; identified as $h^{(0)}$. |
 | `h` | `boundary_tradeoff` | `keep_live_or_fuse` | TASK-04 residual-add; TASK-11 `residual_h`; fan-out 2. |
 | `h_tilde` | `reuse_tradeoff` | `reuse_or_recompute` | TASK-03 high-fan-out 3 or 4; TASK-04 ephemeral. |
 | `h_mid` | `boundary_tradeoff` | `keep_live_or_fuse` | TASK-04 residual-add Mix→MLP; TASK-11 `residual_h_mid`. |
@@ -283,7 +283,7 @@ JSON array `tradeoff_tactic_ids` in this exact order (4 ids). JSON `n_tradeoff_t
 
 | id | Meaning | Availability (DERIVED) | Usefulness |
 | --- | --- | --- | --- |
-| `reuse` | One physical copy, several consumers | high-fan-out catalog IDs and shared \(E\)/`W_\text{lm}` | HYPOTHESIS |
+| `reuse` | One physical copy, several consumers | high-fan-out catalog IDs and shared $E$/`W_\text{lm}` | HYPOTHESIS |
 | `recompute` | Drop and rebuild from current-token parents (parents may include live state) | every catalog ID except `K_state`,`V_state`,`C_state`,`S` | HYPOTHESIS |
 | `local_working_set` | Keep the value only for the duration of the owning node; not a named inter-node buffer | all TASK-11 internals, including live-across `g`/`z` | HYPOTHESIS |
 | `synchronize` | Promote a value to a named sync edge (existing 14, or a split candidate) | 14 TASK-11 edges; 10 split candidates | HYPOTHESIS |
@@ -310,7 +310,7 @@ JSON array `fusion_kind_ids` in this exact order (3 ids). JSON `n_fusion_kinds` 
 
 JSON array `fusion_hypothesis_ids` in this exact order (22 ids). JSON `n_fusion_hypotheses` = 22. Parallel `fusion_hypothesis_kinds`. JSON `n_fusion_hypotheses_selected` = 0. JSON object `fusion_selected` keyed in `fusion_hypothesis_ids` order with every value `false`. JSON `fusion_winner_selected` false.
 
-**Intra-node `fuse_internals` (5).** One hypothesis per node type that owns internals. `embed` has no internals; do not invent `fuse_embed`. Extra sync edges 0. Working-set bytes 0 (no new named buffer; no dropped forced store). KV/\(C\)/\(S\) writes still occur inside the fused node.
+**Intra-node `fuse_internals` (5).** One hypothesis per node type that owns internals. `embed` has no internals; do not invent `fuse_embed`. Extra sync edges 0. Working-set bytes 0 (no new named buffer; no dropped forced store). KV/$C$/$S$ writes still occur inside the fused node.
 
 | id | Kind | Node | Extra sync | Working-set bytes |
 | --- | --- | --- | ---: | ---: |
@@ -364,32 +364,32 @@ Conceptual element sizes from TASK-04: BF16 = 2 B (`bytes_bf16`), F32 = 4 B (`by
 | JSON key | Formula | Value |
 | --- | --- | ---: |
 | `residual_elems` | `hidden_size` | 5120 |
-| `residual_bytes` | \(5120\times 2\) | 10240 |
+| `residual_bytes` | $5120\times 2$ | 10240 |
 | `g_elems` | `num_attention_heads * head_dim` | 6144 |
-| `g_bytes` | \(6144\times 2\) | 12288 |
+| `g_bytes` | $6144\times 2$ | 12288 |
 | `z_elems` | `linear_num_value_heads * linear_value_head_dim` | 6144 |
-| `z_bytes` | \(6144\times 2\) | 12288 |
+| `z_bytes` | $6144\times 2$ | 12288 |
 | `k_rope_elems` | `num_key_value_heads * head_dim` | 1024 |
-| `k_rope_bytes` | \(1024\times 2\) | 2048 |
+| `k_rope_bytes` | $1024\times 2$ | 2048 |
 | `v_full_elems` | same as `k_rope_elems` | 1024 |
 | `v_full_bytes` | 2048 | 2048 |
-| `qkv_elems` | \((2\cdot\texttt{linear_num_key_heads}+\texttt{linear_num_value_heads})\cdot\texttt{linear_key_head_dim}\) | 10240 |
-| `qkv_bytes` | \(10240\times 2\) | 20480 |
+| `qkv_elems` | $(2\cdot\texttt{linear_num_key_heads}+\texttt{linear_num_value_heads})\cdot\texttt{linear_key_head_dim}$ | 10240 |
+| `qkv_bytes` | $10240\times 2$ | 20480 |
 | `swiglu_elems` | `intermediate_size` | 17408 |
-| `swiglu_bytes` | \(17408\times 2\) | 34816 |
-| `mtp_cat_elems` | \(2\cdot\texttt{hidden_size}\) | 10240 |
-| `mtp_cat_bytes` | \(10240\times 2\) | 20480 |
+| `swiglu_bytes` | $17408\times 2$ | 34816 |
+| `mtp_cat_elems` | $2\cdot\texttt{hidden_size}$ | 10240 |
+| `mtp_cat_bytes` | $10240\times 2$ | 20480 |
 | `logits_elems` | `vocab_size` | 248320 |
-| `logits_bytes` | \(248320\times 2\) | 496640 |
+| `logits_bytes` | $248320\times 2$ | 496640 |
 | `kv_bytes_per_full_layer_per_token` | TASK-04 citation | 4096 |
 | `kv_bytes_all_per_token` | TASK-04 citation | 69632 |
 | `c_bytes_per_layer` | TASK-04 citation | 61440 |
 | `s_bytes_per_layer` | TASK-04 citation | 3145728 |
 | `s_bytes_all` | TASK-04 citation | 150994944 |
-| `storage_fixed_bytes` | TASK-04 \(B_\text{store}\) fixed part | 153944064 |
+| `storage_fixed_bytes` | TASK-04 $B_\text{store}$ fixed part | 153944064 |
 | `storage_kv_bytes_coeff_T` | TASK-04 | 69632 |
 
-Cite TASK-04 \(B_\text{store}(T)=69632T+153944064\). Do not re-derive the persistent-state table as a new study. Do not recopy TASK-06 GEMM-IO or region-cut activation totals; those remain TASK-06. Do not fill a SKU ridge.
+Cite TASK-04 $B_\text{store}(T)=69632T+153944064$. Do not re-derive the persistent-state table as a new study. Do not recopy TASK-06 GEMM-IO or region-cut activation totals; those remain TASK-06. Do not fill a SKU ridge.
 
 Synchronization-cost identity (DERIVED, not MEASURED): `net_sync_edges_under_hypothesis = 14 + extra_sync_edges` for a single hypothesis applied in isolation. JSON `n_baseline_sync_edges` = 14. Applying two hypotheses together is **out of scope** (no pairwise table). Usefulness of any net-sync change is HYPOTHESIS.
 
@@ -525,7 +525,7 @@ Integer JSON fields that are counts/widths/bytes are JSON ints. Booleans are JSO
 - Invariants:
   - Ten level-2 headings in the locked order; four canonical sentences verbatim; 7 physical-need classes; 52 catalog IDs partitioned 4/2/1/7/2/5/31; 21 important IDs; 4 tradeoff tactics; 22 fusion hypotheses all unselected; 14 sync edges partitioned 7/5/2; one Mermaid flowchart with required IDs.
   - Prefill/decode share one taxonomy; primary includes MTP; `g`/`z` internal unless split; residual add inside mixer and `mlp`; state writes not optional; `h_64` cannot be hidden from one of its two primary consumers.
-  - GDN numerical definition remains recurrent `(17)`–`(18)`; chunkwise is not zero \(S\) traffic.
+  - GDN numerical definition remains recurrent `(17)`–`(18)`; chunkwise is not zero $S$ traffic.
   - Logical values do not imply allocation; physical-need is not CUDA malloc; every fusion proposal is HYPOTHESIS.
   - Vision encoder remains unexpanded and is not a fusion target.
 - Rejected alternatives:
@@ -533,12 +533,12 @@ Integer JSON fields that are counts/widths/bytes are JSON ints. Booleans are JSO
   - Treating TASK-04 must-survive as CUDA malloc: rejected; TASK-04 already forbade that; this task classifies need vs tradeoff.
   - Promoting `g`/`z` to required inter-node buffers: rejected; TASK-11 keeps them internal; `split_g`/`split_z` are unselected hypotheses.
   - One physical buffer per catalog ID: rejected; fan-out ≠ must-store; most internals are `fuse_default`.
-  - Dropping KV/\(C\)/\(S\) writes by “fusing them away”: rejected; that changes the map.
+  - Dropping KV/$C$/$S$ writes by “fusing them away”: rejected; that changes the map.
   - Fusing Mix+MLP as a **required** node: rejected; TASK-11 `cut_mixer_mlp` and TASK-04 `h_mid`; `fuse_across_residual_h_mid` is only a HYPOTHESIS that still keeps the add.
   - Pairwise or all-subsets fusion search: rejected; 22 isolated hypotheses are the locked list; combinations are TASK-13/14/17 experiment design.
   - Importing TASK-16 occupancy / shared-memory fusion algebra: rejected; not a dependency; this document is hardware-independent.
   - Recopying TASK-06 GEMM-IO / region-cut tables as the materialization floor: rejected; TASK-06 is not a dependency; activation views there are not CUDA live-sets; cite TASK-03 ranks × TASK-04 dtypes instead.
-  - Separate decode and prefill taxonomies: rejected; same map; TASK-13/14 schedule \(T\) and incoming state.
+  - Separate decode and prefill taxonomies: rejected; same map; TASK-13/14 schedule $T$ and incoming state.
   - Inventing catalog IDs or extra required node types (proj/core/out, conv/recurrence/out): rejected; those remain split hypotheses.
   - Using GGUF Q4 or CUDA dtypes as working-set dtypes: rejected; conceptual BF16/F32 from TASK-04.
   - Filling TASK-16 SKU peaks or measuring tok/s: forbidden; not this task.

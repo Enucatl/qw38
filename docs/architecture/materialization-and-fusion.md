@@ -6,7 +6,7 @@ Phase 1 **hardware-independent** physical-materialization need and
 fusion-hypothesis analysis for the Qwen3.8-27B language + MTP map. Catalog IDs,
 fan-out, live-across, and high-fan-out ranking come from
 [`docs/architecture/dataflow.md`](dataflow.md) (TASK-03). Lifetime classes,
-must-survive boundaries, recomputability, and \(K,V,C,S\) bytes come from
+must-survive boundaries, recomputability, and $K,V,C,S$ bytes come from
 [`docs/architecture/lifetime-and-state.md`](lifetime-and-state.md) (TASK-04).
 Node types, internals, 14 sync edges, ten split candidates, and five
 flexibility kinds come from
@@ -14,8 +14,8 @@ flexibility kinds come from
 
 This document specifies mathematical physical-need classes and experiment
 hypotheses, not kernels. Prefill and decode share one physical-need taxonomy
-and one hypothesis list. Only \(T\) (stored KV length after append) and whether
-incoming \((K,V,C,S)\) is zeros versus populated change. Primary classification
+and one hypothesis list. Only $T$ (stored KV length after append) and whether
+incoming $(K,V,C,S)$ is zeros versus populated change. Primary classification
 includes MTP. If a class, catalog ID, rank, byte identity, node type, or
 sync-edge id would disagree with TASK-03/04/11 or sitting `text_config`, the
 earlier document / config wins and this one is wrong.
@@ -45,9 +45,9 @@ kernel is chosen here.
 
 Numeric ranks instantiate sitting `text_config` OBSERVED: `hidden_size` 5120,
 `intermediate_size` 17408, `vocab_size` 248320, 64 decoder layers, 48 linear +
-16 full at \(\ell \bmod 4 = 3\), `mtp_num_hidden_layers` 1, `head_dim` 256,
+16 full at $\ell \bmod 4 = 3$, `mtp_num_hidden_layers` 1, `head_dim` 256,
 `num_attention_heads` 24, `num_key_value_heads` 4, linear widths
-\(d_\text{qkv}=10240\), `linear_key_head_dim` / `linear_value_head_dim` 128,
+$d_\text{qkv}=10240$, `linear_key_head_dim` / `linear_value_head_dim` 128,
 `dtype` `"bfloat16"`, `mamba_ssm_dtype` `"float32"`. Physical-need classes and
 byte identities are DERIVED. Every fusion/split/reuse usefulness remains
 HYPOTHESIS.
@@ -127,8 +127,8 @@ appear in the catalog table as `fuse_default` with justification.
 JSON `high_fanout_boundary_ids` `["h","h_mid","h_64"]`. JSON
 `n_high_fanout_boundary_ids` = 3.
 
-Prefill and decode share this taxonomy. Only \(T\) and incoming
-\((K,V,C,S)\) occupancy change.
+Prefill and decode share this taxonomy. Only $T$ and incoming
+$(K,V,C,S)$ occupancy change.
 
 ## Catalog physical-need table
 
@@ -137,7 +137,7 @@ All 52 catalog IDs in TASK-03 order. Completes classification coverage.
 | ID | Physical need | Default tactic | Justification |
 | --- | --- | --- | --- |
 | `token_id` | `forced_input` | `must_present` | Graph input. |
-| `e` | `boundary_tradeoff` | `keep_live_or_fuse` | TASK-11 `identity_e_h0`; identified as \(h^{(0)}\). |
+| `e` | `boundary_tradeoff` | `keep_live_or_fuse` | TASK-11 `identity_e_h0`; identified as $h^{(0)}$. |
 | `h` | `boundary_tradeoff` | `keep_live_or_fuse` | TASK-04 residual-add; TASK-11 `residual_h`; fan-out 2. |
 | `h_tilde` | `reuse_tradeoff` | `reuse_or_recompute` | TASK-03 high-fan-out 3 or 4; TASK-04 ephemeral. |
 | `h_mid` | `boundary_tradeoff` | `keep_live_or_fuse` | TASK-04 residual-add Mix→MLP; TASK-11 `residual_h_mid`. |
@@ -252,7 +252,7 @@ tactic is HYPOTHESIS.
 
 | id | Meaning | Availability (DERIVED) | Usefulness |
 | --- | --- | --- | --- |
-| `reuse` | One physical copy, several consumers | high-fan-out catalog IDs and shared \(E\)/`W_\text{lm}` | HYPOTHESIS |
+| `reuse` | One physical copy, several consumers | high-fan-out catalog IDs and shared $E$/`W_\text{lm}` | HYPOTHESIS |
 | `recompute` | Drop and rebuild from current-token parents (parents may include live state) | every catalog ID except `K_state`,`V_state`,`C_state`,`S` | HYPOTHESIS |
 | `local_working_set` | Keep the value only for the duration of the owning node; not a named inter-node buffer | all TASK-11 internals, including live-across `g`/`z` | HYPOTHESIS |
 | `synchronize` | Promote a value to a named sync edge (existing 14, or a split candidate) | 14 TASK-11 edges; 10 split candidates | HYPOTHESIS |
@@ -354,7 +354,7 @@ catalog ID, or sync-edge id.
 Intra-node `fuse_internals` (5): one hypothesis per node type that owns
 internals. `embed` has no internals; there is no `fuse_embed`. Extra sync
 edges 0. Working-set bytes 0 (no new named buffer; no dropped forced store).
-KV/\(C\)/\(S\) writes still occur inside the fused node.
+KV/$C$/$S$ writes still occur inside the fused node.
 
 `split_at_internal` (10): exact TASK-11 `split_candidate_ids` order. Each split
 **adds** one hypothesized sync edge and names the working-set bytes of that
@@ -447,32 +447,32 @@ region-cut tables.
 | JSON key | Formula | Value |
 | --- | --- | ---: |
 | `residual_elems` | `hidden_size` | 5120 |
-| `residual_bytes` | \(5120\times 2\) | 10240 |
+| `residual_bytes` | $5120\times 2$ | 10240 |
 | `g_elems` | `num_attention_heads * head_dim` | 6144 |
-| `g_bytes` | \(6144\times 2\) | 12288 |
+| `g_bytes` | $6144\times 2$ | 12288 |
 | `z_elems` | `linear_num_value_heads * linear_value_head_dim` | 6144 |
-| `z_bytes` | \(6144\times 2\) | 12288 |
+| `z_bytes` | $6144\times 2$ | 12288 |
 | `k_rope_elems` | `num_key_value_heads * head_dim` | 1024 |
-| `k_rope_bytes` | \(1024\times 2\) | 2048 |
+| `k_rope_bytes` | $1024\times 2$ | 2048 |
 | `v_full_elems` | same as `k_rope_elems` | 1024 |
 | `v_full_bytes` | 2048 | 2048 |
-| `qkv_elems` | \((2\cdot\texttt{linear_num_key_heads}+\texttt{linear_num_value_heads})\cdot\texttt{linear_key_head_dim}\) | 10240 |
-| `qkv_bytes` | \(10240\times 2\) | 20480 |
+| `qkv_elems` | $(2\cdot\texttt{linear_num_key_heads}+\texttt{linear_num_value_heads})\cdot\texttt{linear_key_head_dim}$ | 10240 |
+| `qkv_bytes` | $10240\times 2$ | 20480 |
 | `swiglu_elems` | `intermediate_size` | 17408 |
-| `swiglu_bytes` | \(17408\times 2\) | 34816 |
-| `mtp_cat_elems` | \(2\cdot\texttt{hidden_size}\) | 10240 |
-| `mtp_cat_bytes` | \(10240\times 2\) | 20480 |
+| `swiglu_bytes` | $17408\times 2$ | 34816 |
+| `mtp_cat_elems` | $2\cdot\texttt{hidden_size}$ | 10240 |
+| `mtp_cat_bytes` | $10240\times 2$ | 20480 |
 | `logits_elems` | `vocab_size` | 248320 |
-| `logits_bytes` | \(248320\times 2\) | 496640 |
+| `logits_bytes` | $248320\times 2$ | 496640 |
 | `kv_bytes_per_full_layer_per_token` | TASK-04 citation | 4096 |
 | `kv_bytes_all_per_token` | TASK-04 citation | 69632 |
 | `c_bytes_per_layer` | TASK-04 citation | 61440 |
 | `s_bytes_per_layer` | TASK-04 citation | 3145728 |
 | `s_bytes_all` | TASK-04 citation | 150994944 |
-| `storage_fixed_bytes` | TASK-04 \(B_\text{store}\) fixed part | 153944064 |
+| `storage_fixed_bytes` | TASK-04 $B_\text{store}$ fixed part | 153944064 |
 | `storage_kv_bytes_coeff_T` | TASK-04 | 69632 |
 
-Cite TASK-04 \(B_\text{store}(T)=69632T+153944064\). Do not re-derive the
+Cite TASK-04 $B_\text{store}(T)=69632T+153944064$. Do not re-derive the
 persistent-state table as a new study.
 
 Synchronization-cost identity (DERIVED, not MEASURED):

@@ -166,8 +166,8 @@ Classify value lifetimes and quantify persistent state traffic and storage.
   output, and lifetime headings, JSON fence, Mermaid node IDs, and
   forbidden-token rules.
 - Ledger open question closed: exact state sizes including MTP KV
-  (\(B_\text{store}(T)=69632T+153944064\) bytes) and mathematical boundary survivors
-  (token \(K,V,C,S\); residual-add `h`/`h_mid`; live-across `g`/`z`) — not CUDA.
+  ($B_\text{store}(T)=69632T+153944064$ bytes) and mathematical boundary survivors
+  (token $K,V,C,S$; residual-add `h`/`h_mid`; live-across `g`/`z`) — not CUDA.
 
 **Open questions:**
 - None for language+MTP lifetime/state; vision encoder internals remain deferred.
@@ -232,15 +232,15 @@ Derive decode/prefill mathematical work and irreducible data movement separately
 **Established results:**
 - `docs/architecture/work-and-traffic.md` — Phase 1 decode/prefill mathematical work
   and irreducible traffic for language+MTP; symbolic MAC by region citing TASK-02
-  `(1)`–`(24)`; instantiated \(C_\text{complete}=27433238528\),
-  \(A_\text{complete}=208896\); decode \(W=C+AT\) and prefill
-  \(W=TC+AT(T+1)/2\) identities; weight (54.64 GiB unique language+MTP),
+  `(1)`–`(24)`; instantiated $C_\text{complete}=27433238528$,
+  $A_\text{complete}=208896$; decode $W=C+AT$ and prefill
+  $W=TC+AT(T+1)/2$ identities; weight (54.64 GiB unique language+MTP),
   state (TASK-04 + triangular prefill KV), and activation (forced/region-cut/GEMM-IO)
   channels; six HYPOTHESIS bottleneck labels; one Mermaid flowchart; JSON fence.
 - `scripts/check_work_and_traffic.py` — stdlib checker with `--json` and
   `--work-traffic` plus JSON-fence verification.
-- Ledger open question closed: DERIVED region intensities \(I=1\) (MLP/`lm_head` vs
-  weights), \(0.75\) (GDN vs \(S\)), \(6\) (full-attn core vs KV); six bottleneck
+- Ledger open question closed: DERIVED region intensities $I=1$ (MLP/`lm_head` vs
+  weights), $0.75$ (GDN vs $S$), $6$ (full-attn core vs KV); six bottleneck
   classes labelled HYPOTHESIS versus an UNKNOWN SKU ridge.
 
 **Open questions:**
@@ -274,7 +274,7 @@ persistent state.
   `state`); seven risk mechanisms; IEEE BF16/F32 widths and config dtype facts;
   20 sensitive ops/accumulation paths with DERIVED reduction lengths citing TASK-02
   `(1)`–`(24)`; severities labelled HYPOTHESIS (9 high, 8 medium, 3 low); conceptual
-  BF16 \(K,V,C\) and F32 \(S\); one Mermaid flowchart; JSON fence.
+  BF16 $K,V,C$ and F32 $S$; one Mermaid flowchart; JSON fence.
 - `scripts/check_numerical_sensitivity.py` — stdlib checker with `--json` and
   `--numerical-sensitivity` plus JSON-fence verification.
 
@@ -307,7 +307,7 @@ Define tensor-specific custom quantization experiments from BF16 source evidence
   quantization research space for language+MTP; four design dimensions (`bit_width`,
   `grouping`, `scale`, `outlier_policy`); 22 candidate recipes; 16 policy families
   with locked `family_candidates` and no winners; DERIVED metadata byte formulas and
-  MLP/unique-non-embed/embed/\(S\) illustrations; 17 quality + 9 decode-complexity
+  MLP/unique-non-embed/embed/$S$ illustrations; 17 quality + 9 decode-complexity
   HYPOTHESIS risks citing TASK-05/06/07; one Mermaid flowchart; JSON fence.
 - `scripts/check_quantization_design_space.py` — stdlib checker with `--json` and
   `--quantization-design-space` plus JSON-fence verification.
@@ -340,7 +340,7 @@ Specify requirements for a compiler-produced, consumer-oriented model artifact.
 - `docs/architecture/runtime-format-design.md` — Phase 1 compiler-produced,
   consumer-oriented runtime artifact requirements for language+MTP; six artifact
   object kinds; 8 representation + 8 packing capabilities; MLP/unique-non-embed/
-  embed-gather/\(S\)/header/dual-view DERIVED illustrations; seven consumer
+  embed-gather/$S$/header/dual-view DERIVED illustrations; seven consumer
   sequences without an ideal sequence; four artifact approaches compared on six
   dimensions with no winner; eight open decisions left unselected; six HYPOTHESIS
   format risks; one Mermaid flowchart; JSON fence.

@@ -16,7 +16,7 @@ Produce `docs/architecture/clean-sheet-architecture.md` and `docs/architecture/e
   - `docs/architecture/plan.md` is authoritative for study scope; do not modify it.
   - The candidate architecture is the **locked Phase 1 structure** (equations, graph, contracts, bounds, methodologies) plus **unselected experiment spaces**. Listing an alternative is not selecting it.
   - If any occupancy, MAC/byte, node type, stage kind, recipe, mapping, or id would disagree with TASK-01–19 or sitting `text_config`, the earlier document wins and this synthesis is wrong.
-  - Label claims `OBSERVED` (sitting `text_config` / inventory already established; TASK-16 \(N_w=32\), \(N_{\text{bank}}=32\)), `MEASURED` (TASK-05 citations only; no new payload stats), `DERIVED` (chain membership, occupancy/MAC citations, experiment DAG), `HYPOTHESIS` (every remaining alternative usefulness; every experiment hypothesis), or `UNKNOWN` (sitting-SKU numeric limits; vision-encoder internals; unselected corpora/hardware). No new `MEASURED` NLL, tok/s, occupancy, or bandwidth.
+  - Label claims `OBSERVED` (sitting `text_config` / inventory already established; TASK-16 $N_w=32$, $N_{\text{bank}}=32$), `MEASURED` (TASK-05 citations only; no new payload stats), `DERIVED` (chain membership, occupancy/MAC citations, experiment DAG), `HYPOTHESIS` (every remaining alternative usefulness; every experiment hypothesis), or `UNKNOWN` (sitting-SKU numeric limits; vision-encoder internals; unselected corpora/hardware). No new `MEASURED` NLL, tok/s, occupancy, or bandwidth.
   - GitHub Markdown math only where a citation needs it. Cite TASK-01–19 ids and documents; do not rewrite forward math, recopy MAC tables, recopy 22 recipes as a new quantization space, recopy 18 mappings as a new design space, or recopy TASK-18/19 methodologies.
   - Allowed evidence: TASK-01–19 deliverables and their JSON fences, sitting `config.json` `text_config`, plan.md evidence vocabulary, this dossier. TASK integers and ids already published may be **cited**. No Quartz, llama.cpp/GGML Qwen, or `models/Qwen3.8-27B-Q4_K_M.gguf` as a design authority or file to open. GGUF remains a named future black-box Pareto **reference** (TASK-18).
 - Non-goals:
@@ -42,7 +42,7 @@ Produce `docs/architecture/clean-sheet-architecture.md` and `docs/architecture/e
 - `docs/architecture/plan.md:107-115` — Phase 1 produces a mathematical and evidence-labelled architecture dossier, not a runtime; experiment backlog is a study deliverable.
 - `docs/architecture/task_ledger.md` TASK-01–19 **Status: DONE**; TASK-20 depends on TASK-01 through TASK-19; produces `clean-sheet-architecture.md` and `experiment-backlog.md`; completion is chain+evidence classes, diagram+alternatives, and dependency-ordered experiment entries with all requested fields; open question (candidate alternatives and unknowns remaining) is **catalogued here, not closed by selecting**.
 - `docs/architecture/task_ledger.md` remaining open questions (still unresolved; catalogue only): TASK-07 risk survival; TASK-08 Pareto frontier; TASK-09 portable vs specialized artifact and ideal byte sequences; TASK-10 integrity `none` vs `checksum`; TASK-12/13 fusion winners; TASK-14 decode/prefill views; TASK-15 parallel decompositions; TASK-16 sitting SKU; TASK-17 mapping winners; TASK-18 corpora / prompt suite / capability / acceptance frontier; TASK-19 hardware / prompt matrix / reproducibility.
-- Established-result citations (do not re-derive): TASK-01 inventory 1199 tensors / 27320697856 language+MTP parameters / 54641395712 BF16 bytes; TASK-02 equations; TASK-03 52-ID DAG; TASK-04 state \(B_\text{store}(T)=69632T+153944064\); TASK-05 MEASURED `pooled_language_mtp.absmax=19.25`; TASK-06 \(C_\text{complete}=27433238528\), \(A_\text{complete}=208896\); TASK-07 20 sensitive ops / four precision roles; TASK-08 22 recipes / 16 families; TASK-09 4 artifact approaches / 7 sequences / 8 open decisions; TASK-10 six compiler stages / three profiles; TASK-11 six node types / 135 instances; TASK-12 22 fusion hypotheses; TASK-13/14 nine stage kinds; TASK-14 four representation + two mode hypotheses; TASK-15 14 orderings / 9 tiles / 9 decompositions; TASK-16 17 SKU-UNKNOWN / \(N_w=32\); TASK-17 18 mappings; TASK-18 quality methodology; TASK-19 performance methodology.
+- Established-result citations (do not re-derive): TASK-01 inventory 1199 tensors / 27320697856 language+MTP parameters / 54641395712 BF16 bytes; TASK-02 equations; TASK-03 52-ID DAG; TASK-04 state $B_\text{store}(T)=69632T+153944064$; TASK-05 MEASURED `pooled_language_mtp.absmax=19.25`; TASK-06 $C_\text{complete}=27433238528$, $A_\text{complete}=208896$; TASK-07 20 sensitive ops / four precision roles; TASK-08 22 recipes / 16 families; TASK-09 4 artifact approaches / 7 sequences / 8 open decisions; TASK-10 six compiler stages / three profiles; TASK-11 six node types / 135 instances; TASK-12 22 fusion hypotheses; TASK-13/14 nine stage kinds; TASK-14 four representation + two mode hypotheses; TASK-15 14 orderings / 9 tiles / 9 decompositions; TASK-16 17 SKU-UNKNOWN / $N_w=32$; TASK-17 18 mappings; TASK-18 quality methodology; TASK-19 performance methodology.
 - `.cache/authorities/qwen3.8-27b-transformers/config.json` — live `text_config` for occupancy arithmetic. Do not read safetensor payloads. Do not read GGUF.
 - `scripts/check_performance_validation.py` / `check_quantization_validation.py` / `check_cuda_design_space.py` — checker-style precedent. TASK-20’s checker is a sibling; do not import them.
 
@@ -263,7 +263,7 @@ Locked what-is-selected flags (all false except catalogue/methodology flags):
 
 - `pareto_frontier_selected` false, `compiler_profile_selected` false, `artifact_boundary_selected` false, `ideal_byte_sequence_selected` false, `integrity_algorithm_selected` false, `fusion_winner_selected` false, `decode_prefill_distinct_views_selected` false, `layout_winner_selected` false, `ordering_selected` false, `tile_size_selected` false, `mapping_winner_selected` false, `hardware_selected` false, `prompt_matrix_selected` false, `reproducibility_protocol_selected` false, `calibration_corpus_selected` false, `eval_corpus_selected` false, `acceptance_frontier_selected` false, `sku_table_filled` false, `hypothesis_survival_selected` false, `n_mappings_selected` 0, `n_fusion_hypotheses_selected` 0, `n_alternatives_selected` 0
 
-Prose required: algebraic equivalents in TASK-02 remain the same real map. Chunkwise GDN is not zero \(S\) traffic. At \(T=1\), MAC prefill = decode; C/S physical reads still differ. Unique weight bytes are a TASK-06 lower bound, not measured HBM traffic.
+Prose required: algebraic equivalents in TASK-02 remain the same real map. Chunkwise GDN is not zero $S$ traffic. At $T=1$, MAC prefill = decode; C/S physical reads still differ. Unique weight bytes are a TASK-06 lower bound, not measured HBM traffic.
 
 ### Alternative families (lock; heading 5)
 
@@ -350,7 +350,7 @@ Bullets required:
 
 - Sixteen experiments, twelve requested fields, listed order is a valid topological order (`experiment_order_is_topological` true).
 - Every `status` is `unrun` (`n_experiments_run` 0; `experiments_run` false).
-- Quality experiments use TASK-18 metrics; performance experiments use TASK-19 metrics; tok/s is not Pareto \(Y\).
+- Quality experiments use TASK-18 metrics; performance experiments use TASK-19 metrics; tok/s is not Pareto $Y$.
 - `exp_mapping_micro` cannot declare `mapping_winner_selected`; only a later measured `exp_mapping_e2e` may, and this study does not run it.
 - Hardware, corpora, prompt matrix, and reproducibility remain unselected blocking unknowns, not extra experiments that select them.
 - Control `keep_source` is the identity compile, not a quality winner.
@@ -741,7 +741,7 @@ Locked document integers that must appear as decimal substrings in **both** mark
   - Eight architecture headings and six backlog headings in locked order; four architecture + four backlog canonical sentences plus `synthesis_question_sentence` verbatim; 12 chain steps; 5 evidence classes; 19 synthesized tasks; 14 alternative families; 125 catalogued alternatives; 0 selected; 12 remaining open questions; 0 closed; 16 experiments; 12 fields; one Mermaid flowchart with required IDs in architecture.md only.
   - Identical JSON fences in both markdown files, equal to live `--json`.
   - Prefill/decode share one graph and one artifact, not one metric identity.
-  - Microbenchmarks cannot pass a mapping; reconstruction is not quality; tok/s is not Pareto \(Y\); Q4_K_M is a reference not a requirement.
+  - Microbenchmarks cannot pass a mapping; reconstruction is not quality; tok/s is not Pareto $Y$; Q4_K_M is a reference not a requirement.
   - `experiments_run` false; `frozen_for_comparative_review` false; `mapping_winner_selected` false; `sku_table_filled` false.
   - Logical values do not imply allocation. Vision encoder remains unexpanded.
 - Rejected alternatives:

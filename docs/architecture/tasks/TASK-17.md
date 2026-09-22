@@ -15,10 +15,10 @@ Produce `docs/architecture/cuda-design-space.md` as the Phase 1 **CUDA mapping e
 - Constraints:
   - `docs/architecture/plan.md` is authoritative for study scope; do not modify it.
   - Node types, I/O, state, internals, and instance counts come from `docs/architecture/semantic-graph.md` (TASK-11). Decode GEMV consumers, one-token setting, serial stage kinds, and unselected fusion/packing attachments come from `docs/architecture/decode-plan.md` (TASK-13). Prefill GEMM consumers, five fundamental differences, layer-serial stages, and unselected views come from `docs/architecture/prefill-plan.md` (TASK-14). Candidate orderings, tile families, parallel decompositions, and justification hypotheses come from `docs/architecture/layout-strategy.md` (TASK-15). Execution/memory/sync/pipeline vocabulary, F1–F14, SKU-UNKNOWN symbols, and the seven evaluation criteria come from `docs/architecture/cuda-hardware-model.md` (TASK-16). Do not add node types, catalog IDs, layout objects, or hardware concepts.
-  - Label claims `OBSERVED` (sitting `text_config` / inventory already established; TASK-16 published identities \(N_w=32\), \(N_{\text{bank}}=32\)), `DERIVED` (MAC/byte citations and occupancy/intensity algebra instantiated from locked ranks and F1–F14), `HYPOTHESIS` (every mapping **usefulness**, every mode-fit, every coalescing/bank-conflict **usefulness**, every fusion \(\Delta I\) vs \(\Delta O\) sign, every layout-decomposition **justification**), or `UNKNOWN` (sitting-SKU numeric limits and optional capabilities `async_copy_cap`, `mma_shapes`, `cluster_cap`; vision-encoder internals). No `MEASURED` tok/s, occupancy, or NLL.
+  - Label claims `OBSERVED` (sitting `text_config` / inventory already established; TASK-16 published identities $N_w=32$, $N_{\text{bank}}=32$), `DERIVED` (MAC/byte citations and occupancy/intensity algebra instantiated from locked ranks and F1–F14), `HYPOTHESIS` (every mapping **usefulness**, every mode-fit, every coalescing/bank-conflict **usefulness**, every fusion $\Delta I$ vs $\Delta O$ sign, every layout-decomposition **justification**), or `UNKNOWN` (sitting-SKU numeric limits and optional capabilities `async_copy_cap`, `mma_shapes`, `cluster_cap`; vision-encoder internals). No `MEASURED` tok/s, occupancy, or NLL.
   - GitHub Markdown math. Cite TASK-02 equation tags via TASK-11/13/14 contracts, TASK-06 MAC/byte integers via those docs, TASK-15 ordering/tile/decomposition ids, TASK-16 concept ids and formulae. Do not rewrite forward math, recopy TASK-06 MAC tables as a new work study, recopy TASK-15 as a new layout study, or recopy TASK-16 as a new hardware-model study.
   - Allowed evidence: TASK-11 semantic-graph, TASK-13 decode-plan, TASK-14 prefill-plan, TASK-15 layout-strategy, TASK-16 cuda-hardware-model, sitting `config.json` `text_config`, plan evidence vocabulary, this dossier. TASK-01/02/03/04/06/09/12 integers and ids already cited by those documents may be **cited** through them. TASK-12 fusion hypothesis ids are cited through TASK-13/14 attachments (22 ids, all unselected); do not treat TASK-12 as a silent extra dependency. No Quartz, llama.cpp/GGML Qwen, or `models/Qwen3.8-27B-Q4_K_M.gguf`. No `deviceQuery`, datasheet SKU fill-in, SASS, or `*.cu` / `*.cuh` kernel bodies.
-  - CUDA mappings name ownership, reduction, hypothesized launch symbols \((R_t,C_{\text{cta}},T_{\text{cta}})\), sync class, and pipeline mix. They are not selected kernels and not sitting-device recipes. Naming `tensor_core_mma` as a hypothesized pipeline is not selecting `mma_shapes`.
+  - CUDA mappings name ownership, reduction, hypothesized launch symbols $(R_t,C_{\text{cta}},T_{\text{cta}})$, sync class, and pipeline mix. They are not selected kernels and not sitting-device recipes. Naming `tensor_core_mma` as a hypothesized pipeline is not selecting `mma_shapes`.
 - Non-goals:
   - No mapping, kernel, launch-config, occupancy-target, MMA-shape, layout, fusion, packing, or view **winner**. Listing an alternative is not selecting it. `n_mappings_selected` = 0. `mapping_winner_selected` false. `launch_config_selected` false. `mma_shapes_selected` false. `layout_winner_selected` false. `fusion_winner_selected` false. `ledger_open_question_mapping_winner_closed` false.
   - No TASK-19 microbenchmarks, end-to-end tok/s, or achieved occupancy. Occupancy estimates are F1–F8 templates with UNKNOWN SKU symbols.
@@ -78,13 +78,13 @@ If a node type, stage kind, layout object, parallel decomposition, MAC/byte, for
 
 - Prefill and decode share **one** semantic graph (TASK-11) and **one** compiled artifact (TASK-09 via TASK-15). This document maps **both** schedule consumers. Distinct **views** remain unselected (`decode_prefill_distinct_views_selected` false). Listing a decode-primary mapping and a prefill-primary mapping is not selecting dual views or a winner.
 - Primary mapped objects are the six TASK-11 node types. Layout objects and parallel decompositions are **attachments**, not extra node types.
-- Algebraic equivalents in TASK-02 remain the same real map: GQA-as-repeat does **not** store repeated KV; paper \(S^\top\) (19) is the same map as (17)–(18); chunkwise GDN is not zero \(S\) traffic; conv delay is 3 stored vectors.
-- A CUDA mapping is not a kernel binary, not a CUDA graph, and not a selected launch. Hypothesized \(T_{\text{cta}}\) candidates are warp-multiple thread counts, not a selected block size.
+- Algebraic equivalents in TASK-02 remain the same real map: GQA-as-repeat does **not** store repeated KV; paper $S^\top$ (19) is the same map as (17)–(18); chunkwise GDN is not zero $S$ traffic; conv delay is 3 stored vectors.
+- A CUDA mapping is not a kernel binary, not a CUDA graph, and not a selected launch. Hypothesized $T_{\text{cta}}$ candidates are warp-multiple thread counts, not a selected block size.
 - Unique weight bytes are counted **once** per complete decode/prefill. Mapping does not restream the model.
 - Do not inspect Quartz, llama.cpp, or GGUF kernels to “confirm” mappings.
 - Do not select a mapping, MMA shape, occupancy target, or layout. Do not fill TASK-16 UNKNOWN symbols from a datasheet.
 - Name a CUDA decomposition for TASK-15 `j_mma_shaped_unselected_par` (`par_gemm_d_out` + `tile_mma_shaped` + hypothesized `tensor_core_mma` pipeline). That **names** the missing decomposition; it does not select MMA extents (`mma_shapes` stays `UNKNOWN`; `mma_tile_extents_selected` false).
-- Instantiate TASK-16 evaluation criteria 1–7 as **criteria applied to hypothesized symbols**, not as measured points. Roofline F14 remains an upper bound with \(\Pi_{\text{peak}}\) and \(\Beta\) `UNKNOWN`.
+- Instantiate TASK-16 evaluation criteria 1–7 as **criteria applied to hypothesized symbols**, not as measured points. Roofline F14 remains an upper bound with $\Pi_{\text{peak}}$ and $\Beta$ `UNKNOWN`.
 
 ### Deliverable structure (`docs/architecture/cuda-design-space.md`)
 
@@ -94,13 +94,13 @@ Title: `# CUDA design space` (not `TASK-17`).
 
 1. **Authority** — this dossier, semantic-graph, decode-plan, prefill-plan, layout-strategy, cuda-hardware-model, inventory via those docs, config, checker; evidence labels; in-scope (language+MTP per-node CUDA ownership/reduction alternatives + six-way estimates + TASK-16 criteria instantiation + TASK-15 layout attachments) vs deferred (vision encoder; TASK-19 measurements; sitting SKU table). State that the document specifies a **CUDA mapping experiment space**, not selected kernels and not measured winners.
 2. **Mapping convention** — the five canonical sentences plus the layout sentence (exact text below); what a mapping / ownership / reduction is; open question stays open; no winner.
-3. **Mapping vocabulary** — ownership, reduction, estimate dimensions, sync classes, pipeline mixes, hypothesized \(T_{\text{cta}}\) candidates; SKU symbols remain UNKNOWN.
+3. **Mapping vocabulary** — ownership, reduction, estimate dimensions, sync classes, pipeline mixes, hypothesized $T_{\text{cta}}$ candidates; SKU symbols remain UNKNOWN.
 4. **Per-node mapping alternatives** — eighteen mappings, three per node type, all unselected. Completes ledger checkbox 1. Contains the Mermaid fence.
-5. **Work, storage, and access estimates** — per-mapping work (cited MAC + DERIVED partition), storage (cited HBM bytes + symbolic \(R_t,C_{\text{cta}}\)), access (TASK-15 ordering/tile attachments; coalescing usefulness HYPOTHESIS). Completes estimate dimensions `work`, `storage`, `access`.
+5. **Work, storage, and access estimates** — per-mapping work (cited MAC + DERIVED partition), storage (cited HBM bytes + symbolic $R_t,C_{\text{cta}}$), access (TASK-15 ordering/tile attachments; coalescing usefulness HYPOTHESIS). Completes estimate dimensions `work`, `storage`, `access`.
 6. **Synchronization, occupancy, and mode suitability** — per-mapping sync class, F1–F10 occupancy/hiding/wave templates with UNKNOWN SKU, decode vs prefill fit. Completes estimate dimensions `synchronization`, `occupancy`, `mode_suitability`. Completes ledger checkbox 2.
 7. **Layout instantiations** — nine TASK-15 parallel decompositions attached to mappings; MMA decomposition named; TASK-15 justification question stays unresolved.
 8. **Evaluation instantiation** — seven TASK-16 criteria applied; F13/F14; no winner.
-9. **Fusion versus occupancy** — TASK-13/14’s 22 fusion hypotheses remain unselected; F11/F12 \(\Delta I\) vs \(\Delta O\) is HYPOTHESIS; mapping-risk hypotheses.
+9. **Fusion versus occupancy** — TASK-13/14’s 22 fusion hypotheses remain unselected; F11/F12 $\Delta I$ vs $\Delta O$ is HYPOTHESIS; mapping-risk hypotheses.
 10. **Non-decisions** — what TASK-19/15/12/09/08/14 still own; open question stays open.
 11. **Deferred vision** — residual-stream interface only; encoder mappings UNKNOWN.
 12. **Machine-checkable summary JSON** — one fenced `json` object copied from a fresh checker `--json` run.
@@ -130,7 +130,7 @@ JSON `canonical_sentence_layout` equals that sentence. JSON `parallel_decomposit
 Bullets required under that heading:
 
 - Six semantic node types are complete for this task (`n_node_types` 6). Eighteen mappings are complete (`n_mappings` 18); three per type (`n_mappings_per_node` 3).
-- A mapping is a named ownership + reduction alternative of one node type with hypothesized \((R_t,C_{\text{cta}},T_{\text{cta}})\), sync class, pipeline mix, and six estimate dimensions. Listing a mapping is not selecting it (`n_mappings_selected` 0, `mapping_winner_selected` false).
+- A mapping is a named ownership + reduction alternative of one node type with hypothesized $(R_t,C_{\text{cta}},T_{\text{cta}})$, sync class, pipeline mix, and six estimate dimensions. Listing a mapping is not selecting it (`n_mappings_selected` 0, `mapping_winner_selected` false).
 - Estimate dimensions are complete: work, storage, access, synchronization, occupancy, mode suitability (`n_estimate_dimensions` 6).
 - TASK-16 evaluation criteria are instantiated (`n_evaluation_criteria` 7) and not measured (`evaluation_measured` false).
 - Prefill and decode share one graph and one artifact; distinct views remain unselected (`decode_prefill_distinct_views_selected` false).
@@ -209,7 +209,7 @@ JSON array `ownership_ids` in this exact order (4 ids). JSON `n_ownership_classe
 | id | TASK-16 concept | Owns |
 | --- | --- | --- |
 | `thread` | `thread` | one output element or one inner-loop step |
-| `warp` | `warp` | \(N_w=32\) lanes issued together |
+| `warp` | `warp` | $N_w=32$ lanes issued together |
 | `cta` | `cta` | one thread block; domain of `syncthreads` |
 | `grid` | `grid` | one kernel launch; no CTA barrier across blocks |
 
@@ -239,7 +239,7 @@ JSON array `pipeline_ids` in this exact order (6 ids). JSON `n_pipeline_ids` = 6
 
 JSON `async_copy_optional` true. Do not assume TMA exists (`tma_assumed_present` false). Do not pick `mma` vs `wgmma` vs later PTX variants. `tensor_core_mma` is the hypothesized MMA family; legal shapes stay `UNKNOWN`.
 
-JSON array `cta_T_candidates` `[32, 64, 128, 256]`. JSON `n_cta_T_candidates` = 4. JSON `n_cta_T_selected` = 0. These are hypothesized threads-per-CTA and **must** be multiples of \(N_w=32\) (DERIVED from TASK-16 F7). They are not TASK-15 tile extents (those remain layout candidates). Naming 256 is not selecting it. JSON `cta_T_all_multiples_of_warp` true.
+JSON array `cta_T_candidates` `[32, 64, 128, 256]`. JSON `n_cta_T_candidates` = 4. JSON `n_cta_T_selected` = 0. These are hypothesized threads-per-CTA and **must** be multiples of $N_w=32$ (DERIVED from TASK-16 F7). They are not TASK-15 tile extents (those remain layout candidates). Naming 256 is not selecting it. JSON `cta_T_all_multiples_of_warp` true.
 
 JSON array `mode_fit_ids` in this exact order (3 ids). JSON `n_mode_fit_ids` = 3: `decode_primary`, `prefill_primary`, `both`. JSON `mode_suitability_label` exactly `HYPOTHESIS`. JSON `n_mode_winners_selected` = 0. A `decode_primary` label is hypothesized fit, not a prohibition on prefill use.
 
@@ -294,17 +294,17 @@ JSON `n_decode_primary_mappings` = 3. JSON `n_prefill_primary_mappings` = 2. JSO
 
 Required prose per node type (compact; do not unroll 135 instances):
 
-**`embed`.** Gather of shared \(E\); TASK-06 `mac_embed` 0; `weight_gather_bytes_per_row` 10240. No RMS. No residual add. Three alternatives differ by who issues the row copy (thread / warp / CTA). Optional `async_gmem_to_smem` may attach to `map_embed_cta_vector` only as HYPOTHESIS (`async_copy_cap` UNKNOWN). Hidden-major gather (`ord_embed_hidden_major`) is an access hypothesis, not a fourth mapping.
+**`embed`.** Gather of shared $E$; TASK-06 `mac_embed` 0; `weight_gather_bytes_per_row` 10240. No RMS. No residual add. Three alternatives differ by who issues the row copy (thread / warp / CTA). Optional `async_gmem_to_smem` may attach to `map_embed_cta_vector` only as HYPOTHESIS (`async_copy_cap` UNKNOWN). Hidden-major gather (`ord_embed_hidden_major`) is an access hypothesis, not a fourth mapping.
 
-**`gated_attn`.** Residual RMS `(2)`, projections `(6)`–`(7)`, QK-RMS + mRoPE, causal GQA softmax `(9)`, sigmoid gate `(10)`, `W_o`, residual add `(4)`, KV append. Decode: one query vs length \(T\). Prefill: causal matrix-matrix with exact \(T(T+1)/2\). `map_attn_cta_head` owns a query head (`par_attn_head`); `map_attn_warp_t` splits stored length (`par_attn_T`) with warp reduction of scores; `map_attn_cta_splitk` splits \(T\) or \(d_\text{in}\) then CTA-reduces. Prefill GEMM of projections may hypothesize `tensor_core_mma` as a **secondary** pipeline on `map_attn_cta_head` without changing the primary `fma` id (softmax/AV stay scalar). Secondary pipeline usefulness is HYPOTHESIS. JSON `attn_prefill_mma_is_secondary_hypothesis` true.
+**`gated_attn`.** Residual RMS `(2)`, projections `(6)`–`(7)`, QK-RMS + mRoPE, causal GQA softmax `(9)`, sigmoid gate `(10)`, `W_o`, residual add `(4)`, KV append. Decode: one query vs length $T$. Prefill: causal matrix-matrix with exact $T(T+1)/2$. `map_attn_cta_head` owns a query head (`par_attn_head`); `map_attn_warp_t` splits stored length (`par_attn_T`) with warp reduction of scores; `map_attn_cta_splitk` splits $T$ or $d_\text{in}$ then CTA-reduces. Prefill GEMM of projections may hypothesize `tensor_core_mma` as a **secondary** pipeline on `map_attn_cta_head` without changing the primary `fma` id (softmax/AV stay scalar). Secondary pipeline usefulness is HYPOTHESIS. JSON `attn_prefill_mma_is_secondary_hypothesis` true.
 
-**`gated_delta_net`.** Residual RMS, projections `(13)`, depthwise conv `(14)` on `C_state`, SiLU/QKV, \(\alpha/\beta\), L2, recurrence `(17)`–`(18)` as definition, GatedRMSNorm `(3)`, `W_out`, residual add. FIR channels use `par_conv_channel` **inside** these mappings (conv is not a seventh node type). `map_gdn_cta_head` / `map_gdn_warp_recurrent` keep left-to-right recurrence per head (`par_gdn_head`). `map_gdn_cta_chunk` is the chunkwise/WY **algebraic equivalent** of the same map (TASK-11 flexibility); it is not zero \(S\) traffic (`chunkwise_not_zero_s_traffic` true) and is not a second node. JSON `gdn_chunk_is_algebraic_equivalent` true.
+**`gated_delta_net`.** Residual RMS, projections `(13)`, depthwise conv `(14)` on `C_state`, SiLU/QKV, $\alpha/\beta$, L2, recurrence `(17)`–`(18)` as definition, GatedRMSNorm `(3)`, `W_out`, residual add. FIR channels use `par_conv_channel` **inside** these mappings (conv is not a seventh node type). `map_gdn_cta_head` / `map_gdn_warp_recurrent` keep left-to-right recurrence per head (`par_gdn_head`). `map_gdn_cta_chunk` is the chunkwise/WY **algebraic equivalent** of the same map (TASK-11 flexibility); it is not zero $S$ traffic (`chunkwise_not_zero_s_traffic` true) and is not a second node. JSON `gdn_chunk_is_algebraic_equivalent` true.
 
-**`mlp`.** Post-RMS `(2)`, SwiGLU `(21)`, residual add `(5)`. Decode GEMV; prefill GEMM over \(T\). `map_mlp_cta_dout` splits \(d_\text{out}\) (`par_gemm_d_out`); `map_mlp_cta_splitk` splits \(d_\text{in}\) (`par_gemm_d_in`); `map_mlp_grid_T` splits sequence \(T\) (`par_gemm_T`) and is `prefill_primary` because decode \(T_\text{new}=1\) makes that split degenerate. `tile_mma_shaped` attaches to `map_mlp_cta_dout` / `map_mlp_grid_T` as an unselected layout family with `mma_shapes` UNKNOWN.
+**`mlp`.** Post-RMS `(2)`, SwiGLU `(21)`, residual add `(5)`. Decode GEMV; prefill GEMM over $T$. `map_mlp_cta_dout` splits $d_\text{out}$ (`par_gemm_d_out`); `map_mlp_cta_splitk` splits $d_\text{in}$ (`par_gemm_d_in`); `map_mlp_grid_T` splits sequence $T$ (`par_gemm_T`) and is `prefill_primary` because decode $T_\text{new}=1$ makes that split degenerate. `tile_mma_shaped` attaches to `map_mlp_cta_dout` / `map_mlp_grid_T` as an unselected layout family with `mma_shapes` UNKNOWN.
 
-**`lm_head`.** Final RMS then \(W_\text{lm}\) `(22)`/`(24)`; \(V=248320\); `mac_lm_head` 1271398400; `weight_bytes_lm_head` 2542796800. Sampling softmax over \(V\) remains out of scope. `map_lm_cta_vocab` owns vocab-out tiles; `map_lm_cta_splitk` splits \(H\); `map_lm_warp_gemv` is decode-primary warp-owned GEMV. A second physical \(W_\text{lm}\) read for MTP logits stays HYPOTHESIS extra, not unique bytes.
+**`lm_head`.** Final RMS then $W_\text{lm}$ `(22)`/`(24)`; $V=248320$; `mac_lm_head` 1271398400; `weight_bytes_lm_head` 2542796800. Sampling softmax over $V$ remains out of scope. `map_lm_cta_vocab` owns vocab-out tiles; `map_lm_cta_splitk` splits $H$; `map_lm_warp_gemv` is decode-primary warp-owned GEMV. A second physical $W_\text{lm}$ read for MTP logits stays HYPOTHESIS extra, not unique bytes.
 
-**`mtp_mix`.** RMS of `e_next` and `h_64`, concat, \(W_\text{fc}\) `(23)`; `mac_mtp_fc` 52428800. `map_mtp_cta_fc` is the unfused-looking CTA GEMM of \(W_\text{fc}\). `map_mtp_cta_fused` attaches unselected `fuse_mtp_mix_internals`. `map_mtp_split_norm_gemm` attaches unselected `split_mtp_cat` as two launches joined by `sync_stream_event`. Attaching a TASK-12/13/14 fusion id is not selecting it.
+**`mtp_mix`.** RMS of `e_next` and `h_64`, concat, $W_\text{fc}$ `(23)`; `mac_mtp_fc` 52428800. `map_mtp_cta_fc` is the unfused-looking CTA GEMM of $W_\text{fc}$. `map_mtp_cta_fused` attaches unselected `fuse_mtp_mix_internals`. `map_mtp_split_norm_gemm` attaches unselected `split_mtp_cat` as two launches joined by `sync_stream_event`. Attaching a TASK-12/13/14 fusion id is not selecting it.
 
 Required: every node type has three alternatives; at least two distinct `ownership_ids` per node type; at least two distinct `reduction_ids` **or** `sync_class_ids` per node type. Checker asserts that partition.
 
@@ -321,7 +321,7 @@ JSON `n_secondary_pipeline_hypotheses` = 5. JSON `n_secondary_pipelines_selected
 
 ### Work, storage, and access estimates (lock; heading 5)
 
-Cite TASK-06 MAC/bytes through TASK-11/13/14/15. Checker **recomputes** the cited MAC integers from `text_config` with the same identities as TASK-06/11 (full proj \(24\cdot 256\cdot H + 2\cdot 4\cdot 256\cdot H + H\cdot 24\cdot 256\); linear token sum; MLP \(3IH\); `lm_head` \(VH\); GDN \(3\cdot 48\cdot 128\cdot 128\); conv \(d_\text{qkv}\cdot 4\); `mtp.fc` \(H\cdot 2H\)).
+Cite TASK-06 MAC/bytes through TASK-11/13/14/15. Checker **recomputes** the cited MAC integers from `text_config` with the same identities as TASK-06/11 (full proj $24\cdot 256\cdot H + 2\cdot 4\cdot 256\cdot H + H\cdot 24\cdot 256$; linear token sum; MLP $3IH$; `lm_head` $VH$; GDN $3\cdot 48\cdot 128\cdot 128$; conv $d_\text{qkv}\cdot 4$; `mtp.fc` $H\cdot 2H$).
 
 JSON keys (ints unless noted):
 
@@ -331,25 +331,25 @@ JSON numbers: `i_mlp_weight_only` 1, `i_lm_head_weight_only` 1, `i_gdn_vs_s_rw` 
 
 JSON `bottleneck_labels` copied from TASK-06 in TASK-06 order: `weight_memory`, `vocab_memory`, `state_memory`, `kv_memory`, `quadratic_attn`, `compute`. Restating a label is a **citation**, still HYPOTHESIS. JSON `n_bottleneck_labels` = 6.
 
-**Work partition (DERIVED, not a new work study).** For a mapping that splits an axis of length \(L\) into hypothesized tiles of extent \(e\) (unselected; \(e\) from TASK-15 `tile_extent_candidates` or head counts), work per owner is \((e/L)\) of the cited MAC when `red_none`, and the full cited MAC per reduction tree when `red_splitk_cta` / `red_warp` (partials sum to the same MAC). Do not pick \(e\). Write the identity:
+**Work partition (DERIVED, not a new work study).** For a mapping that splits an axis of length $L$ into hypothesized tiles of extent $e$ (unselected; $e$ from TASK-15 `tile_extent_candidates` or head counts), work per owner is $(e/L)$ of the cited MAC when `red_none`, and the full cited MAC per reduction tree when `red_splitk_cta` / `red_warp` (partials sum to the same MAC). Do not pick $e$. Write the identity:
 
-\[
+$$
 F_{\text{owner}} = (e/L)\,F_{\text{node}}\quad\text{when reduction is }\texttt{red\_none.}
-\]
+$$
 
-JSON `work_partition_identity_present` true. Head counts used as \(L\) when the split is heads: \(L=24\) for `par_attn_head`, \(L=48\) for `par_gdn_head`, \(L=4\) for `par_kv_head`, \(L=10240\) for `par_conv_channel`, \(L=V=248320\) for embed rows (independent rows, not a split of one row).
+JSON `work_partition_identity_present` true. Head counts used as $L$ when the split is heads: $L=24$ for `par_attn_head`, $L=48$ for `par_gdn_head`, $L=4$ for `par_kv_head`, $L=10240$ for `par_conv_channel`, $L=V=248320$ for embed rows (independent rows, not a split of one row).
 
 Per-mapping work cite (JSON `mapping_work_mac_ids` parallel to `mapping_ids`):
 
 `mac_embed`, `mac_embed`, `mac_embed`, `mac_full_proj_per_layer`, `mac_attn_coeff_per_full_layer`, `mac_attn_coeff_per_full_layer`, `mac_lin_token_per_layer`, `mac_gdn_per_layer`, `mac_gdn_per_layer`, `mac_mlp_per_layer`, `mac_mlp_per_layer`, `mac_mlp_per_layer`, `mac_lm_head`, `mac_lm_head`, `mac_lm_head`, `mac_mtp_fc`, `mac_mtp_fc`, `mac_mtp_fc`
 
-`map_attn_cta_head` cites projection MAC as the large contraction and still must mention `mac_attn_coeff_per_full_layer` \(T\)-scaled core in prose. `map_gdn_cta_head` cites the full linear-token MAC including conv `40960` and GDN `2359296`. `map_gdn_warp_recurrent` and `map_gdn_cta_chunk` cite `mac_gdn_per_layer` for the recurrence core; prose must still name conv as `par_conv_channel` sub-work.
+`map_attn_cta_head` cites projection MAC as the large contraction and still must mention `mac_attn_coeff_per_full_layer` $T$-scaled core in prose. `map_gdn_cta_head` cites the full linear-token MAC including conv `40960` and GDN `2359296`. `map_gdn_warp_recurrent` and `map_gdn_cta_chunk` cite `mac_gdn_per_layer` for the recurrence core; prose must still name conv as `par_conv_channel` sub-work.
 
-**Storage.** HBM backing is the cited unique-weight / state bytes (not a live-set sum). Register and shared footprints stay symbols \(R_t\), \(C_{\text{cta}}\) (TASK-16). Do not invent numeric register counts. JSON `storage_rt_numeric` false. JSON `storage_hbm_cited` true. Per-mapping HBM cite ids (JSON `mapping_hbm_cite_ids`):
+**Storage.** HBM backing is the cited unique-weight / state bytes (not a live-set sum). Register and shared footprints stay symbols $R_t$, $C_{\text{cta}}$ (TASK-16). Do not invent numeric register counts. JSON `storage_rt_numeric` false. JSON `storage_hbm_cited` true. Per-mapping HBM cite ids (JSON `mapping_hbm_cite_ids`):
 
-`weight_gather_bytes_per_row` ×3 for embed; `kv_bytes_per_full_layer_per_token` for the three attn maps; `s_bytes_per_layer` for the three GDN maps (prose also names `c_bytes_per_layer`); `mac_mlp` maps cite weight-memory class (bytes via \(3IH\times\) dtype; do not recopy a full weight table); lm_head maps cite `weight_bytes_lm_head`; mtp maps cite `mac_mtp_fc` work with \(H\cdot 2H\cdot 2\) BF16 unique \(W_\text{fc}\) identity stated in prose as DERIVED \(2\cdot 5120\cdot 10240=104857600\) B if conceptual BF16 — checker key `weight_bytes_mtp_fc` = \(2\cdot H\cdot 2H=104857600\).
+`weight_gather_bytes_per_row` ×3 for embed; `kv_bytes_per_full_layer_per_token` for the three attn maps; `s_bytes_per_layer` for the three GDN maps (prose also names `c_bytes_per_layer`); `mac_mlp` maps cite weight-memory class (bytes via $3IH\times$ dtype; do not recopy a full weight table); lm_head maps cite `weight_bytes_lm_head`; mtp maps cite `mac_mtp_fc` work with $H\cdot 2H\cdot 2$ BF16 unique $W_\text{fc}$ identity stated in prose as DERIVED $2\cdot 5120\cdot 10240=104857600$ B if conceptual BF16 — checker key `weight_bytes_mtp_fc` = $2\cdot H\cdot 2H=104857600$.
 
-JSON `weight_bytes_mtp_fc` 104857600 (DERIVED \(2\cdot H\cdot 2H\) BF16). This is a citation identity, not a selected store dtype (`activation_dtype_decided` false remains).
+JSON `weight_bytes_mtp_fc` 104857600 (DERIVED $2\cdot H\cdot 2H$ BF16). This is a citation identity, not a selected store dtype (`activation_dtype_decided` false remains).
 
 **Access.** Attach TASK-15 orderings/tiles as HYPOTHESIS bindings. Coalescing usefulness is HYPOTHESIS (TASK-16 identity 5 is OBSERVED as a hardware fact; whether a given ordering realizes it is not measured). Bank-conflict usefulness is HYPOTHESIS. JSON `access_usefulness_label` exactly `HYPOTHESIS`. JSON `coalescing_identity_observed` true (the programming-guide identity, cited from TASK-16). JSON `n_access_winners_selected` = 0.
 
@@ -383,7 +383,7 @@ Every TASK-15 `parallel_decomposition_ids` entry appears in at least one mapping
 
 **Synchronization.** Use the `mapping_sync_class_ids` column. Prose must state **what is ordered** for each used class (cite TASK-16): `sync_none` orders nothing beyond the issuing thread; `sync_warp` orders one warp; `sync_cta` is `__syncthreads` within one CTA; `sync_stream_event` orders kernels/memcopies on a stream via events; `sync_grid` is named in vocabulary but unused (`cooperative_groups` grid sync `UNKNOWN`). Do not assume cluster barriers.
 
-**Occupancy.** Instantiate TASK-16 F1–F10 with hypothesized \((R_t,C_{\text{cta}},T_{\text{cta}})\) and UNKNOWN SKU symbols. Required formula substrings **outside** the JSON fence (character-for-character, inside `$...$` or `$$...$$`):
+**Occupancy.** Instantiate TASK-16 F1–F10 with hypothesized $(R_t,C_{\text{cta}},T_{\text{cta}})$ and UNKNOWN SKU symbols. Required formula substrings **outside** the JSON fence (character-for-character, inside `$...$` or `$$...$$`):
 
 - `O = \min(O_\text{reg}, O_\text{smem}, O_\text{threads}, O_\text{cta})` (F1)
 - `W_\text{cta} = \lceil T_\text{cta} / N_w \rceil` (F7)
@@ -391,13 +391,13 @@ Every TASK-15 `parallel_decomposition_ids` entry appears in at least one mapping
 - `W_\text{need} = N_\text{sched} \cdot L_\text{issue}` (F9)
 - `N_\text{waves} = \lceil N_\text{grid} / (N_\text{SM} \cdot B_\text{SM}) \rceil` (F10)
 
-Companion identities (DERIVED; required in prose): \(W_{\text{active}}=B_{\text{SM}}\cdot W_{\text{cta}}\); hiding complete only if \(W_{\text{active}}\ge W_{\text{need}}\); last-wave \(\eta_{\text{wave}}=N_{\text{grid}}/(N_{\text{waves}}\cdot N_{\text{SM}}\cdot B_{\text{SM}})\). \(N_{\text{SM}}\), \(W_{\max}\), \(S_{\text{reg}}\), \(C_{\text{smem}}\), \(T_{\max}\), \(B_{\max}\), \(N_{\text{sched}}\), \(L_{\text{issue}}\) stay `UNKNOWN`. Do not report achieved occupancy. Do not print a numeric occupancy fraction as if measured.
+Companion identities (DERIVED; required in prose): $W_{\text{active}}=B_{\text{SM}}\cdot W_{\text{cta}}$; hiding complete only if $W_{\text{active}}\ge W_{\text{need}}$; last-wave $\eta_{\text{wave}}=N_{\text{grid}}/(N_{\text{waves}}\cdot N_{\text{SM}}\cdot B_{\text{SM}})$. $N_{\text{SM}}$, $W_{\max}$, $S_{\text{reg}}$, $C_{\text{smem}}$, $T_{\max}$, $B_{\max}$, $N_{\text{sched}}$, $L_{\text{issue}}$ stay `UNKNOWN`. Do not report achieved occupancy. Do not print a numeric occupancy fraction as if measured.
 
 JSON `occupancy_sku_symbols_unknown` true. JSON `achieved_occupancy_reported` false.
 
-Hypothesized \(T_{\text{cta}}\) is taken from `cta_T_candidates` and is **not selected**. Prose may say “a hypothesized \(T_{\text{cta}}\in\{32,64,128,256\}\)” without picking one. \(R_t\) and \(C_{\text{cta}}\) remain symbols. Fusion may raise both (F11, F12) and fail F9 even if intensity rises.
+Hypothesized $T_{\text{cta}}$ is taken from `cta_T_candidates` and is **not selected**. Prose may say “a hypothesized $T_{\text{cta}}\in\{32,64,128,256\}$” without picking one. $R_t$ and $C_{\text{cta}}$ remain symbols. Fusion may raise both (F11, F12) and fail F9 even if intensity rises.
 
-**Mode suitability.** Use `mapping_mode_fit_ids`. Completes decode vs prefill (TASK-13 GEMV / TASK-14 GEMM; `diff_matrix_matrix`, `diff_tiling`, `diff_reuse`). Usefulness of acting on a `decode_primary` or `prefill_primary` label remains HYPOTHESIS. Do not select distinct views. At \(T=1\), `map_mlp_grid_T` degenerates (DERIVED); that identity does not select a decode mapping.
+**Mode suitability.** Use `mapping_mode_fit_ids`. Completes decode vs prefill (TASK-13 GEMV / TASK-14 GEMM; `diff_matrix_matrix`, `diff_tiling`, `diff_reuse`). Usefulness of acting on a `decode_primary` or `prefill_primary` label remains HYPOTHESIS. Do not select distinct views. At $T=1$, `map_mlp_grid_T` degenerates (DERIVED); that identity does not select a decode mapping.
 
 JSON `mode_fit_at_T1_grid_T_degenerates` true.
 
@@ -419,7 +419,7 @@ JSON object `decomposition_mapping_ids` keyed in that order (each value an array
 
 JSON array `justification_hypothesis_ids` copied from TASK-15 (10 ids). JSON `n_justification_hypotheses` = 10. JSON `n_justification_hypotheses_selected` = 0. JSON `justification_usefulness_label` exactly `HYPOTHESIS`.
 
-**MMA decomposition name (required prose).** TASK-15 `j_mma_shaped_unselected_par` left the CUDA decomposition unspecified. This document **names** it: CTA-owned \(d_\text{out}\) tiles (`par_gemm_d_out`) whose hypothesized pipeline mix includes `tensor_core_mma`, consuming unselected layout family `tile_mma_shaped`, with legal \((M,N,K)\) and dtypes equal to TASK-16 `mma_shapes` (`UNKNOWN`). Mapped alternatives that may bind that name: `map_mlp_cta_dout`, `map_mlp_grid_T`, `map_lm_cta_vocab`, `map_mtp_cta_fc`. Naming is not selecting extents, not selecting MMA vs wgmma, and not selecting a winner. JSON `mma_decomposition_named` true. JSON `mma_decomposition_id` exactly `par_gemm_d_out`. JSON `mma_pipeline_id` exactly `tensor_core_mma`. JSON `mma_tile_family_id` exactly `tile_mma_shaped`.
+**MMA decomposition name (required prose).** TASK-15 `j_mma_shaped_unselected_par` left the CUDA decomposition unspecified. This document **names** it: CTA-owned $d_\text{out}$ tiles (`par_gemm_d_out`) whose hypothesized pipeline mix includes `tensor_core_mma`, consuming unselected layout family `tile_mma_shaped`, with legal $(M,N,K)$ and dtypes equal to TASK-16 `mma_shapes` (`UNKNOWN`). Mapped alternatives that may bind that name: `map_mlp_cta_dout`, `map_mlp_grid_T`, `map_lm_cta_vocab`, `map_mtp_cta_fc`. Naming is not selecting extents, not selecting MMA vs wgmma, and not selecting a winner. JSON `mma_decomposition_named` true. JSON `mma_decomposition_id` exactly `par_gemm_d_out`. JSON `mma_pipeline_id` exactly `tensor_core_mma`. JSON `mma_tile_family_id` exactly `tile_mma_shaped`.
 
 JSON array `tile_family_ids` copied from TASK-15 (9 ids) as citations; `tile_size_selected` false; `mma_tile_extents_selected` false.
 
@@ -439,20 +439,20 @@ JSON array `evaluation_criterion_ids` in this exact order (7 ids). JSON `n_evalu
 
 | id | TASK-16 item | Instantiation here |
 | --- | ---: | --- |
-| `crit_occupancy` | 1 | F1–F8 with hypothesized \(R_t,C_{\text{cta}},T_{\text{cta}}\); SKU UNKNOWN |
-| `crit_latency_hiding` | 2 | F9; \(L_{\text{issue}}\) symbolic |
-| `crit_wave_quant` | 3 | F10; \(N_{\text{SM}}\) UNKNOWN |
-| `crit_intensity_roofline` | 4 | F13 vs F14; \(\Pi_{\text{FMA}}\) / \(\Pi_{\text{TC}}\) / \(\Beta\) UNKNOWN |
+| `crit_occupancy` | 1 | F1–F8 with hypothesized $R_t,C_{\text{cta}},T_{\text{cta}}$; SKU UNKNOWN |
+| `crit_latency_hiding` | 2 | F9; $L_{\text{issue}}$ symbolic |
+| `crit_wave_quant` | 3 | F10; $N_{\text{SM}}$ UNKNOWN |
+| `crit_intensity_roofline` | 4 | F13 vs F14; $\Pi_{\text{FMA}}$ / $\Pi_{\text{TC}}$ / $\Beta$ UNKNOWN |
 | `crit_sync_class` | 5 | `mapping_sync_class_ids` |
 | `crit_pipeline_mix` | 6 | `mapping_primary_pipeline_ids` + secondary hypotheses |
-| `crit_fusion_delta` | 7 | sign \(\Delta I\) vs sign \(\Delta O\); F9 still holds? HYPOTHESIS |
+| `crit_fusion_delta` | 7 | sign $\Delta I$ vs sign $\Delta O$; F9 still holds? HYPOTHESIS |
 
 Required F13/F14 substrings outside the JSON fence:
 
 - `I = F / B` (F13)
 - `\Pi \le \min(\Pi_\text{peak}, I \cdot \Beta)` (F14)
 
-Cite intensities `i_mlp_weight_only` 1, `i_lm_head_weight_only` 1, `i_gdn_vs_s_rw` 0.75, `i_attn_core_vs_kv` 6 as **node-level** F13 identities (TASK-06 via TASK-11). Mapping-level \(I\) may differ when split-K rereads weights or fusion drops intermediate bytes; the **sign** of that change is HYPOTHESIS. \(\Pi_{\text{peak}}\) is \(\Pi_{\text{FMA}}\) or \(\Pi_{\text{TC}}\) according to the hypothesized pipeline mix, both `UNKNOWN`. F14 is an upper bound, not a measured point. JSON `roofline_is_bound_not_measurement` true. JSON `n_evaluation_winners_selected` = 0.
+Cite intensities `i_mlp_weight_only` 1, `i_lm_head_weight_only` 1, `i_gdn_vs_s_rw` 0.75, `i_attn_core_vs_kv` 6 as **node-level** F13 identities (TASK-06 via TASK-11). Mapping-level $I$ may differ when split-K rereads weights or fusion drops intermediate bytes; the **sign** of that change is HYPOTHESIS. $\Pi_{\text{peak}}$ is $\Pi_{\text{FMA}}$ or $\Pi_{\text{TC}}$ according to the hypothesized pipeline mix, both `UNKNOWN`. F14 is an upper bound, not a measured point. JSON `roofline_is_bound_not_measurement` true. JSON `n_evaluation_winners_selected` = 0.
 
 ### Fusion versus occupancy (lock; heading 9)
 
@@ -463,7 +463,7 @@ Required F11/F12 substrings outside the JSON fence:
 - `R_f \ge \max(R_1, R_2)` (F11)
 - `C_f \ge \max(C_1, C_2)` (F12)
 
-Prose required: fused internals raise live ranges (F11, F12); \(O\) may fall; F9 may fail even if \(I\) rises. That implication is `DERIVED` from TASK-16, not a fusion winner. `map_mtp_cta_fused` and intra-node `fuse_*_internals` attachments illustrate criterion 7; they do not select fusion.
+Prose required: fused internals raise live ranges (F11, F12); $O$ may fall; F9 may fail even if $I$ rises. That implication is `DERIVED` from TASK-16, not a fusion winner. `map_mtp_cta_fused` and intra-node `fuse_*_internals` attachments illustrate criterion 7; they do not select fusion.
 
 JSON `var_splitk_grid_id` exactly `var_splitk_grid`. JSON `n_reduction_variant_hypotheses` = 1. JSON `n_reduction_variant_hypotheses_selected` = 0. `var_splitk_grid` is the HYPOTHESIS that a `red_splitk_cta` mapping instead reduces with `red_grid` if cooperative groups or atomics are available; gated by UNKNOWN capabilities; not a nineteenth mapping.
 
@@ -471,20 +471,20 @@ Mapping-risk hypotheses (every severity is HYPOTHESIS). JSON array `mapping_risk
 
 | ID | Ties to | Severity | Claim (must remain HYPOTHESIS) |
 | --- | --- | --- | --- |
-| `m_occ_fusion` | F9/F11 | high | Fused internals may drop \(O\) so \(W_{\text{active}}<W_{\text{need}}\) |
+| `m_occ_fusion` | F9/F11 | high | Fused internals may drop $O$ so $W_{\text{active}}<W_{\text{need}}$ |
 | `m_splitk_sync` | `red_splitk_cta` | medium | Split-K adds reduction traffic and barriers |
 | `m_mma_sku` | `mma_shapes` | medium | `tensor_core_mma` may be unavailable or shape-mismatched |
 | `m_async_absent` | `async_copy_cap` | low | Async copy / TMA may be absent |
 | `m_cluster_absent` | `cluster_cap` | low | Grid-cooperative / cluster may be absent |
 | `m_decode_prefill_same_map` | TASK-14 views | medium | One mapping may not fit GEMV and GEMM equally; this does **not** select distinct views |
-| `m_gdn_serial` | `(17)`–`(18)` | medium | Per-head serial recurrence limits \(T\)-parallelism |
-| `m_lm_vocab_wave` | F10, \(V\) | medium | Vocab-out grids may wave-quantize |
+| `m_gdn_serial` | `(17)`–`(18)` | medium | Per-head serial recurrence limits $T$-parallelism |
+| `m_lm_vocab_wave` | F10, $V$ | medium | Vocab-out grids may wave-quantize |
 
 JSON `mapping_high_ids`: `m_occ_fusion`. `mapping_medium_ids`: `m_splitk_sync`, `m_mma_sku`, `m_decode_prefill_same_map`, `m_gdn_serial`, `m_lm_vocab_wave`. `mapping_low_ids`: `m_async_absent`, `m_cluster_absent`. JSON `n_mapping_high` = 1, `n_mapping_medium` = 5, `n_mapping_low` = 2. JSON `mapping_risk_severities` `["high","medium","medium","low","low","medium","medium","medium"]`.
 
 ### Non-decisions (lock; heading 10)
 
-Prose required: TASK-19 owns measurements and the sitting SKU table. TASK-15 still owns layout **selection** and still leaves the parallel-decomposition justification question unresolved. TASK-12/13/14 still own fusion **winners**. TASK-09 still owns artifact-boundary, ideal-sequence, scale-storage, scale-placement, alignment-grain, and code-bit-order **selection**. TASK-14 still owns decode/prefill **view** selection. TASK-08 still owns recipe **winners**. TASK-07 `activation_dtype_decided` remains false; hypothesized `fma` vs `tensor_core_mma` is a pipeline mix, not a dtype recipe. This mapping space does not change when a TASK-08 recipe is later applied. The ledger open question (which mappings win after benchmarks) remains unresolved. State writes are not optional. Chunkwise GDN is not zero \(S\) traffic.
+Prose required: TASK-19 owns measurements and the sitting SKU table. TASK-15 still owns layout **selection** and still leaves the parallel-decomposition justification question unresolved. TASK-12/13/14 still own fusion **winners**. TASK-09 still owns artifact-boundary, ideal-sequence, scale-storage, scale-placement, alignment-grain, and code-bit-order **selection**. TASK-14 still owns decode/prefill **view** selection. TASK-08 still owns recipe **winners**. TASK-07 `activation_dtype_decided` remains false; hypothesized `fma` vs `tensor_core_mma` is a pipeline mix, not a dtype recipe. This mapping space does not change when a TASK-08 recipe is later applied. The ledger open question (which mappings win after benchmarks) remains unresolved. State writes are not optional. Chunkwise GDN is not zero $S$ traffic.
 
 JSON `activation_dtype_decided` false.
 
@@ -504,7 +504,7 @@ Visual tokens may replace placeholders on the residual stream (`out_hidden_size`
 
 ### Tooling
 
-Create `scripts/check_cuda_design_space.py` (Python 3.11+, stdlib only: `argparse`, `json`, `math`, `re`, `sys`, `pathlib`, Google docstrings, type annotations on public functions). No torch, safetensors, numpy, mermaid parser, CUDA Python, uv, Ruff, or pytest. Do not import other `scripts/check_*.py`; duplicate the small `text_config` arithmetic needed for layer counts, `full_attention_indices`, \(d_\text{qkv}\), GQA, MAC/byte products, KV/\(C\)/\(S\) bytes, gather/lm-head/mtp-fc bytes. Duplicate TASK-11 `node_type_ids`, TASK-13/14 `stage_kind_ids` and `fusion_hypothesis_ids`, TASK-15 `parallel_decomposition_ids` / `justification_hypothesis_ids` / `tile_family_ids`, and TASK-16 `sku_unknown_symbols` / formula substrings as constants; do not import them.
+Create `scripts/check_cuda_design_space.py` (Python 3.11+, stdlib only: `argparse`, `json`, `math`, `re`, `sys`, `pathlib`, Google docstrings, type annotations on public functions). No torch, safetensors, numpy, mermaid parser, CUDA Python, uv, Ruff, or pytest. Do not import other `scripts/check_*.py`; duplicate the small `text_config` arithmetic needed for layer counts, `full_attention_indices`, $d_\text{qkv}$, GQA, MAC/byte products, KV/$C$/$S$ bytes, gather/lm-head/mtp-fc bytes. Duplicate TASK-11 `node_type_ids`, TASK-13/14 `stage_kind_ids` and `fusion_hypothesis_ids`, TASK-15 `parallel_decomposition_ids` / `justification_hypothesis_ids` / `tile_family_ids`, and TASK-16 `sku_unknown_symbols` / formula substrings as constants; do not import them.
 
 The ledger **Produces** line names only `docs/architecture/cuda-design-space.md`. The checker is stdlib evidence tooling matching TASK-01–16 and the user-required stdlib checker; it is in scope for this increment.
 
@@ -522,7 +522,7 @@ python3 scripts/check_cuda_design_space.py \
 
 Behavior:
 
-- Read `text_config` from `--config`. Build the summary object (schema below). Live fields from config: `hidden_size`, `intermediate_size`, `vocab_size`, layer counts, head dims, linear widths, `full_attention_indices`, `dtype`, `mamba_ssm_dtype`, `linear_conv_kernel_dim`. Derived: \(d_\text{qkv}\), \(g_\text{qa}\), instance counts, cited MAC/byte products, intensities, `weight_bytes_mtp_fc`. Constant fields: canonical sentences, mapping/ownership/reduction/sync/pipeline/estimate/evaluation/risk lists, booleans, SKU-unknown symbols.
+- Read `text_config` from `--config`. Build the summary object (schema below). Live fields from config: `hidden_size`, `intermediate_size`, `vocab_size`, layer counts, head dims, linear widths, `full_attention_indices`, `dtype`, `mamba_ssm_dtype`, `linear_conv_kernel_dim`. Derived: $d_\text{qkv}$, $g_\text{qa}$, instance counts, cited MAC/byte products, intensities, `weight_bytes_mtp_fc`. Constant fields: canonical sentences, mapping/ownership/reduction/sync/pipeline/estimate/evaluation/risk lists, booleans, SKU-unknown symbols.
 - `--json`: print that object to stdout (pretty-printed `json.dumps(..., indent=2)` plus a trailing newline; key order = schema order); run internal asserts listed below; exit 0.
 - Default / `--cuda-design-space PATH`: also require PATH to contain (1) every required `##` heading listed above **in order**, (2) the first fenced `json` block equal to the live object, (3) exactly one ` ```mermaid ` fence containing `flowchart`, (4) all five canonical sentences plus `canonical_sentence_layout` verbatim, (5) every `node_type_ids`, `mapping_ids`, `ownership_ids`, `reduction_ids`, `estimate_dimension_ids`, `sync_class_ids`, `pipeline_ids`, `mode_fit_ids`, `evaluation_criterion_ids`, `parallel_decomposition_ids`, `justification_hypothesis_ids`, `fusion_hypothesis_ids`, `mapping_risk_ids`, `stage_kind_ids`, `tile_family_ids`, `bottleneck_labels`, and `sku_unknown_symbols` id present as a substring, (6) the diagram’s required IDs present **inside that mermaid fence**, (7) none of `TBD`, `TODO`, `???`, (8) the word `UNKNOWN` present in the Deferred vision section, (9) every locked document integer/decimal below present as a decimal or integer substring, (10) the words `HYPOTHESIS` and `unresolved` present, (11) formula tags `(F1)`, `(F7)`, `(F8)`, `(F9)`, `(F10)`, `(F11)`, `(F12)`, `(F13)`, `(F14)` and the required formula substrings present outside the JSON fence, (12) none of the forbidden winner phrases: `winning mapping`, `selected kernel`, `best occupancy`, `should use tensor cores`, `recommend this mapping`, `deviceQuery`, `Quartz kernel`, `llama.cpp kernel`, `GGUF kernel`, `FlashAttention`, `cuBLAS`, `CUTLASS`, `selected winner`, `MMA shape is`, `achieved occupancy`, `this mapping is required`, `selected distinct views`, `prefill requires a distinct view` (allow the substring only inside `not selected kernels` / `not measured winners` / `selects no CUDA mapping winner` / `does not select a layout` / `does not justify`). Exit 1 with a readable list on mismatch.
 - Missing config: exit 2 (blocked, not a content fail).
@@ -583,7 +583,7 @@ Locked document integers/decimals the `--cuda-design-space` check must find:
 
 `5120`, `17408`, `248320`, `10240`, `256`, `128`, `48`, `24`, `4`, `16`, `17`, `64`, `135`, `104857600`, `12288`, `118235136`, `40960`, `2359296`, `267386880`, `1271398400`, `52428800`, `4096`, `69632`, `61440`, `3145728`, `150994944`, `2542796800`, `0.75`
 
-(`10240` is both gather-row bytes and \(d_\text{qkv}\); `104857600` is both full-proj MAC and `weight_bytes_mtp_fc`; substring once is enough.)
+(`10240` is both gather-row bytes and $d_\text{qkv}$; `104857600` is both full-proj MAC and `weight_bytes_mtp_fc`; substring once is enough.)
 
 ### Instantiated summary JSON schema
 
@@ -640,7 +640,7 @@ Draft-status banner (documentation stage): a blockquote or italic line **before*
 - `red_grid` and `sync_grid` stay in vocabulary and unused as selected mapping classes; cluster/TMA not assumed present.
 - MMA decomposition is **named** (`par_gemm_d_out` + `tile_mma_shaped` + `tensor_core_mma`) without selecting `mma_shapes`.
 - TASK-15 justification question remains unresolved; TASK-17 mapping-winner question remains unresolved.
-- State writes are not optional; chunkwise GDN is not zero \(S\) traffic; GQA repeat is not stored.
+- State writes are not optional; chunkwise GDN is not zero $S$ traffic; GQA repeat is not stored.
 - Checker is stdlib-only; JSON fence matches live `--json`.
 - If live `text_config` disagrees with a cited integer, the earlier document / config wins.
 

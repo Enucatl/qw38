@@ -15,7 +15,7 @@ Produce `docs/architecture/clean-sheet-review.md` as the Phase 1 **consistency r
 - Constraints:
   - `docs/architecture/plan.md` is authoritative for study scope; do not modify it.
   - If any occupancy, MAC/byte, catalog id, node type, stage kind, recipe, mapping, or selected-flag would disagree with TASK-01–20 or sitting `text_config`, the earlier document wins and this review is wrong. Planning compared first JSON fences of all twenty-one corpus documents: shared scalars/lists agree except documented notation aliases (not inconsistencies).
-  - Label claims `OBSERVED` (sitting `text_config` / inventory already established; TASK-16 \(N_w=32\), \(N_{\text{bank}}=32\)), `MEASURED` (TASK-05 citations only: `pooled_all.absmax=25.5`, `pooled_language_mtp.absmax=19.25`, `pooled_vision.absmax=25.5`; no new payload stats), `DERIVED` (cross-document key agreement, equation-tag presence, alias classification, freeze membership), `HYPOTHESIS` (every remaining alternative usefulness; every unrun experiment hypothesis — cited, not re-opened), or `UNKNOWN` (sitting-SKU numeric limits; vision-encoder internals; unselected corpora/hardware). No new `MEASURED` NLL, tok/s, occupancy, or bandwidth.
+  - Label claims `OBSERVED` (sitting `text_config` / inventory already established; TASK-16 $N_w=32$, $N_{\text{bank}}=32$), `MEASURED` (TASK-05 citations only: `pooled_all.absmax=25.5`, `pooled_language_mtp.absmax=19.25`, `pooled_vision.absmax=25.5`; no new payload stats), `DERIVED` (cross-document key agreement, equation-tag presence, alias classification, freeze membership), `HYPOTHESIS` (every remaining alternative usefulness; every unrun experiment hypothesis — cited, not re-opened), or `UNKNOWN` (sitting-SKU numeric limits; vision-encoder internals; unselected corpora/hardware). No new `MEASURED` NLL, tok/s, occupancy, or bandwidth.
   - GitHub Markdown math only where a citation needs it. Cite TASK-01–20 ids and documents; do not rewrite forward math, recopy MAC tables, recopy 22 recipes, recopy 18 mappings, or recopy TASK-18/19 methodologies.
   - Allowed evidence: TASK-01–20 deliverables and their JSON fences, sitting `config.json` `text_config`, plan.md evidence vocabulary, this dossier. TASK integers and ids already published may be **cited**. No Quartz, llama.cpp/GGML Qwen, or `models/Qwen3.8-27B-Q4_K_M.gguf` as a design authority or file to open. GGUF remains a named future black-box Pareto **reference** (TASK-18). After freeze, a later comparative review may use those systems as black-box references; they do not become design authority by the freeze mark.
 - Non-goals:
@@ -178,7 +178,7 @@ JSON array `check_family_ids` in this exact order (6 ids). JSON `n_check_familie
 | `equations` | `\tag{1}` … `\tag{24}` present in `model-semantics.md`; TASK-06/07 cite TASK-02 `(1)`–`(24)` as substring | TASK-02 |
 | `dimensions` | occupancy integers and `full_attention_indices` vs sitting `text_config` and across fences | TASK-01 / config |
 | `totals` | parameter/byte/MAC/MEASURED absmax integers across fences | TASK-01 / TASK-05 / TASK-06 |
-| `state` | catalog ids, KV/\(C\)/\(S\) bytes, \(B_\text{store}\) coefficients | TASK-03 / TASK-04 |
+| `state` | catalog ids, KV/$C$/$S$ bytes, $B_\text{store}$ coefficients | TASK-03 / TASK-04 |
 | `contracts` | node types, stage kinds, 135 instances, selected-flags false | TASK-11 / TASK-13 / TASK-14 |
 | `proposals` | 22 recipes, 22 fusions, 18 mappings, 17 SKU symbols, 12 `oq_*` still open | TASK-08 / TASK-12 / TASK-16 / TASK-17 / TASK-20 |
 
@@ -442,7 +442,7 @@ Locked document integers that must appear as decimal substrings in the review ma
   - Eight review headings in locked order; four canonical sentences plus `review_question_sentence` plus `freeze_non_authority_sentence` verbatim; 21 corpus documents; 6 check families; 7 aliases; 0 inconsistencies; 12 remaining open questions; 0 closed; one Mermaid flowchart with required IDs.
   - JSON fence equal to live `--json`.
   - Freeze true in the review only; TASK-20 freeze flag remains false.
-  - Microbenchmarks cannot pass a mapping; reconstruction is not quality; tok/s is not Pareto \(Y\); Q4_K_M is a reference not a requirement.
+  - Microbenchmarks cannot pass a mapping; reconstruction is not quality; tok/s is not Pareto $Y$; Q4_K_M is a reference not a requirement.
   - `experiments_run` false; `comparative_review_executed_here` false; `mapping_winner_selected` false; `sku_table_filled` false; `payloads_restreamed` false.
   - Logical values do not imply allocation. Vision encoder remains unexpanded.
 - Rejected alternatives:

@@ -292,7 +292,7 @@ flowchart TD
     norm --> choose{"Layer index mod 4 = 3?"}
     choose -->|no| gdn["GDN: Q4 MMV + BF16 gates; conv; FP32 recurrence"]
     choose -->|yes| attn["Attention: Q4 MMV; QK/RoPE; segmented KV scan"]
-    state["FP32 S + BF16 conv history"] <--> gdn
+    persistent_state["FP32 S + BF16 conv history"] <--> gdn
     kv["BF16 KV cache"] <--> attn
     gdn --> mid["Q4 output MMV + FP32 residual add"]
     attn --> mid
@@ -404,13 +404,13 @@ Run these against the selected implementation, keeping unrelated choices fixed. 
 flowchart TD
     source["HF BF16 checkpoint + config"] --> compiler["Offline QW38 compiler: validate, classify, quantize, tile, pack"]
     compiler --> artifact["Compiled .qw38: Q4G64 / Q8G32 / BF16; one CUDA weight view"]
-    artifact --> graph["Qwen semantic graph: six families; primary language enabled"]
-    graph --> decode["Decode: quantized MMV, state updates, segmented attention"]
-    graph --> prefill["Prefill: tiled GEMM, causal attention, register-resident recurrence chunks"]
+    artifact --> semantic_graph["Qwen semantic graph: six families; primary language enabled"]
+    semantic_graph --> decode["Decode: quantized MMV, state updates, segmented attention"]
+    semantic_graph --> prefill["Prefill: tiled GEMM, causal attention, register-resident recurrence chunks"]
     decode --> plans["CUDA execution plans + reusable scratch"]
     prefill --> plans
     plans --> gpu["GPU: local unpacking, FP32 accumulation"]
-    gpu <--> state["Persistent VRAM: FP32 GDN S; BF16 conv + KV"]
+    gpu <--> persistent_vram["Persistent VRAM: FP32 GDN S; BF16 conv + KV"]
     gpu --> output["FP32 logits / language behavior"]
     output --> validation["NLL, distributions, generation, capabilities + end-to-end timing"]
     validation -.->|"EXP-A through EXP-H"| compiler

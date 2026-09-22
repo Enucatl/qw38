@@ -14,14 +14,14 @@ Produce `docs/architecture/semantic-graph.md` as the Phase 1 **hardware-independ
 
 - Constraints:
   - `docs/architecture/plan.md` is authoritative for study scope; do not modify it.
-  - Equations, ranks, and algebraic equivalents come from `docs/architecture/model-semantics.md` (TASK-02). Catalog IDs, fan-out, live-across, and model-region names come from `docs/architecture/dataflow.md` (TASK-03). Lifetime classes, must-survive boundaries, and \(K,V,C,S\) bytes come from `docs/architecture/lifetime-and-state.md` (TASK-04). Region MAC and traffic identities are **cited** from `docs/architecture/work-and-traffic.md` (TASK-06), not recopied as a new work study. Sensitive-op ids and precision roles are **cited** from `docs/architecture/numerical-sensitivity.md` (TASK-07), not re-ranked.
+  - Equations, ranks, and algebraic equivalents come from `docs/architecture/model-semantics.md` (TASK-02). Catalog IDs, fan-out, live-across, and model-region names come from `docs/architecture/dataflow.md` (TASK-03). Lifetime classes, must-survive boundaries, and $K,V,C,S$ bytes come from `docs/architecture/lifetime-and-state.md` (TASK-04). Region MAC and traffic identities are **cited** from `docs/architecture/work-and-traffic.md` (TASK-06), not recopied as a new work study. Sensitive-op ids and precision roles are **cited** from `docs/architecture/numerical-sensitivity.md` (TASK-07), not re-ranked.
   - Label claims `OBSERVED` (config/inventory already established), `DERIVED` (node cuts, I/O, instance counts, catalog partition, MAC citations from ranks), or `HYPOTHESIS` (every “fusion would help”, every split-candidate usefulness, every TASK-06 bottleneck **class** restated as a citation). `UNKNOWN` only for vision-encoder internals deferred here. No `MEASURED` tok/s or NLL. No selected fusion or kernel.
   - GitHub Markdown math. Cite TASK-02 equation tags `(1)`–`(24)`, TASK-03 catalog IDs, TASK-04 lifetime/state IDs, TASK-06 MAC integers, TASK-07 sensitive-op ids. Do not rewrite forward math, redraw the eight TASK-03 DAGs, recompute TASK-04 bytes as a new lifetime study, or recopy TASK-06 MAC/byte tables as a new traffic study.
   - Allowed evidence: TASK-02 semantics, TASK-03 dataflow, TASK-04 lifetime/state, TASK-06 work/traffic (citations), TASK-07 numerical-sensitivity (citations), sitting `config.json` `text_config`, plan evidence vocabulary. No Quartz, llama.cpp/GGML Qwen, or `models/Qwen3.8-27B-Q4_K_M.gguf`. No TASK-16 SKU fill-in (not a dependency). No TASK-08/09/10 recipe, packing, or compiler-stage decisions (not dependencies).
   - Contracts are hardware-independent: catalog IDs, equation tags, state kinds, and cited MAC/byte identities. No thread geometry, warps, SMs, CUDA dtypes, kernel names, streams, or sitting-GPU numbers.
 - Non-goals:
   - No fusion, buffer reuse, or physical-allocation **winners** (TASK-12). Internals and split candidates are named so TASK-12 can hypothesize; listing them is not a fusion decision.
-  - No decode/prefill **schedules** (TASK-13/14). Prefill and decode share **one** semantic graph; only \(T\) and incoming \((K,V,C,S)\) change.
+  - No decode/prefill **schedules** (TASK-13/14). Prefill and decode share **one** semantic graph; only $T$ and incoming $(K,V,C,S)$ change.
   - No physical layouts (TASK-15) and no CUDA mapping alternatives (TASK-17).
   - No quantization recipes, runtime-format packing, or compiler stages (TASK-08/09/10). Nodes consume parameters; bit width is not a node boundary.
   - No quality/NLL experiments (TASK-18) and no tok/s (TASK-19).
@@ -41,12 +41,12 @@ Produce `docs/architecture/semantic-graph.md` as the Phase 1 **hardware-independ
 - `docs/architecture/plan.md:89-92` — TASK-11 derives semantic regions from dependencies, state, and lifetimes; TASK-12 fusion; TASK-13/14 schedules; TASK-17 CUDA maps **nodes**.
 - `docs/architecture/task_ledger.md` TASK-11 row — produces `docs/architecture/semantic-graph.md`; purpose is hardware-independent Qwen-specific execution regions and contracts; open question is natural boundaries, internal values, and synchronization/materialization edges (**closed here by DERIVED cuts, not by selecting fusion**); completion is node boundaries from semantic evidence (not framework primitives), per-node ops/I/O/state/internals/flexibilities, hardware-independent contracts.
 - `docs/architecture/task_ledger.md` TASK-03 established results — 52-ID catalog; model regions `embed`, `full_attn`, `linear_attn`, `mlp`, `primary_logits`, `mtp` are **logical DAG regions**, not execution contracts; live-across `g`/`z`; sharing rank 1–11; logical ≠ physical.
-- `docs/architecture/task_ledger.md` TASK-04 established results — five lifetime classes; must-survive: token \(K,V,C,S\); residual-add `h`/`h_mid`; live-across `g`/`z`; \(B_\text{store}(T)=69632T+153944064\); fan-out ≠ must-store.
-- `docs/architecture/task_ledger.md` TASK-06 established results — embed 0 MAC gather; linear token MAC `118235136`; full proj `104857600` plus \(A=12288\) per full layer; MLP `267386880`; `lm_head` `1271398400`; GDN rank-1 `2359296`; `mtp.fc` `52428800`; intensities \(I=1\), \(0.75\), \(6\); six HYPOTHESIS bottleneck labels.
-- `docs/architecture/task_ledger.md` TASK-07 established results — four precision roles; 20 sensitive ops; GDN primary recurrent `(17)`–`(18)`; conceptual BF16 \(K,V,C\) and F32 \(S\); risks remain HYPOTHESIS.
+- `docs/architecture/task_ledger.md` TASK-04 established results — five lifetime classes; must-survive: token $K,V,C,S$; residual-add `h`/`h_mid`; live-across `g`/`z`; $B_\text{store}(T)=69632T+153944064$; fan-out ≠ must-store.
+- `docs/architecture/task_ledger.md` TASK-06 established results — embed 0 MAC gather; linear token MAC `118235136`; full proj `104857600` plus $A=12288$ per full layer; MLP `267386880`; `lm_head` `1271398400`; GDN rank-1 `2359296`; `mtp.fc` `52428800`; intensities $I=1$, $0.75$, $6$; six HYPOTHESIS bottleneck labels.
+- `docs/architecture/task_ledger.md` TASK-07 established results — four precision roles; 20 sensitive ops; GDN primary recurrent `(17)`–`(18)`; conceptual BF16 $K,V,C$ and F32 $S$; risks remain HYPOTHESIS.
 - `docs/architecture/task_ledger.md` TASK-12/13/14/17 — consumers of this graph; do not perform those designs here.
-- `docs/architecture/model-semantics.md` — equations `(1)`–`(24)`; residual wrapper `(4)`–`(5)`; two RMSNorm roles must not be collapsed; GatedRMSNorm `(3)` is GDN-only; algebraic equivalents are the same real map; MTP optional omission is equivalent only when \(\ell^{(0)}\) alone is required.
-- `docs/architecture/dataflow.md` — 52 catalog IDs in locked order; `g` live-across after attention; `z` live-across after recurrence; `h_64` fans out to primary logits and MTP; shared \(E\)/`W_\text{lm}`.
+- `docs/architecture/model-semantics.md` — equations `(1)`–`(24)`; residual wrapper `(4)`–`(5)`; two RMSNorm roles must not be collapsed; GatedRMSNorm `(3)` is GDN-only; algebraic equivalents are the same real map; MTP optional omission is equivalent only when $\ell^{(0)}$ alone is required.
+- `docs/architecture/dataflow.md` — 52 catalog IDs in locked order; `g` live-across after attention; `z` live-across after recurrence; `h_64` fans out to primary logits and MTP; shared $E$/`W_\text{lm}`.
 - `docs/architecture/lifetime-and-state.md` — `h`/`h_mid` residual-add; `g`/`z` live-across-mixer; token-persistent state IDs; `h_64` is ephemeral (not layer-residual).
 - `docs/architecture/work-and-traffic.md` — MAC/traffic identities to cite; region-cut activation bound is not a fusion claim; bottleneck classes stay HYPOTHESIS.
 - `docs/architecture/numerical-sensitivity.md` — sensitive-op ids to attach per node; `activation_dtype_decided` false; chunkwise FP gap HYPOTHESIS.
@@ -74,9 +74,9 @@ N/A — semantic-graph **contract** documentation. No prefill/decode/component t
 
 If a node I/O, state kind, catalog ID, layer count, or cited MAC/byte would disagree with TASK-02/03/04/06/07 or sitting `text_config`, the earlier document / config wins and this one is wrong.
 
-- Prefill and decode share **one** semantic graph. Only \(T\) (stored KV length after append) and whether incoming \((K,V,C,S)\) is zeros versus populated change. Do not duplicate node types per mode.
-- Primary graph **includes MTP** (second embed, `mtp_mix`, one `gated_attn`, one `mlp`, second `lm_head`). Language-only instance counts are secondary. Omitting MTP when only \(\ell^{(0)}\) is required is a TASK-02 algebraic equivalent, not a second graph and not the primary contract.
-- Algebraic equivalents in TASK-02 (chunkwise GDN, SDPA, GQA-as-repeat, RoPE complex form, \(S\) vs \(S^\top\), FIR vs delay-line conv) are the same real map **inside** the owning node. They are flexibilities, not extra node types. Finite-precision chunkwise-vs-recurrent gap remains TASK-07 HYPOTHESIS; GDN primary definition stays `(17)`–`(18)`.
+- Prefill and decode share **one** semantic graph. Only $T$ (stored KV length after append) and whether incoming $(K,V,C,S)$ is zeros versus populated change. Do not duplicate node types per mode.
+- Primary graph **includes MTP** (second embed, `mtp_mix`, one `gated_attn`, one `mlp`, second `lm_head`). Language-only instance counts are secondary. Omitting MTP when only $\ell^{(0)}$ is required is a TASK-02 algebraic equivalent, not a second graph and not the primary contract.
+- Algebraic equivalents in TASK-02 (chunkwise GDN, SDPA, GQA-as-repeat, RoPE complex form, $S$ vs $S^\top$, FIR vs delay-line conv) are the same real map **inside** the owning node. They are flexibilities, not extra node types. Finite-precision chunkwise-vs-recurrent gap remains TASK-07 HYPOTHESIS; GDN primary definition stays `(17)`–`(18)`.
 - TASK-03 **model regions** (`full_attn`, `linear_attn`, `mlp`, …) name logical DAG cuts. Semantic **node types** are execution contracts derived from those cuts plus lifetime/work/precision evidence. Do not copy Hugging Face module names (`Qwen3NextGatedDeltaNet`, `nn.Linear`, …) as node ids.
 - Fan-out ≠ must-store still holds. Declaring a catalog ID as node I/O is not a CUDA store. TASK-04 must-survive IDs (`h`, `h_mid`, `K,V,C,S`, `g`, `z`, logits) constrain **mathematical** visibility; `g`/`z` stay **internal** unless TASK-12 splits a node.
 - Do not inspect Quartz or llama.cpp to “confirm” graphs or kernels.
@@ -130,7 +130,7 @@ Cuts are **DERIVED** from prior evidence, not from framework modules or CUDA ker
 
 | id | Cut | Evidence | Why it is a node type |
 | --- | --- | --- | --- |
-| `cut_mixer_kind` | Gated Attention vs Gated DeltaNet | TASK-02 `(6)`–`(12)` vs `(13)`–`(20)`; state KV vs \(C,S\); TASK-06 \(A T\) vs \(T\)-free GDN; TASK-07 softmax/RoPE/KV vs recurrent \(S\) | Different equations, state, work class, and precision risks. One “attention” node would hide Qwen’s hybrid contract. |
+| `cut_mixer_kind` | Gated Attention vs Gated DeltaNet | TASK-02 `(6)`–`(12)` vs `(13)`–`(20)`; state KV vs $C,S$; TASK-06 $A T$ vs $T$-free GDN; TASK-07 softmax/RoPE/KV vs recurrent $S$ | Different equations, state, work class, and precision risks. One “attention” node would hide Qwen’s hybrid contract. |
 | `cut_mixer_mlp` | Mixer vs MLP | TASK-02 `(4)` vs `(5)`; TASK-04 `h_mid` residual-add; TASK-06 distinct MAC | `h_mid` must survive between Mix add and MLP add. Different work (attn/GDN vs SwiGLU). |
 | `cut_embed_gather` | Embed vs contractions | TASK-02 `(1)`; TASK-06 0 MAC gather 10240 B | Gather is not a GEMM. Distinct traffic class. |
 | `cut_vocab` | `lm_head` vs hidden GEMMs | TASK-02 `(22)` `(24)`; TASK-06 `1271398400` MAC and `vocab_memory` | Vocabulary projection is a distinct contraction and traffic outlier. |
@@ -180,12 +180,12 @@ JSON instance counts (complete primary = language + MTP):
 | `n_mlp_instances` | 65 | 64 language + 1 MTP |
 | `n_lm_head_instances` | 2 | primary + MTP |
 | `n_mtp_mix_instances` | 1 | one mix |
-| `n_node_instances_complete` | 135 | \(2+17+48+65+2+1\) |
-| `n_node_instances_language` | 130 | \(1+16+48+64+1+0\) |
+| `n_node_instances_complete` | 135 | $2+17+48+65+2+1$ |
+| `n_node_instances_language` | 130 | $1+16+48+64+1+0$ |
 
 JSON: `primary_includes_mtp` true; `mtp_omission_is_algebraic_equivalent` true (not the primary graph).
 
-Layer mixer xor: language layer \(\ell\) uses `gated_attn` iff \(\ell\in\mathcal{L}_\text{full}\) (`full_attention_indices` \(\{3,7,\ldots,63\}\)), else `gated_delta_net`. Then `mlp`. Do not unroll 64 layers in prose beyond this rule. JSON `mixer_xor_by_layer_types` true.
+Layer mixer xor: language layer $\ell$ uses `gated_attn` iff $\ell\in\mathcal{L}_\text{full}$ (`full_attention_indices` $\{3,7,\ldots,63\}$), else `gated_delta_net`. Then `mlp`. Do not unroll 64 layers in prose beyond this rule. JSON `mixer_xor_by_layer_types` true.
 
 JSON booleans (lock):
 
@@ -217,7 +217,7 @@ Each type has: operations (equation tags + short op list), inputs, outputs, stat
 
 **`embed`**
 
-- Ops: gather row of shared \(E\); 0 MAC (TASK-06). No RMS. No residual add.
+- Ops: gather row of shared $E$; 0 MAC (TASK-06). No RMS. No residual add.
 - Inputs: `token_id`. Outputs: `e` (language) or `e_next` (MTP instance).
 - State: none. Internals: none (`embed_internal_ids` empty).
 - Weights: shared `E` (`shared_weight_ids` includes `E`).
@@ -227,24 +227,24 @@ Each type has: operations (equation tags + short op list), inputs, outputs, stat
 
 **`gated_attn`**
 
-- Ops: residual-stream RMSNorm `(2)` of `h` → `h_tilde`; projections `(6)`–`(7)` including `q\|g` split; QK-RMSNorm `(8)` then partial mRoPE `(11)`–`(12)` (order required); causal GQA softmax `(9)` against stored \(K,V\) plus current `k_rope`/`v_full`; sigmoid gate `(10)` (**not** SiLU); `W_o`; residual add `(4)` into `h_mid`.
+- Ops: residual-stream RMSNorm `(2)` of `h` → `h_tilde`; projections `(6)`–`(7)` including `q\|g` split; QK-RMSNorm `(8)` then partial mRoPE `(11)`–`(12)` (order required); causal GQA softmax `(9)` against stored $K,V$ plus current `k_rope`/`v_full`; sigmoid gate `(10)` (**not** SiLU); `W_o`; residual add `(4)` into `h_mid`.
 - Inputs: `h` (MTP block: `mtp_u` identified as residual `h`). Outputs: `h_mid`.
-- State RW: `K_state`, `V_state` (append `k_rope`, `v_full`; RoPE baked into stored \(K\); 17 instances including MTP). Reads past \(T-1\) then attends length \(T\) (TASK-04).
+- State RW: `K_state`, `V_state` (append `k_rope`, `v_full`; RoPE baked into stored $K$; 17 instances including MTP). Reads past $T-1$ then attends length $T$ (TASK-04).
 - Internals (`gated_attn_internal_ids`, this order): `h_tilde`, `u_q`, `q_prime`, `g`, `k_raw`, `v_full`, `q_n`, `k_n`, `q_rope`, `k_rope`, `attn`, `y_gate`, `mix_full`. Live-across internal: `g`. High-fan-out internals: `k_rope`, `v_full` (attn + KV write).
 - Contract: `h` remains available until the residual add. `g` remains available from the `q_proj` split until `(10)`.
-- Flexibilities: `algebraic_equivalent` (exact SDPA; GQA-as-repeat; RoPE complex form; text mRoPE vs ordinary RoPE when \(p^T=p^H=p^W\)); `fuse_internals`; `split_at_internal` candidates `g`, `h_tilde`, `k_rope`, `v_full` (TASK-12 HYPOTHESIS cuts, not extra types); `recompute_ephemeral` of all internals and of output `h_mid` from `h` plus state.
+- Flexibilities: `algebraic_equivalent` (exact SDPA; GQA-as-repeat; RoPE complex form; text mRoPE vs ordinary RoPE when $p^T=p^H=p^W$); `fuse_internals`; `split_at_internal` candidates `g`, `h_tilde`, `k_rope`, `v_full` (TASK-12 HYPOTHESIS cuts, not extra types); `recompute_ephemeral` of all internals and of output `h_mid` from `h` plus state.
 - TASK-06 cite: T-free proj MAC `104857600` per instance; T-coefficient `12288`; KV 4096 B/token/instance.
 - TASK-07 cite: `param_bf16`, `residual_stream`, `live_across_gates`, `silu_sigmoid` (sigmoid gate), `rms_hidden`, `rms_head`, `softmax_over_T`, `attn_av_over_T`, `gemm_k5120`, `rope_phase`, `state_kv_bf16`.
 
 **`gated_delta_net`**
 
-- Ops: residual-stream RMSNorm `(2)` of `h` → `h_tilde`; projections `(13)` (`W_qkv`, `W_z`, `W_a`, `W_b`); depthwise causal conv `(14)` reading `C_state`; SiLU and QKV split; \(\alpha/\beta\) `(15)`; L2 `(16)`; recurrence `(17)`–`(18)` as **definition** (not dense `(19)` as extra work); GatedRMSNorm `(3)` with `z`; `W_out`; residual add `(4)` into `h_mid`. Write `qkv` into `C_state`; write `S_t`.
+- Ops: residual-stream RMSNorm `(2)` of `h` → `h_tilde`; projections `(13)` (`W_qkv`, `W_z`, `W_a`, `W_b`); depthwise causal conv `(14)` reading `C_state`; SiLU and QKV split; $\alpha/\beta$ `(15)`; L2 `(16)`; recurrence `(17)`–`(18)` as **definition** (not dense `(19)` as extra work); GatedRMSNorm `(3)` with `z`; `W_out`; residual add `(4)` into `h_mid`. Write `qkv` into `C_state`; write `S_t`.
 - Inputs: `h`. Outputs: `h_mid`.
 - State RW: `C_state` (3×10240), `S` (48×128×128 conceptual F32).
 - Internals (`gated_delta_net_internal_ids`, this order): `h_tilde`, `qkv`, `z`, `a`, `b`, `c_tilde`, `c`, `q_lin`, `k_lin`, `v_lin`, `q_hat`, `k_hat`, `alpha`, `beta`, `o`, `u_gdn`, `mix_lin`. Live-across internal: `z`. Intra-equation reuse: `k_hat` (not a second catalog consumer; not a split candidate).
 - Contract: `h` live until residual add; `z` live from `W_z` until `(20)`; GDN eval primary is left-to-right `(17)`–`(18)`.
-- Flexibilities: `algebraic_equivalent` (chunkwise/WY of the **same** map; FIR vs delay-line conv; \(S\) vs \(S^\top\)); `fuse_internals`; `split_at_internal` candidates `z`, `h_tilde`, `qkv`; `recompute_ephemeral`. Chunkwise FP gap stays HYPOTHESIS; do not treat chunkwise as a second node or as zero \(S\) traffic (TASK-06).
-- TASK-06 cite: `mac_lin_token_per_layer` `118235136` (includes conv `40960`, GDN `2359296`, projs, `out_proj`); \(S\) 3145728 B/instance F32; \(C\) 61440 B/instance; GDN vs \(S\) \(I=0.75\) identity cited, class `state_memory` remains HYPOTHESIS.
+- Flexibilities: `algebraic_equivalent` (chunkwise/WY of the **same** map; FIR vs delay-line conv; $S$ vs $S^\top$); `fuse_internals`; `split_at_internal` candidates `z`, `h_tilde`, `qkv`; `recompute_ephemeral`. Chunkwise FP gap stays HYPOTHESIS; do not treat chunkwise as a second node or as zero $S$ traffic (TASK-06).
+- TASK-06 cite: `mac_lin_token_per_layer` `118235136` (includes conv `40960`, GDN `2359296`, projs, `out_proj`); $S$ 3145728 B/instance F32; $C$ 61440 B/instance; GDN vs $S$ $I=0.75$ identity cited, class `state_memory` remains HYPOTHESIS.
 - TASK-07 cite: `param_bf16`, `residual_stream`, `live_across_gates`, `silu_sigmoid`, `rms_hidden`, `rms_head`, `l2_gdn`, `gemm_k5120`, `gdn_S_recurrent`, `gdn_inner_d128`, `gdn_alpha_beta`, `state_c_bf16`, `s_below_f32`, `conv_fir`.
 
 **`mlp`**
@@ -254,21 +254,21 @@ Each type has: operations (equation tags + short op list), inputs, outputs, stat
 - State: none. Internals (`mlp_internal_ids`, this order): `h_post`, `g_mlp`, `up`, `swiglu`, `mlp_out`.
 - Contract: `h_mid` live until the residual add.
 - Flexibilities: `fuse_internals`; `split_at_internal` candidates `h_post`, `swiglu`; `recompute_ephemeral`. No GDN/SDPA equivalent.
-- TASK-06 cite: `mac_mlp_per_layer` `267386880`; \(I=1\) vs weights (DERIVED identity); class `weight_memory` remains HYPOTHESIS.
+- TASK-06 cite: `mac_mlp_per_layer` `267386880`; $I=1$ vs weights (DERIVED identity); class `weight_memory` remains HYPOTHESIS.
 - TASK-07 cite: `param_bf16`, `residual_stream`, `silu_sigmoid`, `rms_hidden`, `gemm_k5120`, `gemm_k17408`.
 
 **`lm_head`**
 
-- Ops: residual-stream RMSNorm `(2)` (`model.language_model.norm` or `mtp.norm`) then \(W_\text{lm}\) `(22)` or `(24)`. Shared weight `W_lm`. Sampling softmax over \(V\) is **out of scope**.
+- Ops: residual-stream RMSNorm `(2)` (`model.language_model.norm` or `mtp.norm`) then $W_\text{lm}$ `(22)` or `(24)`. Shared weight `W_lm`. Sampling softmax over $V$ is **out of scope**.
 - Inputs: `h_64` (primary) or `h_mtp` (MTP). Outputs: `logits_0` or `logits_1`.
 - State: none. Internals (`lm_head_internal_ids`): `h_final` for the primary instance. The MTP instance’s post-`mtp.norm` vector has **no extra catalog ID**; do not invent one. JSON `mtp_norm_has_no_extra_catalog_id` true.
 - Flexibilities: `shared_weight_reuse` (one `W_lm` payload; a second physical read for `logits_1` is TASK-06 HYPOTHESIS traffic, not DERIVED unique bytes); `fuse_internals`; `split_at_internal` candidate `h_final`; `recompute_ephemeral`.
-- TASK-06 cite: `mac_lm_head` `1271398400`; weight bytes `2542796800`; \(I=1\) vs weights.
+- TASK-06 cite: `mac_lm_head` `1271398400`; weight bytes `2542796800`; $I=1$ vs weights.
 - TASK-07 cite: `param_bf16`, `rms_hidden`, `gemm_lm_head`.
 
 **`mtp_mix`**
 
-- Ops: RMSNorm of `e_next` and of `h_64`; concat embed-then-hidden; \(W_\text{fc}\) `(23)` → `mtp_u` (MTP block residual input).
+- Ops: RMSNorm of `e_next` and of `h_64`; concat embed-then-hidden; $W_\text{fc}$ `(23)` → `mtp_u` (MTP block residual input).
 - Inputs: `h_64`, `e_next`. Outputs: `mtp_u`.
 - State: none. Internals (`mtp_mix_internal_ids`, this order): `e_next_n`, `h64_n`, `mtp_cat`.
 - Flexibilities: `fuse_internals`; `split_at_internal` candidate `mtp_cat`; `recompute_ephemeral`.
@@ -303,7 +303,7 @@ JSON array `sync_edge_ids` in this exact order (14 ids). JSON `n_sync_edges` = 1
 
 | id | Class | From → to | Catalog IDs |
 | --- | --- | --- | --- |
-| `identity_e_h0` | `identity` | `embed` → first mixer | `e` identified as \(h^{(0)}\) |
+| `identity_e_h0` | `identity` | `embed` → first mixer | `e` identified as $h^{(0)}$ |
 | `residual_h` | `residual` | `mlp` → next mixer or `h_64` | `h` / `h_64` |
 | `residual_h_mid` | `residual` | mixer → `mlp` | `h_mid` |
 | `fanout_h64` | `fanout` | last language `mlp` → `lm_head` and `mtp_mix` | `h_64` |
@@ -320,13 +320,13 @@ JSON array `sync_edge_ids` in this exact order (14 ids). JSON `n_sync_edges` = 1
 
 JSON `sync_edge_classes` parallel to `sync_edge_ids`: `["identity","residual","residual","fanout","mtp","mtp","mtp","output","output","state","state","state","shared_weight","shared_weight"]`.
 
-These 14 edges **are** the synchronization/materialization edges named by the ledger. TASK-12 may fuse **across** a non-state, non-output edge only as a HYPOTHESIS that merges or bypasses node types; this document does not authorize that merge. State edges cannot be dropped: omitting a KV/\(C\)/\(S\) write changes the map.
+These 14 edges **are** the synchronization/materialization edges named by the ledger. TASK-12 may fuse **across** a non-state, non-output edge only as a HYPOTHESIS that merges or bypasses node types; this document does not authorize that merge. State edges cannot be dropped: omitting a KV/$C$/$S$ write changes the map.
 
-Optional vision replace into \(h^{(0)}\) annotates `identity_e_h0`; it is not a 15th edge type and not a node (`vision_interface_is_not_a_node` true).
+Optional vision replace into $h^{(0)}$ annotates `identity_e_h0`; it is not a 15th edge type and not a node (`vision_interface_is_not_a_node` true).
 
 ### Work, traffic, and precision citations (lock)
 
-Cite; do not recopy TASK-06 tables or TASK-07’s 20-row severity table. Checker **recomputes** the cited MAC integers from `text_config` with the same identities as TASK-06 (full proj \(12288\cdot5120+2\cdot1024\cdot5120+5120\cdot6144\); linear token sum; MLP \(3IH\); `lm_head` \(VH\); GDN \(3\cdot48\cdot128\cdot128\); `mtp.fc` \(H\cdot 2H\)).
+Cite; do not recopy TASK-06 tables or TASK-07’s 20-row severity table. Checker **recomputes** the cited MAC integers from `text_config` with the same identities as TASK-06 (full proj $12288\cdot5120+2\cdot1024\cdot5120+5120\cdot6144$; linear token sum; MLP $3IH$; `lm_head` $VH$; GDN $3\cdot48\cdot128\cdot128$; `mtp.fc` $H\cdot 2H$).
 
 JSON keys (ints unless noted):
 
@@ -494,12 +494,12 @@ Integer JSON fields that are counts/widths/bytes/MAC are JSON ints. Intensities 
   - Copying Hugging Face modules, GGML ops, or CUDA kernels as node types: rejected; ledger requires semantic evidence, not framework primitives; plan.md forbids Quartz/llama.cpp inspection.
   - One node per catalog ID: rejected; that is TASK-03; contracts would not coarsen the DAG.
   - One `layer` node wrapping mixer+MLP: rejected; TASK-04 `h_mid` residual-add and TASK-06 distinct work.
-  - One `attention` node for GDN and Gated Attention: rejected; different state, \(T\)-scaling, and TASK-07 risks.
+  - One `attention` node for GDN and Gated Attention: rejected; different state, $T$-scaling, and TASK-07 risks.
   - Required proj/core/out split of `gated_attn` or conv/recurrence/out split of GDN: rejected as **required** types; those are TASK-12 `split_at_internal` hypotheses because `g`/`z` are live-across internals.
   - Residual-add or RMSNorm as their own required types: rejected; residual add is the I/O contract inside mixer/`mlp`; RMS is inside the consumer; collapsing RMS roles is forbidden by TASK-02.
-  - Separate decode and prefill graphs: rejected; same map; TASK-13/14 schedule \(T\) and incoming state.
+  - Separate decode and prefill graphs: rejected; same map; TASK-13/14 schedule $T$ and incoming state.
   - Selecting any fusion, split, schedule, tile, or CUDA mapping: TASK-12/13/14/15/17.
-  - Treating chunkwise GDN as a second node or as zero \(S\) traffic: rejected; TASK-02/06/07.
+  - Treating chunkwise GDN as a second node or as zero $S$ traffic: rejected; TASK-02/06/07.
   - Inventing catalog IDs (including a post-`mtp.norm` activation): rejected; MTP RMS has no extra catalog ID.
   - Using GGUF Q4 or CUDA dtypes as contract dtypes: rejected; conceptual BF16/F32 from TASK-04/07.
   - Filling TASK-16 SKU peaks or measuring tok/s: forbidden; not this task.

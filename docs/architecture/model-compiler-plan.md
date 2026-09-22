@@ -20,7 +20,7 @@ This document specifies a **conceptual compiler pipeline**, not a selected
 profile, quantizer, file format, kernel, or layout. Prefill and decode share
 **one** compiled artifact. The primary object is language+MTP checkpoint
 parameters after a TASK-08 recipe (role `param`). The secondary object is
-token-persistent **state schema** for \(K,V,C,S\) (role `state`). Activations
+token-persistent **state schema** for $K,V,C,S$ (role `state`). Activations
 and accumulators are not compiler payloads. Algebraic equivalents in TASK-02
 are the same real map; quantization and packing act on stored elements. If an
 occupancy product would disagree with TASK-01 / sitting `text_config`, or a
@@ -181,7 +181,7 @@ in scope; a corpus and an acceptance frontier are not
 | `family_absmax` | Cited TASK-05 pooled family absmax / rms / percentiles | `model` |
 | `directional_ratios` | Cited TASK-05 row/col absmax ratios | `model` |
 | `outlier_fractions` | Cited TASK-05 `frac_out_6x` / `frac_out_10x` | `model` |
-| `group_local_stats` | Conceptual compile-time group absmax/rms/min/max/\(p_{99}\) / \(p_{50}\) for the declared recipe’s grouping | `model` |
+| `group_local_stats` | Conceptual compile-time group absmax/rms/min/max/$p_{99}$ / $p_{50}$ for the declared recipe’s grouping | `model` |
 | `optional_calibration_hook` | Optional activation / Hessian-like records; **no corpus selected** | `calibration` |
 
 MEASURED citations that shape analysis records and profile **intent**
@@ -235,7 +235,7 @@ a baseline quality winner. Rank-1 families must not receive `per_row` /
 matching language family. `mtp.fc` is its own family (`mtp_fc`).
 
 An example assignment of `mlp_up_gate` × `i4_g128` is not a selected winner.
-Packed-size illustrations (MLP int4 \(g=128\) ratio 0.2578125, total
+Packed-size illustrations (MLP int4 $g=128$ ratio 0.2578125, total
 8823767040 B; unique-non-embed 13431670032 B) are DERIVED citations from
 TASK-08/09; these size illustrations are not a selected profile output.
 
@@ -251,7 +251,7 @@ not select among `scale_storage_bytes_candidates` `[2, 4]`,
 `code_bit_order_candidates` `["lsb_first","msb_first"]`. Portable-view
 payloads remain little-endian (TASK-09 requirement, ownership
 `architecture`). Specialized-view tiles remain TASK-15 (ownership
-`backend`). Illustration packing may cite \(A=1\), \(s=2\), sidecar scales
+`backend`). Illustration packing may cite $A=1$, $s=2$, sidecar scales
 so tight totals match TASK-08 lower bounds; those constants are
 illustrations, not selected packing. TASK-09 format-risk ids
 (`f_unpack_portable`, `f_repack_specialized`, `f_dual_view_size`,
@@ -267,8 +267,8 @@ family, recipe id, shape, access class, view list, integrity records,
 **declared profile name**), `metadata_blob` (per-group scales and optional
 zero-points), `sidecar` (`extract_high` sparse BF16 + indices; `mixed_group`
 width map), `view` (portable and/or specialized projections),
-`schema_state` (\(K,V\) rank \((4,T,256)\) BF16 conceptual; \(C\)
-\(3\times 10240\) BF16; \(S\) \((48,128,128)\) F32 conceptual, `s_f32_bytes`
+`schema_state` ($K,V$ rank $(4,T,256)$ BF16 conceptual; $C$
+$3\times 10240$ BF16; $S$ $(48,128,128)$ F32 conceptual, `s_f32_bytes`
 150994944; 17 KV instances including MTP; 48 C/S instances). State
 **schema** is required; state **payload** inclusion remains unselected
 (TASK-09). JSON `state_schema_required` true. JSON
@@ -319,7 +319,7 @@ JSON array `locked_structure_ids` = the first 8. JSON array
 | `legal_recipe_set` | locked structure | `architecture` | 22 recipes and 16 `family_candidates` lists |
 | `family_access_class` | locked structure | `architecture` | TASK-09 access-class map (gather vs GEMM vs conv vs state) |
 | `shared_weight_binding` | locked structure | `architecture` | `E` and `W_lm` shared payloads; untied embed/`lm_head` |
-| `state_schema` | locked structure | `architecture` | \(K,V,C,S\) schema required |
+| `state_schema` | locked structure | `architecture` | $K,V,C,S$ schema required |
 | `profile_intent_axes` | locked structure | `architecture` | Names `quality`, `balanced`, `compression` exist |
 | `portable_encoding` | locked structure | `architecture` | Portable view little-endian when a portable view exists |
 | `source_weight_statistics` | locked structure | `model` | TASK-05 absmax/rms/outliers/zeros as analysis inputs |
@@ -380,7 +380,7 @@ it is the required identity emission. This is not a selected profile.
 | id | Intent (HYPOTHESIS, not a recipe map) | Must remain true |
 | --- | --- | --- |
 | `quality` | Prefer `keep_source` or wider integer candidates on TASK-08 `quality_high_ids` families (`q_norm_gamma`, `q_gdn_time`, `q_gdn_gate`, `q_attn_out`, `q_mlp_down`, `q_state_kv`, `q_state_s`, `q_int2_mass`) | Every assigned recipe, if/when TASK-18 selects a map, stays inside `family_candidates`; this document assigns none |
-| `balanced` | Mid-width integer **candidates** on mass GEMM families; size illustrations (int4 \(g=128\) ratio 0.2578125, unique-non-embed 13431670032 B) are DERIVED, not assignments | Same legality; no family column of recipes |
+| `balanced` | Mid-width integer **candidates** on mass GEMM families; size illustrations (int4 $g=128$ ratio 0.2578125, unique-non-embed 13431670032 B) are DERIVED, not assignments | Same legality; no family column of recipes |
 | `compression` | Include narrower **candidates** (`i3_g32`, and `i2_g32_extract` only where TASK-08 already lists them — `mlp_up_gate` mass) and accept higher quality/decode-risk **hypotheses** | Same legality; `q_int2_mass` remains HYPOTHESIS, not a selected compression recipe |
 
 JSON `quality_high_ids` copied from TASK-08 in TASK-08 order:

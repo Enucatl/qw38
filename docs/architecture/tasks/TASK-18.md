@@ -51,7 +51,7 @@ Produce `docs/architecture/quantization-validation.md` as the Phase 1 **quantiza
 - `docs/architecture/numerical-sensitivity.md` — 20 sensitive ops; high-risk ids include `residual_stream`, `gdn_S_recurrent`, `gdn_alpha_beta`, `state_kv_bf16`, `s_below_f32`; `n_residual_adds_language` 128 / `n_residual_adds_complete` 130; `example_T` `[1, 4096]`; `T_max` 262144; validation survival not decided there.
 - `docs/architecture/quantization-design-space.md` — 22 recipes; 16 policy families; `quality_high_ids` eight ids; reconstruction/NLL/Pareto deferred here; GGUF cited only as not-a-recipe / TASK-18 reference.
 - `docs/architecture/model-compiler-plan.md` — control emission = all `keep_source`; three conceptual profiles unselected; `optional_calibration_hook` without corpus; recipe maps closed later by TASK-18 **Pareto methodology** with architecture legality; this task still does not select a map.
-- `docs/architecture/model-semantics.md` (via TASK-07/10 citations) — language logits \(\ell^{(0)}_t\) predict token \(t+1\); MTP \(\ell^{(1)}_t\) consumes embedding of \(t+1\) and predicts token \(t+2\); complete map includes MTP; sampling over \(V\) is not the forward map.
+- `docs/architecture/model-semantics.md` (via TASK-07/10 citations) — language logits $\ell^{(0)}_t$ predict token $t+1$; MTP $\ell^{(1)}_t$ consumes embedding of $t+1$ and predicts token $t+2$; complete map includes MTP; sampling over $V$ is not the forward map.
 - `.cache/authorities/qwen3.8-27b-transformers/config.json` — live `text_config` for occupancy arithmetic. Do not read safetensor payloads. Do not read GGUF.
 - `scripts/check_numerical_sensitivity.py` / `scripts/check_quantization_design_space.py` / `scripts/check_model_compiler_plan.py` — checker-style precedent. TASK-18’s checker is a sibling; do not import them.
 
@@ -59,7 +59,7 @@ Produce `docs/architecture/quantization-validation.md` as the Phase 1 **quantiza
 
 N/A — quantization **evaluation-methodology** documentation. No prefill/decode/component timing, no keep/reject, no GPU sink ranking. Byte counts cited from TASK-08 are DERIVED arithmetic, not selected profile outputs. NLL formulas are DERIVED event counts, not MEASURED quality. Methodology-risk **labels** are HYPOTHESIS. Do not apply the performance-evidence checklist to rank kernels or claim a winning quantizer.
 
-- Measurement identity: N/A (no engine binary, no eval run). Future NLL identity is specified as a protocol in heading 4 (same token sequence, same \(T\) horizon, keep_source control vs candidate, MTP included). That protocol is not executed here.
+- Measurement identity: N/A (no engine binary, no eval run). Future NLL identity is specified as a protocol in heading 4 (same token sequence, same $T$ horizon, keep_source control vs candidate, MTP included). That protocol is not executed here.
 - Metric class: N/A for this increment. Future primary quality metric class is teacher-forced complete-map NLL (not decode-only tok/s, not complete-request latency).
 - Coverage: N/A for GPU graphs. Methodology coverage is 3 eval layers, 8 reconstruction diagnostics, 6 limits, 5 teacher-forced metrics, 3 behavioral classes, 4 corpus classes, 3 Pareto axes, 6 methodology risks, and the 8 TASK-08 `quality_high_ids` survival **screens**.
 - Time accounting: N/A
@@ -74,11 +74,11 @@ N/A — quantization **evaluation-methodology** documentation. No prefill/decode
 
 ### Authority for evaluation claims
 
-If an occupancy product would disagree with TASK-01 / sitting `text_config`, or a sensitive-op / residual-add / \(T\) citation would disagree with TASK-07, or a recipe/family/quality-risk / metadata lower bound would disagree with TASK-08, or a profile/calibration/ownership flag would disagree with TASK-10, the earlier document wins and this one is wrong.
+If an occupancy product would disagree with TASK-01 / sitting `text_config`, or a sensitive-op / residual-add / $T$ citation would disagree with TASK-07, or a recipe/family/quality-risk / metadata lower bound would disagree with TASK-08, or a profile/calibration/ownership flag would disagree with TASK-10, the earlier document wins and this one is wrong.
 
-- Prefill and decode share **one** quality methodology. Only \(T\) (context horizon) and whether incoming \((K,V,C,S)\) is zeros versus populated change. Do not duplicate metric ids per mode.
-- Primary object is language+MTP **checkpoint parameters** after a TASK-08 recipe (still unselected) versus control `keep_source`. Secondary object is token-persistent **state** \(K,V,C,S\) when a state recipe is under test. Activations are reconstruction **probes**, not family policies.
-- Algebraic equivalents in TASK-02 are the same real map; quantization acts on stored elements. Log-softmax over \(V\) is an **evaluation readout** of \(\ell^{(0)}\) / \(\ell^{(1)}\), not a new graph node and not a sampling policy.
+- Prefill and decode share **one** quality methodology. Only $T$ (context horizon) and whether incoming $(K,V,C,S)$ is zeros versus populated change. Do not duplicate metric ids per mode.
+- Primary object is language+MTP **checkpoint parameters** after a TASK-08 recipe (still unselected) versus control `keep_source`. Secondary object is token-persistent **state** $K,V,C,S$ when a state recipe is under test. Activations are reconstruction **probes**, not family policies.
+- Algebraic equivalents in TASK-02 are the same real map; quantization acts on stored elements. Log-softmax over $V$ is an **evaluation readout** of $\ell^{(0)}$ / $\ell^{(1)}$, not a new graph node and not a sampling policy.
 - Control emission = all defined families `keep_source` (`vision_deferred` skipped). Control is the identity compile for ΔNLL, not a quality winner.
 - A candidate under test is a **declared** TASK-10 profile recipe map whose every assignment stays inside TASK-08 `family_candidates`. This document assigns none.
 - Do not inspect Quartz, llama.cpp, or GGUF byte layouts to “confirm” K-quants, NLL harnesses, or grouping.
@@ -156,9 +156,9 @@ JSON array `reconstruction_diagnostic_ids` in this exact order (8 ids). JSON `n_
 | `r_param_cosine` | param | source | Cosine of flattened dequant versus source, per family |
 | `r_clip_frac` | param | source | Fraction of elements/groups saturating under a `clip` recipe |
 | `r_act_residual` | activation | control forward | MSE at residual-add catalog points versus `keep_source` |
-| `r_act_logits` | activation | control forward | MSE / max-abs of \(\ell^{(0)}\) (and \(\ell^{(1)}\) when MTP is in the map) versus control; **not** NLL |
-| `r_state_kv` | state | conceptual BF16 \(K,V\) | Store/load versus control conceptual KV (RoPE-baked \(K\)) |
-| `r_state_s` | state | conceptual F32 \(S\) | Store/load versus control conceptual \(S\) (`s_below_f32` screen) |
+| `r_act_logits` | activation | control forward | MSE / max-abs of $\ell^{(0)}$ (and $\ell^{(1)}$ when MTP is in the map) versus control; **not** NLL |
+| `r_state_kv` | state | conceptual BF16 $K,V$ | Store/load versus control conceptual KV (RoPE-baked $K$) |
+| `r_state_s` | state | conceptual F32 $S$ | Store/load versus control conceptual $S$ (`s_below_f32` screen) |
 
 JSON `reconstruction_diagnostic_roles` = `["param","param","param","param","activation","activation","state","state"]`.
 
@@ -170,9 +170,9 @@ JSON array `reconstruction_limit_ids` in this exact order (6 ids). JSON `n_recon
 | --- | --- |
 | `lim_local_not_nll` | Family MSE / cosine / max-abs does not determine teacher-forced NLL; the forward map from local error to logits is nonlinear |
 | `lim_residual_accum` | Residual-path families (`attn_out`, `mlp_down`) can accumulate across `n_residual_adds_language` 128 language adds (130 complete); a small per-layer MSE can be large at logits |
-| `lim_gdn_horizon` | GDN \(S\) error can grow with \(T\); pairs TASK-07 `gdn_S_recurrent` / `s_below_f32` |
+| `lim_gdn_horizon` | GDN $S$ error can grow with $T$; pairs TASK-07 `gdn_S_recurrent` / `s_below_f32` |
 | `lim_identity_control` | `keep_source` reconstruction is identity (error ~0 up to exact dequant of source); that is not a ranking |
-| `lim_gguf_not_target` | Reconstruction target is the BF16 (F32 \(S\)) **source**, never Q4_K_M codes or GGUF grouping |
+| `lim_gguf_not_target` | Reconstruction target is the BF16 (F32 $S$) **source**, never Q4_K_M codes or GGUF grouping |
 | `lim_single_family` | Screening one family in isolation can miss interactions with other families on the same residual stream |
 
 Prose required: reconstruction **may** reject a candidate that is catastrophically wrong (non-finite codes, near-zero cosine, huge max-abs). Reconstruction **must not** accept a candidate onto `axis_quality`. Survival of TASK-07/08 rows is not decided by these screens alone.
@@ -185,43 +185,43 @@ JSON array `teacher_forced_metric_ids` in this exact order (5 ids). JSON `n_teac
 
 | ID | Primary? | Meaning |
 | --- | --- | --- |
-| `tf_nll_language` | secondary | Mean NLL of \(\ell^{(0)}\) versus teacher token \(x_{t+1}\) |
-| `tf_nll_mtp` | secondary | Mean NLL of \(\ell^{(1)}\) versus teacher token \(x_{t+2}\) |
+| `tf_nll_language` | secondary | Mean NLL of $\ell^{(0)}$ versus teacher token $x_{t+1}$ |
+| `tf_nll_mtp` | secondary | Mean NLL of $\ell^{(1)}$ versus teacher token $x_{t+2}$ |
 | `tf_nll_complete` | **primary absolute** | Event-count mixture of language and MTP NLL |
 | `tf_delta_vs_control` | **primary quality axis** | Candidate `tf_nll_complete` minus `keep_source` `tf_nll_complete` on the **same** token sequence |
-| `tf_kl_vs_control` | diagnostic | Mean \(\mathrm{KL}(p_{\text{control}}\Vert p_{\text{candidate}})\) over teacher positions; does not replace ΔNLL |
+| `tf_kl_vs_control` | diagnostic | Mean $\mathrm{KL}(p_{\text{control}}\Vert p_{\text{candidate}})$ over teacher positions; does not replace ΔNLL |
 
-NLL (DERIVED methodology; not measured here). For a teacher token sequence \(x_{1:T}\) with \(T\ge 3\):
+NLL (DERIVED methodology; not measured here). For a teacher token sequence $x_{1:T}$ with $T\ge 3$:
 
-\[
+$$
 \mathrm{NLL}_{\mathrm{lang}}=\frac{1}{T-1}\sum_{t=1}^{T-1}-\log p_{\theta}(x_{t+1}\mid x_{1:t})
 \quad\text{from }\ell^{(0)},
-\]
+$$
 
-\[
+$$
 \mathrm{NLL}_{\mathrm{mtp}}=\frac{1}{T-2}\sum_{t=1}^{T-2}-\log p_{\theta}^{(1)}(x_{t+2}\mid \ldots)
 \quad\text{from }\ell^{(1)},
-\]
+$$
 
-\[
+$$
 \mathrm{NLL}_{\mathrm{complete}}=\frac{(T-1)\,\mathrm{NLL}_{\mathrm{lang}}+(T-2)\,\mathrm{NLL}_{\mathrm{mtp}}}{(T-1)+(T-2)}.
-\]
+$$
 
-JSON: `n_language_nll_events_offset` 1 (events = \(T-1\)); `n_mtp_nll_events_offset` 2 (events = \(T-2\)); `min_eval_tokens_language` 2; `min_eval_tokens_mtp` 3; `min_eval_tokens_complete` 3; `mtp_in_primary_nll` true; `sampling_out_of_nll` true; `log_softmax_is_eval_readout` true.
+JSON: `n_language_nll_events_offset` 1 (events = $T-1$); `n_mtp_nll_events_offset` 2 (events = $T-2$); `min_eval_tokens_language` 2; `min_eval_tokens_mtp` 3; `min_eval_tokens_complete` 3; `mtp_in_primary_nll` true; `sampling_out_of_nll` true; `log_softmax_is_eval_readout` true.
 
-JSON `example_T_values` = `[1, 4096]` matching TASK-07 context horizons (decode-style \(T=1\) means one new token with populated state **and** a teacher target, not a 1-token corpus). JSON `T_max` = 262144. JSON `example_T_is_not_prompt_matrix` true.
+JSON `example_T_values` = `[1, 4096]` matching TASK-07 context horizons (decode-style $T=1$ means one new token with populated state **and** a teacher target, not a 1-token corpus). JSON `T_max` = 262144. JSON `example_T_is_not_prompt_matrix` true.
 
 Identity for `tf_delta_vs_control` (protocol, not executed):
 
-- Same tokenizer and same teacher token ids (including MTP next-ids \(t+1\) as graph inputs).
-- Same \(T\) horizon class and same empty-versus-populated incoming state convention.
+- Same tokenizer and same teacher token ids (including MTP next-ids $t+1$ as graph inputs).
+- Same $T$ horizon class and same empty-versus-populated incoming state convention.
 - Control = TASK-10 control emission (`keep_source` on every defined family).
 - Candidate = a legal TASK-08 recipe per family; this document assigns none.
 - Prefill and decode share the metric; do not report decode-only tok/s as NLL.
 
-Omitting MTP from the primary number is methodology risk `v_nll_without_mtp`. Language-only NLL may be tabulated as a **secondary** row, not the Pareto \(Y\) value.
+Omitting MTP from the primary number is methodology risk `v_nll_without_mtp`. Language-only NLL may be tabulated as a **secondary** row, not the Pareto $Y$ value.
 
-Softmax over \(V\) for sampling remains out of the TASK-02 forward map. Log-softmax used here is an evaluation readout of logits already specified by TASK-02 `(22)`/`(24)` and MTP \(\ell^{(1)}\).
+Softmax over $V$ for sampling remains out of the TASK-02 forward map. Log-softmax used here is an evaluation readout of logits already specified by TASK-02 `(22)`/`(24)` and MTP $\ell^{(1)}$.
 
 ### Behavioral comparisons (lock)
 
@@ -243,8 +243,8 @@ JSON array `pareto_axis_ids` in this exact order (3 ids). JSON `n_pareto_axes` =
 
 | ID | Axis | What is plotted | Selected? |
 | --- | --- | --- | --- |
-| `axis_quality` | \(Y\) | `tf_delta_vs_control` (primary); behavioral only as a later secondary overlay | method locked; values unmeasured |
-| `axis_compression` | \(X\) | TASK-08 payload+metadata **lower bound** bytes for a **declared** legal recipe map, not a packed TASK-09 layout | method locked; no map declared |
+| `axis_quality` | $Y$ | `tf_delta_vs_control` (primary); behavioral only as a later secondary overlay | method locked; values unmeasured |
+| `axis_compression` | $X$ | TASK-08 payload+metadata **lower bound** bytes for a **declared** legal recipe map, not a packed TASK-09 layout | method locked; no map declared |
 | `axis_reference_q4km` | reference point | Future black-box Q4_K_M (file size + quality metric with explicit identity) | not a recipe; not required |
 
 JSON booleans (lock):
@@ -273,7 +273,7 @@ Q4_K_M protocol (future, after freeze; not run here):
 - Custom profiles are **not** required to beat or match Q4_K_M quality or size.
 - Control point: `keep_source` at unique-non-embed BF16 bytes `52098598912`, `tf_delta_vs_control` = 0 by definition.
 
-Compression-axis **illustration** (DERIVED citation from TASK-08, **not** a selected map; must appear as substrings): unique-non-embed int4 \(g=128\) total `13431670032` B, ratio `0.2578125`; MLP \(n=17112760320\), MLP BF16 `34225520640`. Label every use with `example` and `not a selected winner`.
+Compression-axis **illustration** (DERIVED citation from TASK-08, **not** a selected map; must appear as substrings): unique-non-embed int4 $g=128$ total `13431670032` B, ratio `0.2578125`; MLP $n=17112760320$, MLP BF16 `34225520640`. Label every use with `example` and `not a selected winner`.
 
 Do not rank decode-complexity risks on this plot. Tok/s is TASK-19 (`toks_is_not_quality_axis` true).
 
@@ -295,7 +295,7 @@ Protocol (lock, no datasets named as winners):
 - Calibration ∩ eval = empty. Using eval tokens in `optional_calibration_hook` is `v_calib_eval_leak`.
 - GPTQ/AWQ/Hessian remain **not** a TASK-08 scale id. They may only produce scale **values** attached to an existing integer recipe via the hook (`gptq_is_not_a_scale_id` true, `activation_aware_scale_id_added` false, `gptq_required` false).
 - Do not name a numeric ΔNLL / perplexity / match-rate threshold. Acceptance frontier is an open question.
-- Candidate corpus **shapes** may be described as `held_out_text` and `long_context_text` in prose (horizon \(T\) up to `T_max`) without selecting a named dataset.
+- Candidate corpus **shapes** may be described as `held_out_text` and `long_context_text` in prose (horizon $T$ up to `T_max`) without selecting a named dataset.
 
 JSON `calibration_eval_must_be_disjoint` true.
 
@@ -323,12 +323,12 @@ JSON array `methodology_risk_ids` in this exact order (6 ids). Parallel `methodo
 
 | ID | Ties to | Severity | Claim (must remain HYPOTHESIS) |
 | --- | --- | --- | --- |
-| `v_recon_as_quality` | `reconstruction` layer | high | Treating reconstruction MSE/cosine as sufficient for Pareto \(Y\) would freeze selection without model-level evidence |
+| `v_recon_as_quality` | `reconstruction` layer | high | Treating reconstruction MSE/cosine as sufficient for Pareto $Y$ would freeze selection without model-level evidence |
 | `v_gguf_as_requirement` | `axis_reference_q4km` | high | Requiring custom profiles to match or beat Q4_K_M would turn a black-box reference into a design constraint |
 | `v_calib_eval_leak` | `corpus_calibration` / `corpus_eval_nll` | high | Calibrating on eval tokens would inflate teacher-forced comparisons |
 | `v_control_as_winner` | `keep_source` | medium | Treating identity control as a quality winner would confuse ΔNLL with a selected profile |
 | `v_nll_without_mtp` | `tf_nll_complete` | medium | Omitting MTP from the primary NLL would drop the complete map |
-| `v_toks_as_quality` | TASK-19 | low | Using tok/s as a quality axis would mix TASK-19 performance into TASK-18 Pareto \(Y\) |
+| `v_toks_as_quality` | TASK-19 | low | Using tok/s as a quality axis would mix TASK-19 performance into TASK-18 Pareto $Y$ |
 
 JSON `methodology_risk_severities` = `["high","high","high","medium","medium","low"]`. JSON `methodology_high_ids`: `v_recon_as_quality`, `v_gguf_as_requirement`, `v_calib_eval_leak`. `methodology_medium_ids`: `v_control_as_winner`, `v_nll_without_mtp`. `methodology_low_ids`: `v_toks_as_quality`. JSON `n_methodology_high` = 3, `n_methodology_medium` = 2, `n_methodology_low` = 1.
 
@@ -360,11 +360,11 @@ Live from `text_config` (checker recomputes; do not hardcode without asserting a
 | `n_full_layers` | 16 | `layer_types` |
 | `n_mtp_blocks` | 1 | `mtp_num_hidden_layers` |
 | `T_max` | 262144 | `max_position_embeddings` |
-| `mlp_n` | 17112760320 | \(3\times 64\times 17408\times 5120\) |
-| `embed_n` | 1271398400 | \(248320\times 5120\) |
+| `mlp_n` | 17112760320 | $3\times 64\times 17408\times 5120$ |
+| `embed_n` | 1271398400 | $248320\times 5120$ |
 | `n_language_mtp_tensors` | 866 | TASK-01 citation |
 | `n_language_mtp_parameters` | 27320697856 | TASK-01 citation |
-| `mlp_bf16_bytes` | 34225520640 | \(2\times mlp_n\) |
+| `mlp_bf16_bytes` | 34225520640 | $2\times mlp_n$ |
 | `weight_bytes_language_mtp_excl_vision` | 54641395712 | TASK-06/08 citation |
 | `weight_bytes_unique_non_embed` | 52098598912 | TASK-06/08 citation |
 | `unique_non_embed_int4_g128_total_bytes` | 13431670032 | TASK-08 illustration |
@@ -509,7 +509,7 @@ Integer JSON fields that are counts/widths/bytes/offsets are JSON ints. Ratio `m
 
 - **Implementation** writes `scripts/check_quantization_validation.py` **and** `docs/architecture/quantization-validation.md` (three eval layers, eight reconstruction diagnostics, six limits, five teacher-forced metrics, three behavioral classes, Q4_K_M reference positioning, four unselected corpus classes, eight high-risk survival **screens** without survivors, six HYPOTHESIS methodology risks, JSON fence). Runs `--json` and `--quantization-validation` after the document exists. Records command outcomes in this dossier. Does not commit. Does not stream payloads. Does not open GGUF. Does not run NLL.
 - **Documentation** performs a mechanical pass only: draft-status `unverified` banner (TASK-07 / `numerical-sensitivity.md` / TASK-08 / `quantization-design-space.md` / TASK-10 / `model-compiler-plan.md` style), Authority table links to this dossier / numerical-sensitivity / quantization-design-space / model-compiler-plan / plan evidence policy, heading/JSON fence consistency. Must not change locked integers, canonical sentences, diagnostic ids, metric ids, severities, or Mermaid node IDs. Does not edit TASK-07/08/10 artifacts.
-- **Verification** independently re-runs focused commands, recomputes `mlp_n` / unique-non-embed citation from sitting `text_config` (not from JSON echo), spot-checks cited TASK-07/08/10 integers and ids against `docs/architecture/numerical-sensitivity.md`, `docs/architecture/quantization-design-space.md`, and `docs/architecture/model-compiler-plan.md` (not from this JSON echo), reads the document against this dossier, and confirms no Quartz/llama.cpp/GGUF-as-recipe-or-requirement, no winner phrases, no `plan.md` or ledger edit, no payload I/O, no GGUF open, that every methodology-risk row is labelled HYPOTHESIS, that reconstruction cannot place Pareto \(Y\), that teacher-forced complete-map NLL versus `keep_source` is primary, that Q4_K_M is a reference not a requirement, and that corpora / prompt suite / capability benchmarks / acceptance frontier / Pareto hull / hypothesis survival remain unselected. The three ledger completion criteria are closed by the methodology. TASK-07 survival and TASK-08 Pareto **selection** questions remain open.
+- **Verification** independently re-runs focused commands, recomputes `mlp_n` / unique-non-embed citation from sitting `text_config` (not from JSON echo), spot-checks cited TASK-07/08/10 integers and ids against `docs/architecture/numerical-sensitivity.md`, `docs/architecture/quantization-design-space.md`, and `docs/architecture/model-compiler-plan.md` (not from this JSON echo), reads the document against this dossier, and confirms no Quartz/llama.cpp/GGUF-as-recipe-or-requirement, no winner phrases, no `plan.md` or ledger edit, no payload I/O, no GGUF open, that every methodology-risk row is labelled HYPOTHESIS, that reconstruction cannot place Pareto $Y$, that teacher-forced complete-map NLL versus `keep_source` is primary, that Q4_K_M is a reference not a requirement, and that corpora / prompt suite / capability benchmarks / acceptance frontier / Pareto hull / hypothesis survival remain unselected. The three ledger completion criteria are closed by the methodology. TASK-07 survival and TASK-08 Pareto **selection** questions remain open.
 
 - Invariants:
   - Ten level-2 headings in the locked order; four canonical sentences plus `methodology_question_sentence` verbatim; 3 eval layers; 8 reconstruction diagnostics; 6 limits; 5 teacher-forced metrics; 3 behavioral classes; 3 Pareto axes; 4 corpus classes; 6 methodology risks; one Mermaid flowchart with required IDs.
@@ -529,7 +529,7 @@ Integer JSON fields that are counts/widths/bytes/offsets are JSON ints. Ratio `m
   - Locking a numeric ΔNLL / perplexity acceptance threshold: rejected; acceptance frontier unselected.
   - Omitting MTP from primary NLL: rejected; complete map includes MTP; language-only is secondary.
   - Using greedy/capability scores as the primary quality axis: rejected; teacher-forced ΔNLL is primary; behavioral suites unselected.
-  - Using TASK-19 tok/s as Pareto \(Y\): rejected; `v_toks_as_quality`.
+  - Using TASK-19 tok/s as Pareto $Y$: rejected; `v_toks_as_quality`.
   - Adding `fp8_e5m2`, `int5`, or GGUF types to the recipe space: rejected; TASK-18 evaluates the locked 22 recipes.
   - Adding GPTQ/AWQ as a fifth TASK-08 scale id: rejected; TASK-10 hook only; not required.
   - Opening the GGUF file or inspecting Quartz/llama.cpp NLL harnesses: forbidden by plan.md.
@@ -544,7 +544,7 @@ Integer JSON fields that are counts/widths/bytes/offsets are JSON ints. Ratio `m
 
 - Acceptance conditions:
   - `docs/architecture/quantization-validation.md` exists and follows the heading list above.
-  - Reconstruction diagnostics (8) and limits (6) are named; reconstruction is a local screen that cannot place Pareto \(Y\).
+  - Reconstruction diagnostics (8) and limits (6) are named; reconstruction is a local screen that cannot place Pareto $Y$.
   - Teacher-forced metrics (5) include complete-map NLL and ΔNLL versus `keep_source` as primary; MTP is in the primary number; behavioral classes (3) are secondary with suites unselected.
   - Q4_K_M is positioned as a future black-box Pareto reference, not a recipe and not a requirement; GGUF is not opened.
   - Corpora, prompt suite, capability benchmarks, and acceptance frontier remain unselected; Pareto hull and hypothesis survival remain unselected.

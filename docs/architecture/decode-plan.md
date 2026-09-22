@@ -15,8 +15,8 @@ a fusion, packing sequence, layout, or CUDA mapping.
 
 This document specifies a **hardware-independent semantic schedule**, not
 kernels. Prefill and decode share one semantic graph. This document schedules
-decode only: \(T_\text{new}=1\), stored KV length \(T\) after append, incoming
-\((K,V,C,S)\) populated. Primary instance counts include MTP. If a node I/O,
+decode only: $T_\text{new}=1$, stored KV length $T$ after append, incoming
+$(K,V,C,S)$ populated. Primary instance counts include MTP. If a node I/O,
 state kind, catalog ID, layer count, or cited MAC/byte would disagree with
 TASK-06/09/11/12 or sitting `text_config`, the earlier document / config wins
 and this one is wrong.
@@ -24,7 +24,7 @@ and this one is wrong.
 Claims are labelled OBSERVED (sitting `text_config` / inventory already
 established), DERIVED (serial order from the DAG, stage multiplicities,
 stage-cut byte identities, cited TASK-06/04 integers), or HYPOTHESIS
-(hoist/overlap usefulness, second \(W_\text{lm}\) read, extra `h_64` consumer
+(hoist/overlap usefulness, second $W_\text{lm}$ read, extra `h_64` consumer
 read, every packing/fusion usefulness). No MEASURED tok/s or NLL. No fusion,
 packing winner, tile, or kernel is chosen here.
 
@@ -47,9 +47,9 @@ packing winner, tile, or kernel is chosen here.
 
 Numeric ranks instantiate sitting `text_config` OBSERVED: `hidden_size` 5120,
 `intermediate_size` 17408, `vocab_size` 248320, 64 decoder layers, 48 linear +
-16 full at \(\ell \bmod 4 = 3\), `mtp_num_hidden_layers` 1, `head_dim` 256,
+16 full at $\ell \bmod 4 = 3$, `mtp_num_hidden_layers` 1, `head_dim` 256,
 `num_attention_heads` 24, `num_key_value_heads` 4, linear widths
-\(d_\text{qkv}=10240\), `linear_key_head_dim` / `linear_value_head_dim` 128,
+$d_\text{qkv}=10240$, `linear_key_head_dim` / `linear_value_head_dim` 128,
 `dtype` `"bfloat16"`, `mamba_ssm_dtype` `"float32"`. Stage kinds, serial order,
 and stage-cut bytes are DERIVED. Hoist/packing/fusion usefulness remains
 HYPOTHESIS.
@@ -80,7 +80,7 @@ open question in checker-substring form. JSON
 - This document selects one **serial** order (`schedule_serial_selected` true).
   Hoist and overlap remain HYPOTHESIS (`n_hoist_hypotheses_selected` 0).
 - Prefill is not scheduled here (`prefill_schedule_deferred` true). Decode
-  \(T_\text{new}=1\); incoming state is populated (`incoming_state_populated`
+  $T_\text{new}=1$; incoming state is populated (`incoming_state_populated`
   true).
 - Residual add stays inside mixer/`mlp`; `g`/`z` stay internal; RMS stays
   inside the consumer (TASK-11 locks).
@@ -93,11 +93,11 @@ open question in checker-substring form. JSON
 
 ## One-token setting
 
-Let \(T\) be the stored KV length **after** appending the current token
-(TASK-04/06). Decode of one new token has incoming KV length \(T-1\) and
-attention contractions against **length \(T\)**. When \(T=1\), incoming KV is
-empty but \(C,S\) are still populated on a continuing decode; the **first**
-generated token after prefill has incoming KV length \(T-1\) from the prompt.
+Let $T$ be the stored KV length **after** appending the current token
+(TASK-04/06). Decode of one new token has incoming KV length $T-1$ and
+attention contractions against **length $T$**. When $T=1$, incoming KV is
+empty but $C,S$ are still populated on a continuing decode; the **first**
+generated token after prefill has incoming KV length $T-1$ from the prompt.
 This document does not schedule that prefill.
 
 JSON: `T_is_stored_length_after_append` true; `decode_T_new` 1; `example_T`
@@ -106,12 +106,12 @@ JSON: `T_is_stored_length_after_append` true; `decode_T_new` 1; `example_T`
 
 JSON `n_token_presentations` = 2. Current `token_id` feeds `embed_current`;
 next `token_id` feeds `embed_next`. Both are graph inputs to the complete map.
-Do not add a catalog ID. Sampling over \(V\) is out of scope.
+Do not add a catalog ID. Sampling over $V$ is out of scope.
 
 JSON `n_node_instances_complete` = 135; `n_node_instances_language` = 130
-(citations of TASK-11). Mixer xor: language layer \(\ell\) uses `gated_attn`
-iff \(\ell\in\mathcal{L}_\text{full}\) (`full_attention_indices`
-\(\{3,7,\ldots,63\}\)), else `gated_delta_net`. Then `mlp`. Do not unroll 64
+(citations of TASK-11). Mixer xor: language layer $\ell$ uses `gated_attn`
+iff $\ell\in\mathcal{L}_\text{full}$ (`full_attention_indices`
+$\{3,7,\ldots,63\}$), else `gated_delta_net`. Then `mlp`. Do not unroll 64
 layers beyond this rule. JSON `mixer_xor_by_layer_types` true.
 
 Prefill and decode share **one** semantic graph (`decode_prefill_share_graph`
@@ -122,10 +122,10 @@ true); **schedules** are independent. Residual add lives inside mixer and
 the consuming node (`rms_inside_consumer` true). Live-across `g` and `z` are
 internal (`live_across_are_internal` true). GDN primary stays recurrent
 `(17)`–`(18)` (`gdn_primary_is_recurrent_eq_17` true); chunkwise GDN is not
-zero \(S\) traffic (`chunkwise_not_zero_s_traffic` true). State writes are
+zero $S$ traffic (`chunkwise_not_zero_s_traffic` true). State writes are
 not optional (`state_write_not_optional` true). `h_64` cannot be hidden from
 one of its two primary consumers (`fanout_h64_cannot_hide_from_one_consumer`
-true). Unique weights are counted once; a second physical \(W_\text{lm}\)
+true). Unique weights are counted once; a second physical $W_\text{lm}$
 read is HYPOTHESIS extra, not unique
 (`weight_second_w_lm_read_is_hypothesis` true). Hardware mapping is TASK-17
 (`cuda_mapping_deferred` true, `hardware_independent` true,
@@ -147,7 +147,7 @@ seventh TASK-11 node type. Node types remain `embed`, `gated_attn`,
 | id | Multiplicity | Node type | Serial rank |
 | --- | ---: | --- | ---: |
 | `embed_current` | 1 | `embed` | 1 |
-| `language_mixer` | 64 | `mixer_xor` (`gated_attn` iff \(\ell\in\mathcal{L}_\text{full}\), else `gated_delta_net`) | 2 (loop with next) |
+| `language_mixer` | 64 | `mixer_xor` (`gated_attn` iff $\ell\in\mathcal{L}_\text{full}$, else `gated_delta_net`) | 2 (loop with next) |
 | `language_mlp` | 64 | `mlp` | 2 (after matching mixer) |
 | `lm_head_primary` | 1 | `lm_head` | 3 |
 | `embed_next` | 1 | `embed` | 4 |
@@ -163,12 +163,12 @@ JSON `stage_multiplicities` `[1,64,64,1,1,1,1,1,1]`. Sum 135. JSON
 Instance-count cross-check: `language_mixer` contributes 16 `gated_attn` + 48
 `gated_delta_net`; plus `mtp_mixer` → 17 `gated_attn`. `language_mlp` +
 `mtp_mlp` → 65 `mlp`. Two `embed`, two `lm_head`, one `mtp_mix`. Matches
-TASK-11 complete counts (\(2+17+48+65+2+1=135\)).
+TASK-11 complete counts ($2+17+48+65+2+1=135$).
 
 **Serial order** (selected; one complete decode):
 
 1. `embed_current`
-2. For \(\ell=0,\ldots,63\): `language_mixer`[\(\ell\)] then `language_mlp`[\(\ell\)]
+2. For $\ell=0,\ldots,63$: `language_mixer`[$\ell$] then `language_mlp`[$\ell$]
 3. `lm_head_primary`
 4. `embed_next`
 5. `mtp_mix`
@@ -187,8 +187,8 @@ JSON array `ready_constraint_ids` in this exact order (10 ids). JSON
 | --- | --- | --- |
 | `ready_embed_current` | `embed_current` | current `token_id` present |
 | `ready_language_mixer_0` | `language_mixer`[0] | `embed_current` (`identity_e_h0`) |
-| `ready_language_mlp` | `language_mlp`[\(\ell\)] | matching `language_mixer`[\(\ell\)] (`residual_h_mid`) |
-| `ready_language_mixer_next` | `language_mixer`[\(\ell>0\)] | `language_mlp`[\(\ell-1\)] (`residual_h`) |
+| `ready_language_mlp` | `language_mlp`[$\ell$] | matching `language_mixer`[$\ell$] (`residual_h_mid`) |
+| `ready_language_mixer_next` | `language_mixer`[$\ell>0$] | `language_mlp`[$\ell-1$] (`residual_h`) |
 | `ready_lm_head_primary` | `lm_head_primary` | `language_mlp`[63] (`fanout_h64`) |
 | `ready_embed_next` | `embed_next` | next `token_id` present (no language-stack data edge) |
 | `ready_mtp_mix` | `mtp_mix` | `language_mlp`[63] **and** `embed_next` |
@@ -213,15 +213,15 @@ byte sequence.
 
 | Stage | Loads | State read | State write | Visibility in | Visibility out | Reuse |
 | --- | --- | --- | --- | --- | --- | --- |
-| `embed_current` | One row of shared \(E\) (10240 B gather; table not streamed) | none | none | current `token_id` | `e` identified as \(h^{(0)}\) | `shared_E`; gather vs full table |
-| `language_mixer` | Mixer unique weights for that layer (self-attn **or** linear-attn family; counted once in the unique-weight total). Access `dense_gemm`; GDN also `depthwise_conv` | `gated_attn`: \(K,V\) of length \(T-1\) (4096 B/token/instance). `gated_delta_net`: \(C\) 61440 B and \(S\) 3145728 B per instance | `gated_attn`: append \(K,V\) 4096 B. `gated_delta_net`: write \(C\) and \(S_t\) | `h` (live until Mix add) | `h_mid` | Residual `h` until add; internals default inside (`g` live-across internal; `k_rope`/`v_full`/`qkv` reuse_or_recompute HYPOTHESIS; `k_hat` intra-equation) |
-| `language_mlp` | MLP unique weights for that layer (counted once in the unique-weight total). Access `dense_gemm` | none | none | `h_mid` (live until MLP add) | next `h`, or `h_64` at \(\ell=63\) | Residual `h_mid` until add; `h_post`/`swiglu` fuse_or_recompute HYPOTHESIS |
-| `lm_head_primary` | Shared \(W_\text{lm}\) 2542796800 B (`seq_lm_head_full`) plus final RMS gamma | none | none | `h_64` | `logits_0` | `shared_W_lm`; `h_64` also consumed by `mtp_mix` |
-| `embed_next` | One row of shared \(E\) (10240 B gather) | none | none | next `token_id` | `e_next` | `shared_E` (same payload as `embed_current`) |
+| `embed_current` | One row of shared $E$ (10240 B gather; table not streamed) | none | none | current `token_id` | `e` identified as $h^{(0)}$ | `shared_E`; gather vs full table |
+| `language_mixer` | Mixer unique weights for that layer (self-attn **or** linear-attn family; counted once in the unique-weight total). Access `dense_gemm`; GDN also `depthwise_conv` | `gated_attn`: $K,V$ of length $T-1$ (4096 B/token/instance). `gated_delta_net`: $C$ 61440 B and $S$ 3145728 B per instance | `gated_attn`: append $K,V$ 4096 B. `gated_delta_net`: write $C$ and $S_t$ | `h` (live until Mix add) | `h_mid` | Residual `h` until add; internals default inside (`g` live-across internal; `k_rope`/`v_full`/`qkv` reuse_or_recompute HYPOTHESIS; `k_hat` intra-equation) |
+| `language_mlp` | MLP unique weights for that layer (counted once in the unique-weight total). Access `dense_gemm` | none | none | `h_mid` (live until MLP add) | next `h`, or `h_64` at $\ell=63$ | Residual `h_mid` until add; `h_post`/`swiglu` fuse_or_recompute HYPOTHESIS |
+| `lm_head_primary` | Shared $W_\text{lm}$ 2542796800 B (`seq_lm_head_full`) plus final RMS gamma | none | none | `h_64` | `logits_0` | `shared_W_lm`; `h_64` also consumed by `mtp_mix` |
+| `embed_next` | One row of shared $E$ (10240 B gather) | none | none | next `token_id` | `e_next` | `shared_E` (same payload as `embed_current`) |
 | `mtp_mix` | `mtp.pre_fc_norm_embedding`, `mtp.pre_fc_norm_hidden`, and `mtp.fc` contraction weights. Access `dense_gemm` | none | none | `h_64`, `e_next` | `mtp_u` as residual `h` | `h_64` fan-out reuse; `mtp_cat` split HYPOTHESIS |
-| `mtp_mixer` | MTP `gated_attn` unique weights. Access `dense_gemm` | MTP \(K,V\) of length \(T-1\) | MTP \(K,V\) append 4096 B | `mtp_u` as `h` | `h_mid` | Same gated-attn reuse as language full layers |
+| `mtp_mixer` | MTP `gated_attn` unique weights. Access `dense_gemm` | MTP $K,V$ of length $T-1$ | MTP $K,V$ append 4096 B | `mtp_u` as `h` | `h_mid` | Same gated-attn reuse as language full layers |
 | `mtp_mlp` | MTP MLP unique weights. Access `dense_gemm` | none | none | `h_mid` | `h_mtp` | Same MLP reuse as language |
-| `lm_head_mtp` | `mtp.norm` and shared \(W_\text{lm}\) (second physical read HYPOTHESIS, not unique bytes) | none | none | `h_mtp` | `logits_1` | `shared_W_lm` |
+| `lm_head_mtp` | `mtp.norm` and shared $W_\text{lm}$ (second physical read HYPOTHESIS, not unique bytes) | none | none | `h_mtp` | `logits_1` | `shared_W_lm` |
 
 JSON `stage_visibility_in` / `stage_visibility_out` keyed in `stage_kind_ids`
 order: `embed_current` in `["token_id"]` out `["e"]`; `language_mixer` in
@@ -265,8 +265,8 @@ identities as TASK-06):
 | `decode_read_fixed_bytes` | 153944064 |
 | `decode_read_kv_bytes_coeff_Tm1` | 69632 |
 
-Omitting a KV/\(C\)/\(S\) write changes the map (`state_write_not_optional`).
-Chunkwise GDN is not zero \(S\) traffic.
+Omitting a KV/$C$/$S$ write changes the map (`state_write_not_optional`).
+Chunkwise GDN is not zero $S$ traffic.
 
 ## Unavoidable versus proposed-boundary traffic
 
@@ -282,7 +282,7 @@ stage-cut transfers. Do not recopy TASK-06 family tables.
 | Gather complete (`e_t` + `e_{t+1}`) | 20480 | unavoidable |
 | Unique+gather decode complete | 52098619392 | unavoidable |
 | Unique extra vs TASK-06 | 0 | DERIVED |
-| Second physical \(W_\text{lm}\) read | 2542796800 | HYPOTHESIS extra, not unique |
+| Second physical $W_\text{lm}$ read | 2542796800 | HYPOTHESIS extra, not unique |
 
 JSON: `weight_bytes_unique_non_embed` 52098598912,
 `weight_gather_bytes_decode_complete` 20480,
@@ -294,15 +294,15 @@ JSON: `weight_bytes_unique_non_embed` 52098598912,
 
 | Item | Bytes | Label |
 | --- | --- | --- |
-| Write all \(K,V,C,S\) | 152047616 | unavoidable |
-| Read | \(69632(T-1)+153944064\) | unavoidable |
-| Read at \(T=1\) | 153944064 | DERIVED |
-| Read at \(T=4096\) | 439087104 | DERIVED |
+| Write all $K,V,C,S$ | 152047616 | unavoidable |
+| Read | $69632(T-1)+153944064$ | unavoidable |
+| Read at $T=1$ | 153944064 | DERIVED |
+| Read at $T=4096$ | 439087104 | DERIVED |
 | Extra vs TASK-06 | 0 | DERIVED |
 
 JSON arrays `decode_read_bytes_at_example_T`, `storage_bytes_at_example_T`
-follow `example_T`. Storage \(B_\text{store}(T)=69632T+153944064\) (154013696
-at \(T=1\), 439156736 at \(T=4096\)). JSON `state_boundary_added_bytes` 0.
+follow `example_T`. Storage $B_\text{store}(T)=69632T+153944064$ (154013696
+at $T=1$, 439156736 at $T=4096$). JSON `state_boundary_added_bytes` 0.
 
 **Activation — three views plus this stage-cut**
 
@@ -317,22 +317,22 @@ JSON `n_h_mid_crossings` = 65 (64 language + 1 MTP). JSON
 `n_h_interlayer_crossings` = 63. JSON `n_identity_e_h0_crossings` = 1. JSON
 `n_fanout_h64_crossings` = 1. JSON `n_embed_e_next_crossings` = 1. JSON
 `n_mtp_u_crossings` = 1. JSON `n_h_mtp_crossings` = 1. JSON
-`n_residual_stage_crossings` = 133. Sum: 1 (`e` as \(h^{(0)}\)) + 65
+`n_residual_stage_crossings` = 133. Sum: 1 (`e` as $h^{(0)}$) + 65
 (`h_mid`) + 63 (inter-layer `h`) + 1 (`h_64`) + 1 (`e_next`) + 1 (`mtp_u`) +
 1 (`h_mtp`). Do **not** add a second MTP `h_mid` line; it is already inside
 `n_h_mid_crossings`.
 
 JSON `residual_bytes` 10240. JSON `act_residual_stage_cut_bytes` =
-\(133\times 10240\) = 1361920. JSON `logits_bytes` 496640. JSON
+$133\times 10240$ = 1361920. JSON `logits_bytes` 496640. JSON
 `n_logit_outputs` = 2. JSON `act_logits_stage_cut_bytes` = 993280. JSON
 `act_stage_cut_decode_complete_bytes` = 2355200.
 
 `g`/`z` stay inside mixers: JSON `act_gz_local_bytes` =
-\(16\times 12288 + 48\times 12288 + 12288\) = 798720 (language `g` + language
+$16\times 12288 + 48\times 12288 + 12288$ = 798720 (language `g` + language
 `z` + MTP `g`). These are **not** stage-cut bytes.
 
-JSON `act_boundary_added_vs_forced` = \(2355200-3123200\) = \(-768000\). JSON
-`act_boundary_added_vs_region_cut` = \(2355200-5847040\) = \(-3491840\).
+JSON `act_boundary_added_vs_forced` = $2355200-3123200$ = $-768000$. JSON
+`act_boundary_added_vs_region_cut` = $2355200-5847040$ = $-3491840$.
 
 Negative values are DERIVED identities, not “the schedule is cheaper than
 liveness.” Forced includes live-across `g`/`z` as mathematical must-survive;
@@ -345,15 +345,15 @@ the second of (`lm_head_primary`, `mtp_mix`) is HYPOTHESIS
 (`act_h64_second_consumer_is_hypothesis` true). Unique stage-cut counts
 `h_64` once.
 
-JSON `act_h_mid_stage_cut_bytes` = \(65\times 10240\) = 665600.
+JSON `act_h_mid_stage_cut_bytes` = $65\times 10240$ = 665600.
 `fuse_across_residual_h_mid` would remove this as **inter-stage** I/O
-(TASK-12 extra_sync \(-1\)) while keeping the add in a local working set.
+(TASK-12 extra_sync $-1$) while keeping the add in a local working set.
 Usefulness HYPOTHESIS. Do not apply that fusion here.
 
 This heading **closes** the ledger open question. Unavoidable unique-weight
 extra is 0. Unavoidable state extra is 0. Proposed-boundary activation is the
 stage-cut identity 2355200 B, compared with TASK-06 forced 3123200 B and
-region-cut 5847040 B. A second \(W_\text{lm}\) read, an extra `h_64` consumer
+region-cut 5847040 B. A second $W_\text{lm}$ read, an extra `h_64` consumer
 read, hoist/overlap, and every TASK-12 fusion/split change to those extras
 remain HYPOTHESIS. This document does not authorize a merge, a split, a
 packing winner, or a CUDA mapping.
@@ -405,8 +405,8 @@ object `hoist_selected` all false. Usefulness HYPOTHESIS. JSON
 | --- | --- |
 | `hoist_embed_next` | Issue `embed_next` as soon as next `token_id` is present (serial places it after `lm_head_primary`) |
 | `overlap_fanout_h64` | `lm_head_primary` and `mtp_mix` are both ready after `h_64` |
-| `reuse_E` | Two gathers of one \(E\) payload |
-| `reuse_W_lm` | Two `lm_head` instances of one \(W_\text{lm}\) payload; second physical read is HYPOTHESIS extra bytes |
+| `reuse_E` | Two gathers of one $E$ payload |
+| `reuse_W_lm` | Two `lm_head` instances of one $W_\text{lm}$ payload; second physical read is HYPOTHESIS extra bytes |
 | `reuse_h64` | Two consumers of one `h_64`; extra physical read is HYPOTHESIS 10240 B |
 
 Diagram 1 of 1. Compact serial decode stages with residual-stream and state
@@ -462,12 +462,12 @@ JSON `n_diagrams` is 1. `diagram_ids` is
 ## Work citations and non-decisions
 
 Cite; do not recopy TASK-06 symbolic tables. Checker **recomputes**
-\(C,A,W(T)\) from `text_config` with the same identities as TASK-06.
+$C,A,W(T)$ from `text_config` with the same identities as TASK-06.
 
 JSON: `mac_C_complete` 27433238528, `mac_A_complete` 208896,
 `mac_decode_complete_at_example_T` `[27433447424, 28288876544]`. Language
 secondary: `mac_C_language` 25737166848, `mac_A_language` 196608. Identity
-\(W=C+AT\). Per-region citations: `mac_full_proj_per_layer` 104857600,
+$W=C+AT$. Per-region citations: `mac_full_proj_per_layer` 104857600,
 `mac_lin_token_per_layer` 118235136, `mac_mlp_per_layer` 267386880,
 `mac_lm_head` 1271398400, `mac_mtp_fc` 52428800, `mac_gdn_per_layer`
 2359296. Intensities (DERIVED identities, not SKU rankings):

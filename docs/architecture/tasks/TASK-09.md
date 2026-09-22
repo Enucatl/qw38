@@ -14,7 +14,7 @@ Produce `docs/architecture/runtime-format-design.md` as the Phase 1 **compiler-p
 
 - Constraints:
   - `docs/architecture/plan.md` is authoritative for study scope; do not modify it.
-  - Logical producers/consumers and the logical-≠-physical rule come from `docs/architecture/dataflow.md` (TASK-03). Weight/state traffic and access identities (gather versus full GEMM; unique weight read versus \(T\)-reuse) come from `docs/architecture/work-and-traffic.md` (TASK-06). Element formats, grouping, scales, outlier policies, 22 recipes, 16 policy families, and metadata **lower bounds** come from `docs/architecture/quantization-design-space.md` (TASK-08). Family occupancy comes from `docs/architecture/model-inventory.md` (TASK-01).
+  - Logical producers/consumers and the logical-≠-physical rule come from `docs/architecture/dataflow.md` (TASK-03). Weight/state traffic and access identities (gather versus full GEMM; unique weight read versus $T$-reuse) come from `docs/architecture/work-and-traffic.md` (TASK-06). Element formats, grouping, scales, outlier policies, 22 recipes, 16 policy families, and metadata **lower bounds** come from `docs/architecture/quantization-design-space.md` (TASK-08). Family occupancy comes from `docs/architecture/model-inventory.md` (TASK-01).
   - Label claims `OBSERVED` (inventory/config occupancy), `DERIVED` (packed-byte ceilings, header illustrations, occupancy products, dual-view size products), or `HYPOTHESIS` (every portable-versus-specialized tradeoff cell, every format-risk severity, every “ideal sequence” rationale). `UNKNOWN` only for vision-encoder internals deferred here. No new `MEASURED` payload statistics. No `MEASURED` quality or tok/s. No selected artifact.
   - GitHub Markdown math. Cite TASK-03 catalog/region IDs, TASK-06 traffic identities, TASK-08 recipe/family/risk ids. Do not rewrite forward math, redraw the TASK-03 DAG, re-stream safetensor payloads, recopy TASK-08’s 22-recipe research space as a new quantization grid, or choose TASK-15 tiles.
   - Allowed evidence: TASK-01 inventory, TASK-03 dataflow, TASK-06 work/traffic, TASK-08 quantization-design-space, sitting `config.json` `text_config`, plan evidence vocabulary, and general bit-packing / little-endian / checksum material. No Quartz, llama.cpp/GGML Qwen, or `models/Qwen3.8-27B-Q4_K_M.gguf` as a format constraint. GGUF is not the runtime format; it remains a future black-box Pareto **reference** (TASK-18). Safetensors is the **source** checkpoint, not the runtime artifact.
@@ -42,10 +42,10 @@ Produce `docs/architecture/runtime-format-design.md` as the Phase 1 **compiler-p
 - `docs/architecture/plan.md:85-88` — TASK-09 is the compiled runtime representation after TASK-08, before TASK-10.
 - `docs/architecture/task_ledger.md` TASK-09 row — produces `docs/architecture/runtime-format-design.md`; purpose is requirements for a compiler-produced, consumer-oriented model artifact; open question (portable versus backend-specialized boundaries and ideal consumer byte sequences) is **not** closed here; completion is representation/packing capability analysis, portable-versus-backend comparison, and keeping decisions open absent compelling evidence.
 - `docs/architecture/task_ledger.md` TASK-03 established results — 52 catalog IDs; logical ≠ physical; sharing rank is DERIVED, not a cache layout; `E` and `W_lm` are shared-weight stadium nodes with fan-out 2 each; embeddings and `lm_head` are **untied**.
-- `docs/architecture/task_ledger.md` TASK-06 established results — language+MTP unique weight bytes `54641395712`; unique non-embed `52098598912`; embed gather 10240 B/row (0 MAC); `lm_head` 2542796800 B `vocab_memory`; MLP vs weights \(I=1\); \(S\) 150994944 B/step; bottleneck **labels** HYPOTHESIS.
+- `docs/architecture/task_ledger.md` TASK-06 established results — language+MTP unique weight bytes `54641395712`; unique non-embed `52098598912`; embed gather 10240 B/row (0 MAC); `lm_head` 2542796800 B `vocab_memory`; MLP vs weights $I=1$; $S$ 150994944 B/step; bottleneck **labels** HYPOTHESIS.
 - `docs/architecture/task_ledger.md` TASK-08 established results — four design dimensions; 22 recipes; 16 policy families without winners; metadata bytes are **lower bounds, not packed layouts**; `scale_storage_bytes_candidates` `[2, 4]`; `d_3bit_pack` defers non-byte-aligned layout to this task.
-- `docs/architecture/dataflow.md` — canonical logical-≠-physical sentence; region IDs `embed`, `full_attn`, `linear_attn`, `mlp`, `primary_logits`, `mtp`; catalog consumers of packed weights and of state \(K,V,C,S\).
-- `docs/architecture/work-and-traffic.md` — DERIVED unique weight bytes; embed is gather; decode unique+gather complete `52098619392`; state volumes for \(K,V,C,S\).
+- `docs/architecture/dataflow.md` — canonical logical-≠-physical sentence; region IDs `embed`, `full_attn`, `linear_attn`, `mlp`, `primary_logits`, `mtp`; catalog consumers of packed weights and of state $K,V,C,S$.
+- `docs/architecture/work-and-traffic.md` — DERIVED unique weight bytes; embed is gather; decode unique+gather complete `52098619392`; state volumes for $K,V,C,S$.
 - `docs/architecture/quantization-design-space.md` — packable recipes and family candidate sets; metadata formulas; packing, scale-storage 2 vs 4, and runtime format explicitly deferred here.
 - `docs/architecture/model-inventory.md` — 42 level-2 families; language+MTP 866 tensors / 27320697856 parameters / 54641395712 BF16 bytes; all checkpoint tensors BF16; embeddings and `lm_head` untied `(248320, 5120)`.
 - `.cache/authorities/qwen3.8-27b-transformers/config.json` — live `text_config` for occupancy arithmetic. Do not read safetensor payloads.
@@ -74,7 +74,7 @@ N/A — runtime-format **requirements** documentation. No prefill/decode/compone
 If an occupancy product would disagree with TASK-01 / sitting `text_config`, or a cited weight/state byte would disagree with TASK-06, or a recipe/family/metadata lower bound would disagree with TASK-08, or a catalog/region id would disagree with TASK-03, the earlier document wins and this one is wrong.
 
 - Prefill and decode share **one** compiled artifact. Distinct **views** of the same logical tensor are a capability (`view_binding`), not a selected decode/prefill split (TASK-14).
-- Primary object is language+MTP **checkpoint parameters** after a TASK-08 recipe (role `param`). Secondary object is token-persistent **state schema** for \(K,V,C,S\) (role `state`): ranks and conceptual dtypes so a consumer can allocate. Whether zero-filled state **payloads** live in the artifact is an open decision.
+- Primary object is language+MTP **checkpoint parameters** after a TASK-08 recipe (role `param`). Secondary object is token-persistent **state schema** for $K,V,C,S$ (role `state`): ranks and conceptual dtypes so a consumer can allocate. Whether zero-filled state **payloads** live in the artifact is an open decision.
 - Activations and accumulators are **not** artifact payloads.
 - Algebraic equivalents in TASK-02 are the same real map; packing acts on stored elements, not on a second mathematical model.
 - Logical values do not imply allocation; a packed tensor is not a CUDA buffer.
@@ -90,7 +90,7 @@ Use these **level-2 headings in this order**. Compact tables + one Mermaid fence
 2. **Format convention** — the five canonical sentences below; what a capability is; GGUF is not the runtime format; safetensors is source-only; open question stays open.
 3. **Artifact object model** — producer/consumer; kinds; what is in versus out of the artifact; shared bindings; one artifact for prefill and decode.
 4. **Representation capabilities** — the eight locked representation ids; mapping of 16 policy families to access classes; TASK-08 recipes remain the packable set.
-5. **Packing capabilities** — the eight locked packing ids; ceil/align formulas; instantiated illustrations (MLP, unique-non-embed, embed gather, \(S\), int3/int2/int6 grains, header overhead, dual-view size); scale-storage/placement/align/bit-order remain unselected.
+5. **Packing capabilities** — the eight locked packing ids; ceil/align formulas; instantiated illustrations (MLP, unique-non-embed, embed gather, $S$, int3/int2/int6 grains, header overhead, dual-view size); scale-storage/placement/align/bit-order remain unselected.
 6. **Consumer access and byte sequences** — seven named sequences from TASK-03/06 access; no ideal sequence.
 7. **Portable versus backend-specific artifacts** — four approaches; six comparison dimensions; no winner.
 8. **Open decisions** — the eight locked open ids, all unselected; format-risk hypotheses; one Mermaid summary (diagram 1 of 1).
@@ -131,7 +131,7 @@ JSON array `artifact_kinds` in this order: `manifest`, `payload`, `metadata_blob
 | `metadata_blob` | Per-group scales and optional zero-points. |
 | `sidecar` | `extract_high` sparse BF16 values plus indices; `mixed_group` width map. |
 | `view` | One portable and/or one-or-more specialized projections of the same logical tensor. |
-| `schema_state` | Ranks and conceptual dtypes for \(K,V,C,S\) allocation; not a cache layout. |
+| `schema_state` | Ranks and conceptual dtypes for $K,V,C,S$ allocation; not a cache layout. |
 
 Producer: future TASK-10 compiler (not specified here). Consumers: TASK-13/14 schedules, TASK-15 layouts, TASK-17 kernels (not specified here). Source: `.cache/authorities/qwen3.8-27b-transformers` safetensors (not copied through as the runtime bytes).
 
@@ -168,7 +168,7 @@ JSON array `representation_capability_ids` in this exact order (8 ids). JSON `n_
 | `mixed_width_map` | Per-group wider/narrower integer width for `mixed_group` | TASK-08 |
 | `shared_binding` | Single payload with multiple catalog consumers (`E`, `W_lm`) | TASK-03 |
 | `access_class` | Consumer access class per family (table below) | TASK-03/06 |
-| `state_schema` | \(K,V\) rank \((4,T,256)\) BF16 conceptual; \(C\) \(3\times 10240\) BF16; \(S\) \((48,128,128)\) F32 conceptual; 17 KV instances including MTP; 48 C/S instances | TASK-03/04/06 |
+| `state_schema` | $K,V$ rank $(4,T,256)$ BF16 conceptual; $C$ $3\times 10240$ BF16; $S$ $(48,128,128)$ F32 conceptual; 17 KV instances including MTP; 48 C/S instances | TASK-03/04/06 |
 
 Do not add a ninth representation capability (`codebook`, `kernel`, `activation_payload`, `gguf_type`). The 22 TASK-08 recipes are the **only** packable combinations this document must support. Families list subsets there; this document does not add recipes.
 
@@ -218,53 +218,53 @@ JSON array `packing_capability_ids` in this exact order (8 ids). JSON `n_packing
 
 JSON `code_bit_order_candidates` = `["lsb_first","msb_first"]`. JSON `scale_placement_candidates` = `["sidecar_array","interleaved_group"]`. JSON `alignment_grain_candidates` = `[1, 16, 32, 128, 256]`. JSON `scale_storage_bytes_candidates` = `[2, 4]`. JSON `integrity_algorithm_candidates` = `["none","checksum"]`. JSON `scale_storage_illustration_bytes` = 2. JSON `alignment_illustration_grain` = 1. JSON `scale_placement_illustration` = `"sidecar_array"`.
 
-Packed payload at integer bit-width \(b\) on \(n\) elements:
+Packed payload at integer bit-width $b$ on $n$ elements:
 
-\[
+$$
 B_{\text{payload,pack}}=\Bigl\lceil\frac{n\,b}{8}\Bigr\rceil.
-\]
+$$
 
-Group grain: for grouping size \(g\), pack each group with \(\lceil g_{\text{eff}} b/8\rceil\) then concatenate; last group may be ragged (`ragged_last_group` true, inherited from TASK-08). IEEE-like: \(B_{\text{payload,pack}}=n\times\) element bytes (`bytes_bf16` = 2, `bytes_f32` = 4, `bytes_fp8` = 1).
+Group grain: for grouping size $g$, pack each group with $\lceil g_{\text{eff}} b/8\rceil$ then concatenate; last group may be ragged (`ragged_last_group` true, inherited from TASK-08). IEEE-like: $B_{\text{payload,pack}}=n\times$ element bytes (`bytes_bf16` = 2, `bytes_f32` = 4, `bytes_fp8` = 1).
 
 Align:
 
-\[
+$$
 B_{\text{aligned}}=\Bigl\lceil B_{\text{payload,pack}}/A\Bigr\rceil A.
-\]
+$$
 
-Metadata lower bound unchanged from TASK-08: \(n_g=\lceil n/g\rceil\), \(B_{\text{meta}}=n_g(s+z)\). Illustration packing uses \(A=1\), \(s=2\), \(z=0\), sidecar scales, so **tight packed totals equal TASK-08 lower bounds** for the named MLP / unique-non-embed / embed-gather illustrations. JSON `packing_illustration_matches_task08_lower_bound` true. JSON `payload_formula_uses_ceil` true.
+Metadata lower bound unchanged from TASK-08: $n_g=\lceil n/g\rceil$, $B_{\text{meta}}=n_g(s+z)$. Illustration packing uses $A=1$, $s=2$, $z=0$, sidecar scales, so **tight packed totals equal TASK-08 lower bounds** for the named MLP / unique-non-embed / embed-gather illustrations. JSON `packing_illustration_matches_task08_lower_bound` true. JSON `payload_formula_uses_ceil` true.
 
 **Grain identities** (DERIVED; must appear as these integers):
 
 | JSON key | Value | Meaning |
 | --- | ---: | --- |
-| `int3_g32_group_payload_bytes` | 12 | \(32\times 3/8=12\) exact; TASK-08 `d_3bit_pack` layout grain |
-| `int2_g32_group_payload_bytes` | 8 | \(32\times 2/8=8\) |
-| `int6_row_hidden_payload_bytes` | 3840 | \(5120\times 6/8=3840\) one hidden-width row |
-| `int4_row_hidden_payload_bytes` | 2560 | \(5120\times 4/8=2560\) |
+| `int3_g32_group_payload_bytes` | 12 | $32\times 3/8=12$ exact; TASK-08 `d_3bit_pack` layout grain |
+| `int2_g32_group_payload_bytes` | 8 | $32\times 2/8=8$ |
+| `int6_row_hidden_payload_bytes` | 3840 | $5120\times 6/8=3840$ one hidden-width row |
+| `int4_row_hidden_payload_bytes` | 2560 | $5120\times 4/8=2560$ |
 | `embed_gather_int4_row_bytes` | 2562 | 2560 + one 2-byte scale (TASK-08 illustration C) |
 | `embed_gather_bf16_bytes` | 10240 | TASK-06 gather row |
 
-**Illustration A — language MLP** (same as TASK-08, now labelled packed-tight): \(n=17112760320\), int4, \(s=2\), \(A=1\):
+**Illustration A — language MLP** (same as TASK-08, now labelled packed-tight): $n=17112760320$, int4, $s=2$, $A=1$:
 
-| \(g\) | \(B_{\text{payload,pack}}\) | \(B_{\text{meta}}\) | \(B\) | \(B/B_{\text{bf16}}\) |
+| $g$ | $B_{\text{payload,pack}}$ | $B_{\text{meta}}$ | $B$ | $B/B_{\text{bf16}}$ |
 | ---: | ---: | ---: | ---: | ---: |
 | 32 | 8556380160 | 1069547520 | 9625927680 | 0.28125 |
 | 128 | 8556380160 | 267386880 | 8823767040 | 0.2578125 |
 
 JSON keys match TASK-08: `mlp_n`, `mlp_bf16_bytes`, `mlp_int4_payload_bytes`, `mlp_int4_g32_total_bytes`, `mlp_int4_g32_over_bf16`, `mlp_int4_g128_total_bytes`, `mlp_int4_g128_over_bf16`.
 
-**Illustration B — unique non-embed language+MTP:** \(n=26049299456\), \(B_{\text{bf16}}=52098598912\), int4 \(g=128\) \(s=2\) \(A=1\): \(B=13431670032\), ratio \(0.2578125\). JSON keys `unique_non_embed_n`, `unique_non_embed_bf16_bytes`, `unique_non_embed_int4_g128_total_bytes`, `unique_non_embed_int4_g128_over_bf16`. Label: illustration, **not** a selected profile.
+**Illustration B — unique non-embed language+MTP:** $n=26049299456$, $B_{\text{bf16}}=52098598912$, int4 $g=128$ $s=2$ $A=1$: $B=13431670032$, ratio $0.2578125$. JSON keys `unique_non_embed_n`, `unique_non_embed_bf16_bytes`, `unique_non_embed_int4_g128_total_bytes`, `unique_non_embed_int4_g128_over_bf16`. Label: illustration, **not** a selected profile.
 
 **Illustration C — embed gather:** as TASK-08 / table above. Access class `gather_row` requires `row_addressable` packing so decode need not stream 2542796800 B.
 
-**Illustration D — \(S\):** conceptual F32 150994944 B/step; BF16 store 75497472 B; FP8 37748736 B. JSON `s_f32_bytes`, `s_bf16_bytes`, `s_fp8_bytes`. Schema required; payload-in-artifact unselected.
+**Illustration D — $S$:** conceptual F32 150994944 B/step; BF16 store 75497472 B; FP8 37748736 B. JSON `s_f32_bytes`, `s_bf16_bytes`, `s_fp8_bytes`. Schema required; payload-in-artifact unselected.
 
 **Illustration E — manifest header overhead:** 64 bytes/tensor × 866 language+MTP tensors = 55424 B. JSON `n_language_mtp_tensors` 866, `container_header_illustration_bytes_per_tensor` 64, `container_header_illustration_total_bytes` 55424. 64 is an illustration constant, not a selected header size.
 
-**Illustration F — dual-view store amplification:** two copies of illustration B = \(2\times 13431670032=26863340064\) B, still below BF16 unique-non-embed 52098598912. JSON `dual_view_int4_g128_unique_non_embed_bytes` 26863340064. DERIVED size only; **not** a recommendation to store two views.
+**Illustration F — dual-view store amplification:** two copies of illustration B = $2\times 13431670032=26863340064$ B, still below BF16 unique-non-embed 52098598912. JSON `dual_view_int4_g128_unique_non_embed_bytes` 26863340064. DERIVED size only; **not** a recommendation to store two views.
 
-Sidecar `extract_high` packed size is data-dependent (\(n_{\text{out}}\times(2+\text{index bytes})\)); do **not** instantiate a tensor-level sidecar byte count from TASK-05 fractions (those fractions shaped TASK-08 candidates, not packed layouts). JSON `outlier_sidecar_bytes_instantiated` false.
+Sidecar `extract_high` packed size is data-dependent ($n_{\text{out}}\times(2+\text{index bytes})$); do **not** instantiate a tensor-level sidecar byte count from TASK-05 fractions (those fractions shaped TASK-08 candidates, not packed layouts). JSON `outlier_sidecar_bytes_instantiated` false.
 
 ### Consumer access and byte sequences (lock)
 
@@ -272,12 +272,12 @@ JSON array `consumer_sequence_ids` in this exact order (7 ids). JSON `n_consumer
 
 | id | Access | Sequence (capability, not a winner) |
 | --- | --- | --- |
-| `seq_gemm_codes_then_scales` | `dense_gemm` | Read packed codes for a contraction, then sidecar scales (TASK-06 \(I=1\) MLP/`lm_head` vs weights) |
+| `seq_gemm_codes_then_scales` | `dense_gemm` | Read packed codes for a contraction, then sidecar scales (TASK-06 $I=1$ MLP/`lm_head` vs weights) |
 | `seq_gemm_interleaved_group` | `dense_gemm` | For each group: scale then codes |
 | `seq_gather_row` | `gather_row` | One vocab row of codes + one scale (10240 B BF16 or 2562 B int4-row illustration) |
 | `seq_lm_head_full` | `dense_gemm` | Entire `lm_head` unique 2542796800 B-class table every decode (TASK-06 `vocab_memory`; TASK-08 `d_lm_head_unpack`) |
 | `seq_outlier_extra` | any `extract_high` | Additional irregular BF16 sidecar gathers (TASK-08 `d_outlier_gather`) |
-| `seq_state_s_dense` | `state_s` | Dense \(S\) 150994944 B/step conceptual F32 (TASK-06 `state_memory`) |
+| `seq_state_s_dense` | `state_s` | Dense $S$ 150994944 B/step conceptual F32 (TASK-06 `state_memory`) |
 | `seq_specialized_tile` | specialized view | Backend tile/swizzle order; **layout is TASK-15**; named only as a sequence the format must be able to store |
 
 JSON `consumer_sequence_access_classes` = `["dense_gemm","dense_gemm","gather_row","dense_gemm","dense_gemm","state_s","dense_gemm"]` with the last meaning “specialized view of a dense family” (do not invent an eighth access class). Prose must say `seq_specialized_tile` is a **view** sequence, not a new access class.
@@ -472,7 +472,7 @@ TASK-08 `policy_families` order (16): `norm_gamma`, `gdn_time_param`, `gdn_gate_
   - Choosing MMA tiles, swizzles, or alignment 128 as the specialized layout: TASK-15.
   - Designing compiler stages or quality/balanced/compression profiles: TASK-10.
   - Instantiating `extract_high` sidecar bytes from TASK-05 `frac_out_6x`: rejected; data-dependent; not a packed layout.
-  - Using CUDA dtypes or GGUF sizes as packed element sizes: rejected; TASK-08 formats + conceptual F32 \(S\).
+  - Using CUDA dtypes or GGUF sizes as packed element sizes: rejected; TASK-08 formats + conceptual F32 $S$.
   - Inspecting Quartz or llama.cpp for “real” packing: forbidden by plan.md.
   - uv / Ruff / pytest for this increment: rejected; stdlib checker matches TASK-01–08.
   - Editing frozen TASK-01/03/06/08 docs or `plan.md`.
@@ -485,7 +485,7 @@ TASK-08 `policy_families` order (16): `norm_gamma`, `gdn_time_param`, `gdn_gate_
 
 - Acceptance conditions:
   - `docs/architecture/runtime-format-design.md` exists and follows the heading list above.
-  - Eight representation and eight packing capabilities are named and analyzed; packing formulas instantiated (MLP \(g=32/128\) ratios 0.28125 / 0.2578125 matching TASK-08; unique-non-embed illustration; embed gather 2562; int3 g32 grain 12; header 55424; dual-view 26863340064).
+  - Eight representation and eight packing capabilities are named and analyzed; packing formulas instantiated (MLP $g=32/128$ ratios 0.28125 / 0.2578125 matching TASK-08; unique-non-embed illustration; embed gather 2562; int3 g32 grain 12; header 55424; dual-view 26863340064).
   - Four artifact approaches are compared on six dimensions without a winner; seven consumer sequences are tabulated without an ideal sequence; eight open decisions are listed and unselected.
   - Format risks (6) are tabulated as HYPOTHESIS and do not claim experimental proof or an artifact selection.
   - Five canonical sentences verbatim; one Mermaid flowchart contains the required IDs.
@@ -540,7 +540,7 @@ Do not run Ruff, pytest, CMake, or CUDA; this increment does not introduce those
 - Agent/model: `cursor-grok-4.6-high` (this stage; parent/inherit mapping)
 - Changes:
   - Created `scripts/check_runtime_format_design.py` (stdlib checker: `text_config` occupancy arithmetic matching TASK-01/06 family BF16 bytes, MLP/embed/metadata/header/dual-view illustrations with `ceil(n b/8)` packing, locked 8+8 capabilities / 6 artifact kinds / 7 sequences / 4 approaches / 8 open decisions / 6 HYPOTHESIS format risks; `--json` internal asserts; `--runtime-format-design` heading/JSON/mermaid/canonical/id/token/winner-phrase checks). Does not import other `check_*.py` or `analyze_bf16_tensors.py`. Does not stream safetensor payloads.
-  - Created `docs/architecture/runtime-format-design.md` (ten locked headings, five canonical sentences, artifact object model, representation/packing capability tables, MLP \(g=32/128\) ratios 0.28125 / 0.2578125 plus unique-non-embed / embed-gather / \(S\) / header 55424 / dual-view 26863340064 illustrations, seven consumer sequences without an ideal sequence, four artifact approaches compared on six dimensions without a winner, eight open decisions left unselected, six HYPOTHESIS format-risk rows, one `flowchart TB` mermaid with required IDs, JSON fence copied from a live `--json` run).
+  - Created `docs/architecture/runtime-format-design.md` (ten locked headings, five canonical sentences, artifact object model, representation/packing capability tables, MLP $g=32/128$ ratios 0.28125 / 0.2578125 plus unique-non-embed / embed-gather / $S$ / header 55424 / dual-view 26863340064 illustrations, seven consumer sequences without an ideal sequence, four artifact approaches compared on six dimensions without a winner, eight open decisions left unselected, six HYPOTHESIS format-risk rows, one `flowchart TB` mermaid with required IDs, JSON fence copied from a live `--json` run).
   - Did not edit `docs/architecture/plan.md`, `dataflow.md`, `work-and-traffic.md`, `quantization-design-space.md`, `model-inventory.md`, `model-semantics.md`, `lifetime-and-state.md`, `numerical-sensitivity.md`, or `bf16-tensor-analysis.md`. Did not commit.
 - Commands:
   - `python3 -m py_compile scripts/check_runtime_format_design.py` — pass (exit 0)

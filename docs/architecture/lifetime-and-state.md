@@ -12,9 +12,9 @@ state kinds come from
 Dimensions instantiate sitting `text_config` / TASK-01 inventory.
 
 This document classifies every catalog value by lifetime and recomputability,
-gives DERIVED element counts and byte volumes for \(K,V,C,S\), and names
+gives DERIVED element counts and byte volumes for $K,V,C,S$, and names
 semantic storage candidates. It specifies mathematical state sizes, not
-kernels. Prefill and decode share one lifetime model; only \(T\) and whether
+kernels. Prefill and decode share one lifetime model; only $T$ and whether
 incoming state is zeros versus populated change.
 
 If a class or byte total would disagree with a TASK-02 rank or TASK-03 catalog
@@ -37,7 +37,7 @@ ID, the earlier document wins and this one is wrong.
 
 Numeric ranks instantiate sitting `text_config` OBSERVED: `hidden_size` 5120,
 64 decoder layers, `full_attention_interval` 4, 48 linear + 16 full at
-\(\ell \bmod 4 = 3\), `mtp_num_hidden_layers` 1, `num_key_value_heads` 4,
+$\ell \bmod 4 = 3$, `mtp_num_hidden_layers` 1, `num_key_value_heads` 4,
 `head_dim` 256, `linear_conv_kernel_dim` 4, `linear_num_value_heads` 48,
 `linear_key_head_dim` / `linear_value_head_dim` 128, `dtype` `"bfloat16"`,
 `mamba_ssm_dtype` `"float32"`. Lifetime class, recomputability, and byte
@@ -50,7 +50,7 @@ volumes are DERIVED from TASK-02 ranks × multiplicity × element size.
 > A value that must survive a named boundary is mathematical state for that boundary, not a cache layout or CUDA allocation.
 
 - Fan-out of a named value is not a requirement to store that value.
-- Token-crossing edges name mathematical state \((K,V,C,S)\), not a cache layout.
+- Token-crossing edges name mathematical state $(K,V,C,S)$, not a cache layout.
 - Identifying a semantic storage candidate is not a CUDA buffer, fusion, or layout decision (TASK-12).
 
 ## Lifetime taxonomy
@@ -77,7 +77,7 @@ Recomputability (two labels, disjoint):
 | Label | JSON | Meaning |
 | --- | --- | --- |
 | `recomputable` | every catalog ID except the four state IDs | If dropped, the value can be rebuilt from its current-token catalog parents (parents may include live persistent state). |
-| `requires-prior-state` | `requires_prior_state_ids` = `state_ids` | The value **is** prior-token mathematical state. Reconstructing it without that state requires replaying tokens \(1\ldots t-1\). |
+| `requires-prior-state` | `requires_prior_state_ids` = `state_ids` | The value **is** prior-token mathematical state. Reconstructing it without that state requires replaying tokens $1\ldots t-1$. |
 
 Boundary column (exactly one per catalog ID):
 
@@ -89,26 +89,26 @@ Boundary column (exactly one per catalog ID):
 | `token` | `K_state`, `V_state`, `C_state`, `S` |
 | `output` | `logits_0`, `logits_1` |
 
-Prefill of length \(T\) and decode of one new token share this taxonomy. Only
-\(T\) and whether incoming state is zeros versus populated change. There is no
+Prefill of length $T$ and decode of one new token share this taxonomy. Only
+$T$ and whether incoming state is zeros versus populated change. There is no
 sixth class. Intra-equation reuse of `k_hat` (TASK-03) is not a lifetime class.
 
-Let \(T\) be the stored KV length **after** appending the current token
-(TASK-02 rank \((4,T,256)\)). Decode of one new token has incoming KV length
-\(T-1\). When \(T=1\), incoming KV is empty and KV read volume is 0. \(C\) and
-\(S\) have \(T\)-independent stored ranks (initial zeros still occupy the full
-\(C\) and \(S\) ranks). JSON: `T_is_stored_length_after_append` is `true`;
+Let $T$ be the stored KV length **after** appending the current token
+(TASK-02 rank $(4,T,256)$). Decode of one new token has incoming KV length
+$T-1$. When $T=1$, incoming KV is empty and KV read volume is 0. $C$ and
+$S$ have $T$-independent stored ranks (initial zeros still occupy the full
+$C$ and $S$ ranks). JSON: `T_is_stored_length_after_append` is `true`;
 `decode_T_new` is `1`; `example_T` is `[1, 4096]`.
 
 Element sizes are IEEE widths used as conceptual element sizes, not allocation
 dtypes: BF16 = 2 bytes (OBSERVED `text_config.dtype` `"bfloat16"`; inventory
-all checkpoint tensors BF16) for conceptual \(K,V,C\); F32 = 4 bytes (OBSERVED
-`text_config.mamba_ssm_dtype` `"float32"`) for conceptual \(S\). Byte volume =
+all checkpoint tensors BF16) for conceptual $K,V,C$; F32 = 4 bytes (OBSERVED
+`text_config.mamba_ssm_dtype` `"float32"`) for conceptual $S$. Byte volume =
 element count × element size (DERIVED).
 
 ## Catalog lifetime table
 
-All 52 TASK-03 catalog IDs in locked order. Shared weights \(E\), \(W_\text{lm}\)
+All 52 TASK-03 catalog IDs in locked order. Shared weights $E$, $W_\text{lm}$
 are parameters, not catalog intermediates, and are not classified here.
 
 | ID | Lifetime class | Recomputability | Boundary | Eq |
@@ -178,118 +178,118 @@ Locked class arrays (catalog order, disjoint union = `catalog_ids`):
 
 Live config identities (OBSERVED / DERIVED):
 
-- \(n_\text{kv}=\) `num_key_value_heads` = 4; \(d_h=\) `head_dim` = 256
-- \(n_\text{full}=\) 16 from `layer_types`; \(n_\text{mtp}=\) `mtp_num_hidden_layers` = 1; \(n_\text{full}^\text{KV}=n_\text{full}+n_\text{mtp}=17\)
-- \(n_\text{lin}=\) 48 from `layer_types`
-- \(d_\text{qkv}=(2\cdot\texttt{linear_num_key_heads}+\texttt{linear_num_value_heads})\cdot\texttt{linear_key_head_dim}=10240\)
-- \(d_C=\texttt{linear_conv_kernel_dim}-1=3\)
-- \(S\) rank \((n_v,d_k,d_v)=(\texttt{linear_num_value_heads},\texttt{linear_key_head_dim},\texttt{linear_value_head_dim})=(48,128,128)\)
+- $n_\text{kv}=$ `num_key_value_heads` = 4; $d_h=$ `head_dim` = 256
+- $n_\text{full}=$ 16 from `layer_types`; $n_\text{mtp}=$ `mtp_num_hidden_layers` = 1; $n_\text{full}^\text{KV}=n_\text{full}+n_\text{mtp}=17$
+- $n_\text{lin}=$ 48 from `layer_types`
+- $d_\text{qkv}=(2\cdot\texttt{linear_num_key_heads}+\texttt{linear_num_value_heads})\cdot\texttt{linear_key_head_dim}=10240$
+- $d_C=\texttt{linear_conv_kernel_dim}-1=3$
+- $S$ rank $(n_v,d_k,d_v)=(\texttt{linear_num_value_heads},\texttt{linear_key_head_dim},\texttt{linear_value_head_dim})=(48,128,128)$
 
-**KV** (grows with \(T\); RoPE baked into stored \(K\)):
+**KV** (grows with $T$; RoPE baked into stored $K$):
 
-\[
+$$
 N_{KV}^{(\ell)}/\text{token}=2\cdot n_\text{kv}\cdot d_h=2048,\qquad
 B_{KV}^{(\ell)}/\text{token}=4096
-\]
+$$
 
-\[
+$$
 N_{KV}^{\text{all}}/\text{token}=17\cdot 2048=34816,\qquad
 B_{KV}^{\text{all}}/\text{token}=69632
-\]
+$$
 
-Language-only (secondary): \(16\cdot 2048=32768\) elements/token, \(65536\)
+Language-only (secondary): $16\cdot 2048=32768$ elements/token, $65536$
 bytes/token.
 
-Storage: \(N_{KV}^{\text{all}}(T)=34816\,T\) elements, \(B_{KV}^{\text{all}}(T)=69632\,T\) bytes.
+Storage: $N_{KV}^{\text{all}}(T)=34816\,T$ elements, $B_{KV}^{\text{all}}(T)=69632\,T$ bytes.
 
-**C** (does not grow with \(T\); last 3 QKV vectors):
+**C** (does not grow with $T$; last 3 QKV vectors):
 
-\[
+$$
 N_C^{(\ell)}=3\cdot 10240=30720,\qquad B_C^{(\ell)}=61440
-\]
+$$
 
-\[
+$$
 N_C^{\text{all}}=48\cdot 30720=1474560,\qquad B_C^{\text{all}}=2949120
-\]
+$$
 
-**S** (does not grow with \(T\); conceptual F32):
+**S** (does not grow with $T$; conceptual F32):
 
-\[
+$$
 N_S^{(\ell)}=48\cdot 128\cdot 128=786432,\qquad B_S^{(\ell)}=3145728
-\]
+$$
 
-\[
+$$
 N_S^{\text{all}}=48\cdot 786432=37748736,\qquad B_S^{\text{all}}=150994944
-\]
+$$
 
-\(B_S^{\text{all}}=144\times 2^{20}\) exactly (144 MiB). That identity is exact,
+$B_S^{\text{all}}=144\times 2^{20}$ exactly (144 MiB). That identity is exact,
 not an approximation.
 
 **Primary storage** (includes MTP KV):
 
-\[
+$$
 N_\text{store}(T)=34816\,T+39223296,\qquad
 B_\text{store}(T)=69632\,T+153944064
-\]
+$$
 
-Fixed part \(39223296=1474560+37748736\) elements,
-\(153944064=2949120+150994944\) bytes.
+Fixed part $39223296=1474560+37748736$ elements,
+$153944064=2949120+150994944$ bytes.
 
-| \(T\) | KV elems | KV bytes | Store elems | Store bytes |
+| $T$ | KV elems | KV bytes | Store elems | Store bytes |
 | ---: | ---: | ---: | ---: | ---: |
 | 1 | 34816 | 69632 | 39258112 | 154013696 |
 | 4096 | 142606336 | 285212672 | 181829632 | 439156736 |
 
-Language-only storage (secondary; exclude MTP KV, still include all \(C\) and
-\(S\)): \(N=32768\,T+39223296\), \(B=65536\,T+153944064\).
+Language-only storage (secondary; exclude MTP KV, still include all $C$ and
+$S$): $N=32768\,T+39223296$, $B=65536\,T+153944064$.
 
 Per-layer and all-layers table. Primary totals include MTP KV (17 full-attention
 KV instances = 16 language + 1 MTP). Language-only KV is the secondary row
-above, not the primary total. BF16=2 for \(K,V,C\); F32=4 for \(S\).
+above, not the primary total. BF16=2 for $K,V,C$; F32=4 for $S$.
 
-| State | Instances | Elems / instance | Bytes / instance | All-instances elems | All-instances bytes | vs \(T\) |
+| State | Instances | Elems / instance | Bytes / instance | All-instances elems | All-instances bytes | vs $T$ |
 | --- | ---: | --- | --- | ---: | ---: | --- |
-| \(K\) | 17 | \(1024\,T\) | \(2048\,T\) | \(17408\,T\) | \(34816\,T\) | grows |
-| \(V\) | 17 | \(1024\,T\) | \(2048\,T\) | \(17408\,T\) | \(34816\,T\) | grows |
-| \(K{+}V\) | 17 | \(2048\,T\) | \(4096\,T\) | \(34816\,T\) | \(69632\,T\) | grows |
-| \(C\) | 48 | 30720 | 61440 | 1474560 | 2949120 | fixed |
-| \(S\) | 48 | 786432 | 3145728 | 37748736 | 150994944 | fixed |
-| Primary total | — | — | — | \(34816\,T+39223296\) | \(69632\,T+153944064\) | mixed |
+| $K$ | 17 | $1024\,T$ | $2048\,T$ | $17408\,T$ | $34816\,T$ | grows |
+| $V$ | 17 | $1024\,T$ | $2048\,T$ | $17408\,T$ | $34816\,T$ | grows |
+| $K{+}V$ | 17 | $2048\,T$ | $4096\,T$ | $34816\,T$ | $69632\,T$ | grows |
+| $C$ | 48 | 30720 | 61440 | 1474560 | 2949120 | fixed |
+| $S$ | 48 | 786432 | 3145728 | 37748736 | 150994944 | fixed |
+| Primary total | — | — | — | $34816\,T+39223296$ | $69632\,T+153944064$ | mixed |
 
-One residual vector is \(H=5120\) BF16 elements = 10240 bytes (DERIVED rank ×
+One residual vector is $H=5120$ BF16 elements = 10240 bytes (DERIVED rank ×
 dtype). That figure is not a physical working-set peak.
 
 ## Per-token read/write volumes
 
-Decode \(T_\text{new}=1\). Write volume is new mathematical state produced this
+Decode $T_\text{new}=1$. Write volume is new mathematical state produced this
 token. Read volume is prior-token state consumed this token. KV read uses
-\(T-1\).
+$T-1$.
 
 | Channel | Write elems | Write bytes | Read elems | Read bytes |
 | --- | ---: | ---: | --- | ---: |
-| KV (17 layers, incl. MTP) | 34816 | 69632 | \(34816(T-1)\) | \(69632(T-1)\) |
-| \(C\) (48 layers) | 491520 | 983040 | 1474560 | 2949120 |
-| \(S\) (48 layers) | 37748736 | 150994944 | 37748736 | 150994944 |
-| Primary total | 38275072 | 152047616 | \(34816(T-1)+39223296\) | \(69632(T-1)+153944064\) |
+| KV (17 layers, incl. MTP) | 34816 | 69632 | $34816(T-1)$ | $69632(T-1)$ |
+| $C$ (48 layers) | 491520 | 983040 | 1474560 | 2949120 |
+| $S$ (48 layers) | 37748736 | 150994944 | 37748736 | 150994944 |
+| Primary total | 38275072 | 152047616 | $34816(T-1)+39223296$ | $69632(T-1)+153944064$ |
 
 Conventions:
 
 - **KV write:** append current `k_rope` and `v_full` (one token) per full layer including MTP. Current `k_rope`/`v_full` are produced this step; they are not a state read.
-- **KV read:** past \(T-1\) tokens of stored \(K\) and \(V\). At \(T=1\), KV read is 0.
-- **C write:** one new QKV vector of width 10240 per linear layer (the delay drops the oldest tap). Do **not** count rewriting the two retained taps as new writes. Stored \(C\) remains 3 vectors. \(48\times 10240=491520\) elements, \(983040\) bytes.
-- **C read:** all 3 stored taps per linear layer (\(1474560\) elements, \(2949120\) bytes), including when they are zeros.
-- **S read and write:** the full matrix \(S_{t-1}\) and \(S_t\) (\(37748736\) elements, \(150994944\) bytes), including when \(S_0=0\).
+- **KV read:** past $T-1$ tokens of stored $K$ and $V$. At $T=1$, KV read is 0.
+- **C write:** one new QKV vector of width 10240 per linear layer (the delay drops the oldest tap). Do **not** count rewriting the two retained taps as new writes. Stored $C$ remains 3 vectors. $48\times 10240=491520$ elements, $983040$ bytes.
+- **C read:** all 3 stored taps per linear layer ($1474560$ elements, $2949120$ bytes), including when they are zeros.
+- **S read and write:** the full matrix $S_{t-1}$ and $S_t$ ($37748736$ elements, $150994944$ bytes), including when $S_0=0$.
 
 Instantiated decode reads:
 
-| \(T\) | Read elems | Read bytes |
+| $T$ | Read elems | Read bytes |
 | ---: | ---: | ---: |
 | 1 | 39223296 | 153944064 |
 | 4096 | 181794816 | 439087104 |
 
-Prefill of length \(T\) from zeros writes the same per-token KV/C/S as the
-table, \(T\) times for KV and once-per-token for C/S, and ends at storage
-\(B_\text{store}(T)\). A triangular KV-read schedule is out of scope.
+Prefill of length $T$ from zeros writes the same per-token KV/C/S as the
+table, $T$ times for KV and once-per-token for C/S, and ends at storage
+$B_\text{store}(T)$. A triangular KV-read schedule is out of scope.
 
 ## Semantic storage candidates
 
@@ -307,7 +307,7 @@ Ranked must-survive list:
 
 High-fan-out `h_tilde`, `h_post`, `k_rope`, `v_full`, `qkv`, `h_64` remain
 recomputable from current-token parents; physical materialization is not
-decided here. Shared \(E\) / \(W_\text{lm}\) are parameters, not activation
+decided here. Shared $E$ / $W_\text{lm}$ are parameters, not activation
 lifetime.
 
 Diagram 1 of 1. Lifetime-class summary of catalog values that must survive a
@@ -347,7 +347,7 @@ flowchart TB
 ## Deferred vision
 
 Visual tokens may replace placeholders in the residual stream as vectors in
-\(\mathbb{R}^{H}\) (`out_hidden_size` 5120 OBSERVED). Encoder, patch embed, and
+$\mathbb{R}^{H}$ (`out_hidden_size` 5120 OBSERVED). Encoder, patch embed, and
 merger internals are **UNKNOWN** / out of scope. This document does not
 classify vision-encoder activations and does not assign vision KV/C/S.
 

@@ -35,7 +35,7 @@ Script: [`scripts/analyze_bf16_tensors.py`](../../scripts/analyze_bf16_tensors.p
 | `percentile_method` | `nearest_rank_ceil` on \|w\| | OBSERVED |
 | `percentiles` | [50, 90, 99, 99.9, 99.99] | OBSERVED |
 | `outlier_multiples` | [6, 10] times family/global `p50_abs` | OBSERVED |
-| `axis_convention` | `d_out_d_in_transformers` (rows = \(d_\text{out}\), cols = \(d_\text{in}\), \(y=Wx\)) | OBSERVED |
+| `axis_convention` | `d_out_d_in_transformers` (rows = $d_\text{out}$, cols = $d_\text{in}$, $y=Wx$) | OBSERVED |
 | `scope_detail` / `scope_coarse` | `language_mtp` / `vision` | OBSERVED |
 | Rank-3 `linear_attn.conv1d` | squeezed axis 1 and treated as rank-2 `(10240, 4)` | OBSERVED |
 | Rank-1 language/MTP and all vision | `directional.applicable = false` | OBSERVED |
@@ -43,7 +43,7 @@ Script: [`scripts/analyze_bf16_tensors.py`](../../scripts/analyze_bf16_tensors.p
 
 Headers are parsed first (`inventory_checkpoint`). Each tensor payload is then `seek`ed and read in successive 8 MiB chunks. A process-global 65,536-entry LUT maps little-endian BF16 uint16 codes to IEEE binary32 (`u16 << 16`). Global statistics that depend only on the multiset of values are computed from the histogram after the tensor is fully read. Family and grand-total global stats are exact pooled histograms (sum of member `hist` arrays), not averages of per-tensor percentiles.
 
-\|w\| percentiles use nearest-rank: for percentage \(p\), `rank = min(N, max(1, ceil(p/100 × N)))` (1-based), walking magnitude codes `u16 & 0x7FFF` until the cumulative count is at least `rank`. This is not the average of two central values.
+\|w\| percentiles use nearest-rank: for percentage $p$, `rank = min(N, max(1, ceil(p/100 × N)))` (1-based), walking magnitude codes `u16 & 0x7FFF` until the cumulative count is at least `rank`. This is not the average of two central values.
 
 Directional reductions (rank-2 language/MTP weights, and squeezed `conv1d`) maintain per-row and per-column absmax and sum-of-squares during the same sequential pass. Markdown reports summaries of those vectors, not the vectors themselves. Median of the short row/col vectors uses Python `statistics.median`. Population std is `sqrt(max(0, sum(w²)/n − mean²))`.
 

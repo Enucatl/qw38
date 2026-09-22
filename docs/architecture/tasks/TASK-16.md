@@ -58,10 +58,10 @@ Do not transcribe kernels, SASS, or sitting `cudaGetDeviceProperties` output. Do
 
 **Published identities that may be labelled `OBSERVED`** (this list is exhaustive for the deliverable; do not mark other claims `OBSERVED`):
 
-1. Warp size \(N_w=32\) on the CUDA devices this study considers.
+1. Warp size $N_w=32$ on the CUDA devices this study considers.
 2. Occupancy is the ratio of active resident warps on an SM to that SM’s maximum resident warps.
 3. A CTA (thread block) is the domain of `__syncthreads`.
-4. Shared memory is banked; the programming-guide identity is \(N_{\text{bank}}=32\) banks of 32-bit words.
+4. Shared memory is banked; the programming-guide identity is $N_{\text{bank}}=32$ banks of 32-bit words.
 5. Consecutive threads of a warp accessing consecutive aligned addresses in global memory coalesce into the minimum number of transactions for that request size.
 6. Occupancy is jointly limited by registers per SM, shared memory per SM, threads per SM, and maximum CTAs per SM.
 
@@ -82,7 +82,7 @@ Title: `# CUDA hardware model` (not `TASK-16`).
 7. **Resource limiters** — registers/thread, shared mem/CTA, threads/CTA, CTAs/SM, warp slots, barrier slots; limiter formulae F2–F6 and F1.
 8. **Synchronization** — CTA barrier, warp sync, fences, streams, events, cooperative groups, async copy pipeline; **what each orders**.
 9. **Instruction pipelines** — FMA/FFMA, load/store, tensor-core MMA family, async global-to-shared / TMA as optional SKU-UNKNOWN capability.
-10. **Fusion versus occupancy** — algebraic tradeoff (F11, F12, intensity via F13); fused kernel raises register/shared footprint ⇒ \(O\) may fall ⇒ latency hiding may fail even if bytes/FLOPs per launch improve.
+10. **Fusion versus occupancy** — algebraic tradeoff (F11, F12, intensity via F13); fused kernel raises register/shared footprint ⇒ $O$ may fall ⇒ latency hiding may fail even if bytes/FLOPs per launch improve.
 11. **Evaluation criteria** — numbered TASK-17 instantiation checklist (roofline F14 as a criterion, not a measured point); no winner.
 12. **Deferred SKU table** — restates the open-question closure; lists SKU-UNKNOWN fields; forbids sitting-device fill-in in this document.
 13. **Machine-checkable catalog** — exactly one fenced `json` code block, copied from a fresh `python3 scripts/check_cuda_hardware_model.py --json` run (pretty-printed, key order as emitted).
@@ -101,31 +101,31 @@ Immediately under **Evaluation criteria**, include this **canonical winner sente
 
 No extra `##` headings. `###` subheadings are allowed. Documentation-stage `unverified` banner must be a blockquote or italic line **before** the first `##`, not a new `##` heading.
 
-### SKU symbols (lock; all numeric values UNKNOWN except \(N_w\))
+### SKU symbols (lock; all numeric values UNKNOWN except $N_w$)
 
 Table columns: `Symbol` | `JSON id` | `Meaning` | `Status`.
 
 | Symbol | JSON id | Meaning | Status |
 | --- | --- | --- | --- |
-| \(N_w\) | `N_w` | threads per warp | `OBSERVED` \(=32\) |
-| \(N_{\text{bank}}\) | `N_bank` | shared-memory banks | `OBSERVED` \(=32\) |
-| \(N_{\text{SM}}\) | `N_SM` | SM count | `UNKNOWN` |
-| \(W_{\max}\) | `W_max` | max resident warps per SM | `UNKNOWN` |
-| \(S_{\text{reg}}\) | `S_reg` | 32-bit register-file size per SM | `UNKNOWN` |
-| \(C_{\text{smem}}\) | `C_smem` | shared-memory capacity per SM (bytes) | `UNKNOWN` |
-| \(T_{\max}\) | `T_max` | max threads per SM | `UNKNOWN` |
-| \(B_{\max}\) | `B_max` | max CTAs per SM | `UNKNOWN` |
-| \(N_{\text{bar}}\) | `N_bar` | hardware barrier slots per SM | `UNKNOWN` |
-| \(N_{\text{sched}}\) | `N_sched` | warp schedulers per SM | `UNKNOWN` |
-| \(G_{\text{reg}}\) | `G_reg` | register allocation granularity (32-bit regs) | `UNKNOWN` |
-| \(G_{\text{smem}}\) | `G_smem` | shared-memory allocation granularity (bytes) | `UNKNOWN` |
-| \(\Beta\) | `Beta_HBM` | device-global (HBM) peak bandwidth | `UNKNOWN` |
-| \(\Pi_{\text{FMA}}\) | `Pi_FMA` | scalar FMA peak throughput | `UNKNOWN` |
-| \(\Pi_{\text{TC}}\) | `Pi_TC` | tensor-core MMA peak throughput | `UNKNOWN` |
-| \(L_{\text{issue}}\) | `L_issue` | dominant stall latency in scheduler cycles | `UNKNOWN` |
-| \(\texttt{async\_copy\_cap}\) | `async_copy_cap` | `{absent, cp.async, TMA}` | `UNKNOWN` |
-| \(\texttt{mma\_shapes}\) | `mma_shapes` | legal MMA \((M,N,K)\) and dtypes | `UNKNOWN` |
-| \(\texttt{cluster\_cap}\) | `cluster_cap` | thread-block cluster availability | `UNKNOWN` |
+| $N_w$ | `N_w` | threads per warp | `OBSERVED` $=32$ |
+| $N_{\text{bank}}$ | `N_bank` | shared-memory banks | `OBSERVED` $=32$ |
+| $N_{\text{SM}}$ | `N_SM` | SM count | `UNKNOWN` |
+| $W_{\max}$ | `W_max` | max resident warps per SM | `UNKNOWN` |
+| $S_{\text{reg}}$ | `S_reg` | 32-bit register-file size per SM | `UNKNOWN` |
+| $C_{\text{smem}}$ | `C_smem` | shared-memory capacity per SM (bytes) | `UNKNOWN` |
+| $T_{\max}$ | `T_max` | max threads per SM | `UNKNOWN` |
+| $B_{\max}$ | `B_max` | max CTAs per SM | `UNKNOWN` |
+| $N_{\text{bar}}$ | `N_bar` | hardware barrier slots per SM | `UNKNOWN` |
+| $N_{\text{sched}}$ | `N_sched` | warp schedulers per SM | `UNKNOWN` |
+| $G_{\text{reg}}$ | `G_reg` | register allocation granularity (32-bit regs) | `UNKNOWN` |
+| $G_{\text{smem}}$ | `G_smem` | shared-memory allocation granularity (bytes) | `UNKNOWN` |
+| $\Beta$ | `Beta_HBM` | device-global (HBM) peak bandwidth | `UNKNOWN` |
+| $\Pi_{\text{FMA}}$ | `Pi_FMA` | scalar FMA peak throughput | `UNKNOWN` |
+| $\Pi_{\text{TC}}$ | `Pi_TC` | tensor-core MMA peak throughput | `UNKNOWN` |
+| $L_{\text{issue}}$ | `L_issue` | dominant stall latency in scheduler cycles | `UNKNOWN` |
+| $\texttt{async\_copy\_cap}$ | `async_copy_cap` | `{absent, cp.async, TMA}` | `UNKNOWN` |
+| $\texttt{mma\_shapes}$ | `mma_shapes` | legal MMA $(M,N,K)$ and dtypes | `UNKNOWN` |
+| $\texttt{cluster\_cap}$ | `cluster_cap` | thread-block cluster availability | `UNKNOWN` |
 
 JSON field `sku_unknown_symbols` is exactly this list of JSON ids **excluding** `N_w` and `N_bank` (those are published identities, not sitting-SKU unknowns):
 
@@ -146,14 +146,14 @@ Every `ID` appears in the markdown as a backtick-wrapped token (for example `` `
 | ID | Symbol | Must define |
 | --- | --- | --- |
 | `thread` | scalar CUDA thread | Programmable scalar lane; has private registers and a thread index in the CTA. |
-| `warp` | warp of \(N_w\) threads | SIMT scheduling unit issued together. |
-| `warp_size` | \(N_w=32\) | Constant warp width; `OBSERVED` published identity. |
+| `warp` | warp of $N_w$ threads | SIMT scheduling unit issued together. |
+| `warp_size` | $N_w=32$ | Constant warp width; `OBSERVED` published identity. |
 | `simt_divergence` | diverged warp | Taken/not-taken paths in a warp serialize; reconvergence is warp-scoped, not a CTA barrier. |
 | `cta` | cooperative thread array | Launch unit that shares shared memory and `__syncthreads`; synonym of block. |
 | `block` | thread block | Alias of `cta`; both IDs must appear; state they are the same object. |
-| `grid` | \(N_{\text{grid}}\) CTAs | The kernel launch; CTAs of one grid do not share a CTA barrier. |
+| `grid` | $N_{\text{grid}}$ CTAs | The kernel launch; CTAs of one grid do not share a CTA barrier. |
 | `sm` | streaming multiprocessor | Occupancy, register file, shared memory, and scheduler domain. |
-| `scheduler` | warp scheduler | Selects ready warps on an SM; count \(N_{\text{sched}}\) is `UNKNOWN`. |
+| `scheduler` | warp scheduler | Selects ready warps on an SM; count $N_{\text{sched}}$ is `UNKNOWN`. |
 | `thread_block_cluster` | optional cluster | Multi-CTA grouping with optional distributed shared memory; availability `cluster_cap` is `UNKNOWN`. Do not assume it exists. |
 
 **Occupancy and latency hiding**
@@ -161,26 +161,26 @@ Every `ID` appears in the markdown as a backtick-wrapped token (for example `` `
 | ID | Symbol | Must define |
 | --- | --- | --- |
 | `stall` | scheduler stall | A warp is not issuable (scoreboard, memory, barrier, divergence). Distinct from capacity. |
-| `occupancy` | \(O=W_{\text{active}}/W_{\max}\) | Fraction of max resident warps that are resident; F8. |
-| `theoretical_occupancy` | same \(O\) from launch + footprints | Occupancy implied by resource limits (F1–F8). Achieved occupancy would be `MEASURED` and is out of scope; do not report it. |
-| `latency_hiding` | \(W_{\text{active}}\ge W_{\text{need}}\) | Covering \(L_{\text{issue}}\) by switching warps (F9). May fail when fusion lowers \(O\). |
-| `wave_quantization` | \(N_{\text{waves}},\eta_{\text{wave}}\) | Last wave of CTAs may underfill the device (F10). |
+| `occupancy` | $O=W_{\text{active}}/W_{\max}$ | Fraction of max resident warps that are resident; F8. |
+| `theoretical_occupancy` | same $O$ from launch + footprints | Occupancy implied by resource limits (F1–F8). Achieved occupancy would be `MEASURED` and is out of scope; do not report it. |
+| `latency_hiding` | $W_{\text{active}}\ge W_{\text{need}}$ | Covering $L_{\text{issue}}$ by switching warps (F9). May fail when fusion lowers $O$. |
+| `wave_quantization` | $N_{\text{waves}},\eta_{\text{wave}}$ | Last wave of CTAs may underfill the device (F10). |
 
 **Memory hierarchy** (capacity vs bandwidth vs latency must be named as distinct resources).
 
 | ID | Symbol | Must define |
 | --- | --- | --- |
-| `registers` | per-thread register file slice | Fastest operand storage; private; sized by \(R_t\). |
-| `shared_memory` | per-CTA scratch | Software-managed SM memory; capacity \(C_{\text{cta}}\) counts toward \(C_{\text{smem}}\). |
-| `shared_memory_banks` | \(N_{\text{bank}}=32\) | Banked organization; `OBSERVED` published identity. |
+| `registers` | per-thread register file slice | Fastest operand storage; private; sized by $R_t$. |
+| `shared_memory` | per-CTA scratch | Software-managed SM memory; capacity $C_{\text{cta}}$ counts toward $C_{\text{smem}}$. |
+| `shared_memory_banks` | $N_{\text{bank}}=32$ | Banked organization; `OBSERVED` published identity. |
 | `l1` | per-SM cache | Hardware cache in front of L2/HBM; capacity/bandwidth `UNKNOWN`. Not a substitute for shared memory. |
 | `l2` | device-wide cache | Shared among SMs; capacity/bandwidth `UNKNOWN`. |
-| `hbm` | device global / HBM | Off-SM device memory; backing store for global loads/stores; bandwidth \(\Beta\) `UNKNOWN`. |
+| `hbm` | device global / HBM | Off-SM device memory; backing store for global loads/stores; bandwidth $\Beta$ `UNKNOWN`. |
 | `host_pinned` | page-locked host memory | Host staging for DMA; not device HBM; bandwidth/latency `UNKNOWN`. |
 | `local_memory` | per-thread spill space | Lives in device memory; used when registers spill. |
 | `capacity` | size (bytes or registers) | A distinct resource from bandwidth and latency. |
 | `bandwidth` | bytes per second | A distinct resource from capacity and latency. |
-| `latency_resource` | time per request | A distinct resource from capacity and bandwidth; feeds \(L_{\text{issue}}\). |
+| `latency_resource` | time per request | A distinct resource from capacity and bandwidth; feeds $L_{\text{issue}}$. |
 
 **Access patterns**
 
@@ -188,20 +188,20 @@ Every `ID` appears in the markdown as a backtick-wrapped token (for example `` `
 | --- | --- | --- |
 | `coalescing` | warp-global transaction packing | Consecutive aligned addresses from a warp collapse transactions (`OBSERVED` identity 5). |
 | `alignment` | address multiple of request size | Misalignment increases transactions; state it separately from coalescing. |
-| `bank_conflicts` | multi-lane same-bank shared access | \(N\) distinct 32-bit words in one bank serialize \(N\)-way; broadcast of one word is not a conflict. |
+| `bank_conflicts` | multi-lane same-bank shared access | $N$ distinct 32-bit words in one bank serialize $N$-way; broadcast of one word is not a conflict. |
 
 **Resource limiters**
 
 | ID | Symbol | Must define |
 | --- | --- | --- |
-| `registers_per_thread` | \(R_t\) | Static register footprint of the compiled kernel per thread. |
-| `shared_mem_per_cta` | \(C_{\text{cta}}\) | Dynamic + static shared memory per CTA (bytes). |
-| `threads_per_cta` | \(T_{\text{cta}}\) | Block size; must be a multiple of \(N_w\) to avoid wasted warp lanes (F7 still uses \(\lceil\cdot\rceil\)). |
-| `ctas_per_sm` | \(B_{\text{SM}}\) | Resident CTAs per SM after all limiters (F6). |
-| `warp_slots` | \(W_{\max}\) | Hardware warp residency slots per SM; `UNKNOWN` magnitude. |
-| `barrier_slots` | \(N_{\text{bar}}\) | Hardware CTA-barrier slots; a CTA using `__syncthreads` consumes a slot; `UNKNOWN` magnitude. |
-| `register_spilling` | spill to `local_memory` | When \(R_t\) exceeds what occupancy math can admit, extra live values go to local memory and raise \(L_{\text{issue}}\). |
-| `littles_law` | \(W_{\text{need}}=N_{\text{sched}}\cdot L_{\text{issue}}\) | Independent warps needed to hide \(L_{\text{issue}}\) at one issue per scheduler per cycle (F9). |
+| `registers_per_thread` | $R_t$ | Static register footprint of the compiled kernel per thread. |
+| `shared_mem_per_cta` | $C_{\text{cta}}$ | Dynamic + static shared memory per CTA (bytes). |
+| `threads_per_cta` | $T_{\text{cta}}$ | Block size; must be a multiple of $N_w$ to avoid wasted warp lanes (F7 still uses $\lceil\cdot\rceil$). |
+| `ctas_per_sm` | $B_{\text{SM}}$ | Resident CTAs per SM after all limiters (F6). |
+| `warp_slots` | $W_{\max}$ | Hardware warp residency slots per SM; `UNKNOWN` magnitude. |
+| `barrier_slots` | $N_{\text{bar}}$ | Hardware CTA-barrier slots; a CTA using `__syncthreads` consumes a slot; `UNKNOWN` magnitude. |
+| `register_spilling` | spill to `local_memory` | When $R_t$ exceeds what occupancy math can admit, extra live values go to local memory and raise $L_{\text{issue}}$. |
+| `littles_law` | $W_{\text{need}}=N_{\text{sched}}\cdot L_{\text{issue}}$ | Independent warps needed to hide $L_{\text{issue}}$ at one issue per scheduler per cycle (F9). |
 
 **Synchronization** (each row must state **what is ordered**).
 
@@ -219,7 +219,7 @@ Every `ID` appears in the markdown as a backtick-wrapped token (for example `` `
 
 | ID | Symbol | Must define |
 | --- | --- | --- |
-| `fma` | scalar fused multiply-add | Arithmetic pipeline for \(d=a\cdot b+c\) on the scalar datapath; peak \(\Pi_{\text{FMA}}\) `UNKNOWN`. |
+| `fma` | scalar fused multiply-add | Arithmetic pipeline for $d=a\cdot b+c$ on the scalar datapath; peak $\Pi_{\text{FMA}}$ `UNKNOWN`. |
 | `ffma` | FP FMA encoding | Same pipeline family as `fma` for floating dtypes; name the PTX-level FMA/FFMA family without picking a dtype mix. |
 | `load_store` | memory pipeline | Global/shared/local ld/st; consumes bandwidth and latency of the addressed level. |
 | `tensor_core_mma` | MMA pipeline | Matrix-multiply-accumulate pipeline with shape/dtype constraints; legal set `mma_shapes` is `UNKNOWN`. Distinct from scalar `fma`. Do not pick `mma` vs `wgmma` vs later PTX variants. |
@@ -230,10 +230,10 @@ Every `ID` appears in the markdown as a backtick-wrapped token (for example `` `
 
 | ID | Symbol | Must define |
 | --- | --- | --- |
-| `occupancy_min` | F1 | \(O\) is the min of the four limiter occupancies. |
-| `fusion_footprint` | \(R_f,C_f\) | Fused live ranges are at least the per-kernel maxima and typically larger (F11, F12). |
-| `arithmetic_intensity` | \(I=F/B\) | FLOPs per byte at a named level (HBM unless stated). Evaluation criterion, not a measured point. |
-| `roofline` | \(\Pi\le\min(\Pi_{\text{peak}},I\cdot\Beta)\) | Upper bound used as a TASK-17 criterion. \(\Pi_{\text{peak}}\) and \(\Beta\) stay `UNKNOWN`. |
+| `occupancy_min` | F1 | $O$ is the min of the four limiter occupancies. |
+| `fusion_footprint` | $R_f,C_f$ | Fused live ranges are at least the per-kernel maxima and typically larger (F11, F12). |
+| `arithmetic_intensity` | $I=F/B$ | FLOPs per byte at a named level (HBM unless stated). Evaluation criterion, not a measured point. |
+| `roofline` | $\Pi\le\min(\Pi_{\text{peak}},I\cdot\Beta)$ | Upper bound used as a TASK-17 criterion. $\Pi_{\text{peak}}$ and $\Beta$ stay `UNKNOWN`. |
 
 ### Formulae (lock F1–F14)
 
@@ -241,12 +241,12 @@ Number them `(F1)` … `(F14)` in the prose. Each **required substring** below m
 
 **Register/shared allocation (prose next to F2/F3, DERIVED):**
 
-\[
+$$
 R_{\text{cta}}=G_{\text{reg}}\Bigl\lceil\frac{R_t\cdot T_{\text{cta}}}{G_{\text{reg}}}\Bigr\rceil,\qquad
 C_{\text{alloc}}=G_{\text{smem}}\Bigl\lceil\frac{C_{\text{cta}}}{G_{\text{smem}}}\Bigr\rceil
-\]
+$$
 
-Implementation must include this granularity rounding. Because \(G_{\text{reg}}\) and \(G_{\text{smem}}\) are `UNKNOWN`, leave them symbolic.
+Implementation must include this granularity rounding. Because $G_{\text{reg}}$ and $G_{\text{smem}}$ are `UNKNOWN`, leave them symbolic.
 
 | Tag | `formula_ids` entry | Required substring |
 | --- | --- | --- |
@@ -267,24 +267,24 @@ Implementation must include this granularity rounding. Because \(G_{\text{reg}}\
 
 **Required companion identities in prose (DERIVED; not extra formula IDs):**
 
-- \(W_{\text{active}}=B_{\text{SM}}\cdot W_{\text{cta}}\) next to F8.
-- Component occupancies \(O_{\text{reg}}=\min(1,B_{\text{reg}}W_{\text{cta}}/W_{\max})\) and likewise for smem, threads, and cta, so F1 is the min of those four.
-- Last-wave efficiency \(\eta_{\text{wave}}=N_{\text{grid}}/(N_{\text{waves}}\cdot N_{\text{SM}}\cdot B_{\text{SM}})\) next to F10.
-- Hiding test: hiding is complete only if \(W_{\text{active}}\ge W_{\text{need}}\).
-- Typical fused footprints when live ranges do not overlap: \(R_f\approx R_1+R_2-R_{\cap}\), \(C_f\approx C_1+C_2-C_{\cap}\) with \(R_{\cap},C_{\cap}\ge 0\).
-- Fused intensity \(I_f=(F_1+F_2)/(B_1+B_2-B_{\text{int}})\) where \(B_{\text{int}}\) is the intermediate tensor traffic avoided (store+load of the intermediate in the unfused pair). Must state that if \(O_f\) falls so \(W_{\text{active},f}<W_{\text{need}}\), issue slots idle and wall time **may** worsen despite larger \(I_f\). That implication is `DERIVED` from F1+F9+F13, not a winner claim.
+- $W_{\text{active}}=B_{\text{SM}}\cdot W_{\text{cta}}$ next to F8.
+- Component occupancies $O_{\text{reg}}=\min(1,B_{\text{reg}}W_{\text{cta}}/W_{\max})$ and likewise for smem, threads, and cta, so F1 is the min of those four.
+- Last-wave efficiency $\eta_{\text{wave}}=N_{\text{grid}}/(N_{\text{waves}}\cdot N_{\text{SM}}\cdot B_{\text{SM}})$ next to F10.
+- Hiding test: hiding is complete only if $W_{\text{active}}\ge W_{\text{need}}$.
+- Typical fused footprints when live ranges do not overlap: $R_f\approx R_1+R_2-R_{\cap}$, $C_f\approx C_1+C_2-C_{\cap}$ with $R_{\cap},C_{\cap}\ge 0$.
+- Fused intensity $I_f=(F_1+F_2)/(B_1+B_2-B_{\text{int}})$ where $B_{\text{int}}$ is the intermediate tensor traffic avoided (store+load of the intermediate in the unfused pair). Must state that if $O_f$ falls so $W_{\text{active},f}<W_{\text{need}}$, issue slots idle and wall time **may** worsen despite larger $I_f$. That implication is `DERIVED` from F1+F9+F13, not a winner claim.
 
-Place F1–F6 and the component-\(O\) identities in **Resource limiters**. Place F7–F10 in **Occupancy and latency hiding** (F7/F8 may be restated in Resource limiters; the required substrings need appear at least once outside the JSON fence). Place F11–F13 in **Fusion versus occupancy**. Place F14 in **Evaluation criteria**.
+Place F1–F6 and the component-$O$ identities in **Resource limiters**. Place F7–F10 in **Occupancy and latency hiding** (F7/F8 may be restated in Resource limiters; the required substrings need appear at least once outside the JSON fence). Place F11–F13 in **Fusion versus occupancy**. Place F14 in **Evaluation criteria**.
 
 ### Fusion versus occupancy (the tradeoff TASK-17 consumes)
 
 Work a **symbolic** two-kernel example with no numeric SKU fill-in:
 
-1. Unfused launches \(K_1,K_2\) with footprints \((R_1,C_1,T_{\text{cta},1})\) and \((R_2,C_2,T_{\text{cta},2})\), work \(F_1,F_2\), HBM bytes \(B_1,B_2\), intermediate bytes \(B_{\text{int}}\) written by \(K_1\) and read by \(K_2\).
-2. Fused \(K_f\) with \(R_f\ge\max(R_1,R_2)\), \(C_f\ge\max(C_1,C_2)\) (F11, F12), \(F_f=F_1+F_2\), \(B_f=B_1+B_2-B_{\text{int}}\).
-3. Compute \(O_1,O_2,O_f\) from F1–F8 using SKU symbols. State \(O_f\le\min(O_1,O_2)\) is **not** always true (block size may change) but **is** the expected direction when fusion adds live registers/shared memory at fixed \(T_{\text{cta}}\).
-4. Intensity \(I_f\ge I_{\text{unfused}}\) when \(B_{\text{int}}>0\).
-5. Roofline (F14) may therefore show a higher bound for \(K_f\), while F9 may show \(W_{\text{active},f}<W_{\text{need}}\) so the bound is not approachable.
+1. Unfused launches $K_1,K_2$ with footprints $(R_1,C_1,T_{\text{cta},1})$ and $(R_2,C_2,T_{\text{cta},2})$, work $F_1,F_2$, HBM bytes $B_1,B_2$, intermediate bytes $B_{\text{int}}$ written by $K_1$ and read by $K_2$.
+2. Fused $K_f$ with $R_f\ge\max(R_1,R_2)$, $C_f\ge\max(C_1,C_2)$ (F11, F12), $F_f=F_1+F_2$, $B_f=B_1+B_2-B_{\text{int}}$.
+3. Compute $O_1,O_2,O_f$ from F1–F8 using SKU symbols. State $O_f\le\min(O_1,O_2)$ is **not** always true (block size may change) but **is** the expected direction when fusion adds live registers/shared memory at fixed $T_{\text{cta}}$.
+4. Intensity $I_f\ge I_{\text{unfused}}$ when $B_{\text{int}}>0$.
+5. Roofline (F14) may therefore show a higher bound for $K_f$, while F9 may show $W_{\text{active},f}<W_{\text{need}}$ so the bound is not approachable.
 
 Do not conclude which side wins. Do not pick a fusion policy.
 
@@ -292,13 +292,13 @@ Do not conclude which side wins. Do not pick a fusion policy.
 
 Numbered list, this order. Each item is a **criterion**, not a performed mapping:
 
-1. Occupancy \(O\) from F1–F8 given hypothesized \(R_t,C_{\text{cta}},T_{\text{cta}}\).
-2. Latency-hiding test \(W_{\text{active}}\ge W_{\text{need}}\) (F9) with \(L_{\text{issue}}\) left symbolic or later-measured.
-3. Wave quantization \(\eta_{\text{wave}}\) (F10) for the hypothesized grid.
-4. Arithmetic intensity \(I\) (F13) versus roofline bound (F14); \(\Pi_{\text{peak}}\) is \(\Pi_{\text{FMA}}\) or \(\Pi_{\text{TC}}\) according to the hypothesized pipeline mix, both `UNKNOWN` here.
+1. Occupancy $O$ from F1–F8 given hypothesized $R_t,C_{\text{cta}},T_{\text{cta}}$.
+2. Latency-hiding test $W_{\text{active}}\ge W_{\text{need}}$ (F9) with $L_{\text{issue}}$ left symbolic or later-measured.
+3. Wave quantization $\eta_{\text{wave}}$ (F10) for the hypothesized grid.
+4. Arithmetic intensity $I$ (F13) versus roofline bound (F14); $\Pi_{\text{peak}}$ is $\Pi_{\text{FMA}}$ or $\Pi_{\text{TC}}$ according to the hypothesized pipeline mix, both `UNKNOWN` here.
 5. Synchronization class: none / `warp_sync` / `syncthreads` / grid-cooperative / `stream`+`event`.
 6. Pipeline mix: `fma`/`ffma` vs `tensor_core_mma` vs `load_store` vs `async_gmem_to_smem`/`tma`.
-7. Fusion candidate: sign of \(\Delta I\) versus sign of \(\Delta O\) (and whether F9 still holds).
+7. Fusion candidate: sign of $\Delta I$ versus sign of $\Delta O$ (and whether F9 still holds).
 
 TASK-17 instantiates these. This document does not.
 
@@ -383,8 +383,8 @@ Top-level keys in **this exact order** (all required):
 - Invariants:
   - Model-independent: no model-equation, inventory, or dataflow content.
   - Warp size 32 is the only sitting-numeric constant besides bank count 32, both programming-guide `OBSERVED`.
-  - Occupancy \(O=\min(O_{\text{reg}},O_{\text{smem}},O_{\text{threads}},O_{\text{cta}})\).
-  - Fusion may lower \(O\) enough to fail F9 even when \(I\) rises.
+  - Occupancy $O=\min(O_{\text{reg}},O_{\text{smem}},O_{\text{threads}},O_{\text{cta}})$.
+  - Fusion may lower $O$ enough to fail F9 even when $I$ rises.
   - Sitting-SKU limits and TMA/MMA-shape/cluster availability remain `UNKNOWN`.
   - No `MEASURED` numbers; no winning fusion policy.
   - Checker is stdlib-only; JSON fence matches live `--json`.
@@ -489,8 +489,8 @@ Do not run Ruff, pytest, CMake, or CUDA; this increment does not introduce those
   - All 54 locked `concept_ids` appear as backtick-wrapped tokens outside the JSON fence.
   - `(F1)`–`(F14)` tags and all 14 required formula substrings present outside the fence. F7–F10 displayed in Occupancy; F1–F6 displayed in Resource limiters; F11–F13 displayed in Fusion; F14 displayed in Evaluation.
   - Three canonical sentences present verbatim under SKU parameterization / Fusion versus occupancy / Evaluation criteria.
-  - SKU table: numeric constants only \(N_w=32\) and \(N_{\text{bank}}=32\) (`OBSERVED`); remaining 17 JSON ids stay `UNKNOWN`. Independent hunt for datasheet/SKU numbers (A100/H100/65536/…) in the body: none.
-  - Fusion versus occupancy: algebraic two-kernel example with F11/F12 footprints, \(I_f\) vs unfused, and explicit `DERIVED` implication that if \(O_f\) falls so \(W_{\text{active},f}<W_{\text{need}}\), wall time **may** worsen despite larger \(I_f\); canonical fusion/winner sentences; no mapping winner.
+  - SKU table: numeric constants only $N_w=32$ and $N_{\text{bank}}=32$ (`OBSERVED`); remaining 17 JSON ids stay `UNKNOWN`. Independent hunt for datasheet/SKU numbers (A100/H100/65536/…) in the body: none.
+  - Fusion versus occupancy: algebraic two-kernel example with F11/F12 footprints, $I_f$ vs unfused, and explicit `DERIVED` implication that if $O_f$ falls so $W_{\text{active},f}<W_{\text{need}}$, wall time **may** worsen despite larger $I_f$; canonical fusion/winner sentences; no mapping winner.
   - Forbidden tokens `qwen` / `quartz` / `llama.cpp` / `ggml` / `gguf` / `opt-` / `.cu` / `.cuh` / `TBD` / `TODO` / `???` / `MEASURED` / `HYPOTHESIS`: absent from the hardware-model body (they appear only inside the JSON fence as the catalog `forbidden_tokens` list). No kernel-inspection artifacts in the TASK-16 file set.
   - Model-independent: hardware-model body has no model-equation / inventory / dataflow content; quantization/SASS/semantic-node mentions are out-of-scope exclusions only.
   - Performance evidence: N/A (instruction-only; no timing invented).

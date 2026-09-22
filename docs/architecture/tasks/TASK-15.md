@@ -10,11 +10,11 @@
 
 ## Goal and boundaries
 
-Produce `docs/architecture/layout-strategy.md` as the Phase 1 **consumer-driven candidate physical layouts** for Qwen3.8-27B language+MTP **weights and persistent state**. Close the three ledger completion criteria by (1) analyzing logical dimensions, consumers, access, tiling, alignment, and conversion for every layout object, (2) including GDN \(S\), depthwise convolution \(W^{\text{conv}}\) / \(C\), and KV \(K,V\) as first-class objects, and (3) making **no** optimality claim before CUDA analysis. Fill TASK-09 `seq_specialized_tile` with a **named candidate space** (orderings, tile families, conversion hypotheses). **Keep** the ledger open question (which planned parallel decompositions justify each candidate ordering and tile) **unresolved**. Do **not** select an ordering, tile extent, alignment grain, conversion pipeline, MMA shape, decode/prefill view split, or ideal byte sequence.
+Produce `docs/architecture/layout-strategy.md` as the Phase 1 **consumer-driven candidate physical layouts** for Qwen3.8-27B language+MTP **weights and persistent state**. Close the three ledger completion criteria by (1) analyzing logical dimensions, consumers, access, tiling, alignment, and conversion for every layout object, (2) including GDN $S$, depthwise convolution $W^{\text{conv}}$ / $C$, and KV $K,V$ as first-class objects, and (3) making **no** optimality claim before CUDA analysis. Fill TASK-09 `seq_specialized_tile` with a **named candidate space** (orderings, tile families, conversion hypotheses). **Keep** the ledger open question (which planned parallel decompositions justify each candidate ordering and tile) **unresolved**. Do **not** select an ordering, tile extent, alignment grain, conversion pipeline, MMA shape, decode/prefill view split, or ideal byte sequence.
 
 - Constraints:
   - `docs/architecture/plan.md` is authoritative for study scope; do not modify it.
-  - Artifact capabilities, seven consumer sequences, `view_binding`, portable little-endian, alignment-grain candidates, and `seq_specialized_tile` as a named-but-unfilled sequence come from `docs/architecture/runtime-format-design.md` (TASK-09); do not close portable-versus-specialized, ideal-sequence, scale-storage, scale-placement, alignment-grain, or artifact-boundary. Decode consumers, one-token GEMV, populated incoming state, and stage sequence attachments come from `docs/architecture/decode-plan.md` (TASK-13). Prefill consumers, GEMM-over-\(T\), triangular KV, zeros incoming, named tiling **axes**, and unselected distinct views come from `docs/architecture/prefill-plan.md` (TASK-14). Do not add node types, catalog IDs, sequences, or access classes as **required** contracts.
+  - Artifact capabilities, seven consumer sequences, `view_binding`, portable little-endian, alignment-grain candidates, and `seq_specialized_tile` as a named-but-unfilled sequence come from `docs/architecture/runtime-format-design.md` (TASK-09); do not close portable-versus-specialized, ideal-sequence, scale-storage, scale-placement, alignment-grain, or artifact-boundary. Decode consumers, one-token GEMV, populated incoming state, and stage sequence attachments come from `docs/architecture/decode-plan.md` (TASK-13). Prefill consumers, GEMM-over-$T$, triangular KV, zeros incoming, named tiling **axes**, and unselected distinct views come from `docs/architecture/prefill-plan.md` (TASK-14). Do not add node types, catalog IDs, sequences, or access classes as **required** contracts.
   - Label claims `OBSERVED` (sitting `text_config` / inventory already established), `DERIVED` (axis names and ranks from TASK-02 via TASK-09/13/14, byte identities cited from TASK-04/06, group-payload grains cited from TASK-09, divisibility of locked widths by tile-extent candidates), or `HYPOTHESIS` (every ordering/tile **usefulness**, every conversion-cost **usefulness**, every parallel-decomposition **justification**, every layout-risk severity). `UNKNOWN` only for vision-encoder internals deferred here. No `MEASURED` tok/s or NLL. No selected layout, tile, view split, or kernel.
   - GitHub Markdown math. Cite TASK-02 equation tags via TASK-13/14 contracts, TASK-06 MAC/byte integers, TASK-09 sequence / access-class / packing ids, TASK-13/14 stage-kind ids. Do not rewrite forward math, recopy TASK-06 MAC tables as a new work study, recopy TASK-09 packing illustrations as a new format study, recopy TASK-13/14 serial orders as a new schedule, or instantiate TASK-16 occupancy algebra.
   - Allowed evidence: TASK-09 runtime-format, TASK-13 decode-plan, TASK-14 prefill-plan, sitting `config.json` `text_config`, plan evidence vocabulary, this dossier. TASK-01/02/03/04/06/08/11/12 integers and ids already cited by those three documents may be **cited** through them. No Quartz, llama.cpp/GGML Qwen, or `models/Qwen3.8-27B-Q4_K_M.gguf`. No TASK-16 occupancy/fusion-versus-occupancy algebra (not a listed dependency; this document names candidate layouts, not CUDA mappings). No TASK-17 CUDA mappings.
@@ -25,7 +25,7 @@ Produce `docs/architecture/layout-strategy.md` as the Phase 1 **consumer-driven 
   - No CUDA mapping alternatives (TASK-17) and no sitting-device fill-in (TASK-16).
   - No decode or prefill **schedule** rewrite (TASK-13/14 already published). Cite their consumers; do not change serial order.
   - No quantization recipe winners, artifact-boundary winner, or compiler-stage rewrite (TASK-08/09/10). This document may **constrain** specialized-view alignment as a capability restatement; it must not close TASK-09 `alignment_grain`.
-  - No activation working-buffer layouts (`activations_in_layout_scope` false). Ledger purpose is weights and persistent state. Prefill’s \(T\) axis on activations is a **consumer** of weight/state layouts, not a new artifact payload.
+  - No activation working-buffer layouts (`activations_in_layout_scope` false). Ledger purpose is weights and persistent state. Prefill’s $T$ axis on activations is a **consumer** of weight/state layouts, not a new artifact payload.
   - No quality/NLL experiments (TASK-18) and no tok/s (TASK-19).
   - No new operators, extra catalog IDs, extra access classes, or extra consumer sequences.
   - No generic cuBLAS / CUTLASS cookbook and no GGUF block layout as authority.
@@ -44,8 +44,8 @@ Produce `docs/architecture/layout-strategy.md` as the Phase 1 **consumer-driven 
 - `docs/architecture/plan.md:89-92` — TASK-13 and TASK-14 independently schedule decode and prefill, **leading to** consumer-driven candidate layouts in TASK-15; TASK-17 CUDA-maps nodes **and layouts**.
 - `docs/architecture/task_ledger.md` TASK-15 row — produces `docs/architecture/layout-strategy.md`; purpose is candidate consumer-driven layouts for weights and persistent state; open question is which planned parallel decompositions justify each candidate ordering and tile (**kept unresolved here**); completion is the six-way analysis, GDN/conv/KV inclusion, and no optimality before CUDA.
 - `docs/architecture/task_ledger.md` TASK-09 established results — seven consumer sequences without an ideal sequence; `ideal_byte_sequence_selected` false; one compiled artifact for prefill and decode; `view_binding` capability; `seq_specialized_tile` named with layout deferred here; portable LE required for the portable view; specialized views may swizzle; `alignment_grain_candidates` `[1, 16, 32, 128, 256]` unselected; `tile_layout_deferred_to_task15` true **there**.
-- `docs/architecture/task_ledger.md` TASK-13 established results — nine decode stage kinds; GEMV consumers; populated incoming \((K,V,C,S)\); stage sequence attachments; `layout_selected` false **there**.
-- `docs/architecture/task_ledger.md` TASK-14 established results — same nine stage kinds over length-\(T\); GEMM consumers; zeros incoming; five fundamental differences including `diff_tiling`; `tile_size_selected` false; `decode_prefill_distinct_views_selected` false; representation tradeoffs unresolved.
+- `docs/architecture/task_ledger.md` TASK-13 established results — nine decode stage kinds; GEMV consumers; populated incoming $(K,V,C,S)$; stage sequence attachments; `layout_selected` false **there**.
+- `docs/architecture/task_ledger.md` TASK-14 established results — same nine stage kinds over length-$T$; GEMM consumers; zeros incoming; five fundamental differences including `diff_tiling`; `tile_size_selected` false; `decode_prefill_distinct_views_selected` false; representation tradeoffs unresolved.
 - `docs/architecture/task_ledger.md` TASK-16/17 — TASK-16 is DONE and **not** a listed dependency; occupancy algebra must not rank tiles. TASK-17 consumes this candidate space; do not perform CUDA mappings here.
 - `docs/architecture/runtime-format-design.md` — seven `consumer_sequence_ids`; seven `access_class_ids`; `family_access_class`; packing grains; dual-view size illustration F; format risks `f_gather_stride` / `f_unpack_portable` / `f_3bit_shift`.
 - `docs/architecture/decode-plan.md` — decode GEMV consumers; `seq_state_s_dense` on GDN; `seq_lm_head_full`; `seq_gather_row`; incoming populated state.
@@ -75,9 +75,9 @@ N/A — layout **candidate-space** documentation. No prefill/decode/component ti
 If a rank, access class, sequence id, stage kind, family mapping, or cited byte would disagree with TASK-09/13/14 or sitting `text_config`, the earlier document / config wins and this one is wrong.
 
 - Prefill and decode share **one** compiled artifact (TASK-09) and **one** semantic graph (TASK-11 via the schedules). This document names **candidate layouts** of weights and persistent state for **both** schedule consumers. Distinct **views** remain unselected (`decode_prefill_distinct_views_selected` false). Listing a decode-GEMV ordering and a prefill-GEMM ordering is not selecting dual views.
-- Primary objects are language+MTP **checkpoint parameters** after a TASK-08 recipe (still unselected) and token-persistent **state** \(K,V,C,S\). Activations and accumulators are **not** layout objects here (`activations_in_layout_scope` false).
-- Algebraic equivalents in TASK-02 are the same real map: GQA-as-repeat does **not** store repeated KV; paper \(S^\top\) (19) is the same map as (17)–(18); chunkwise GDN is not zero \(S\) traffic; conv delay is 3 stored vectors, not a length-4 buffer with a current-token slot as extra math.
-- Logical values do not imply allocation; a candidate layout is not a CUDA buffer. Checkpoint orientation \((d_\text{out},d_\text{in})\) is the **source** rank, not a required physical order (`logical ≠ physical` still holds).
+- Primary objects are language+MTP **checkpoint parameters** after a TASK-08 recipe (still unselected) and token-persistent **state** $K,V,C,S$. Activations and accumulators are **not** layout objects here (`activations_in_layout_scope` false).
+- Algebraic equivalents in TASK-02 are the same real map: GQA-as-repeat does **not** store repeated KV; paper $S^\top$ (19) is the same map as (17)–(18); chunkwise GDN is not zero $S$ traffic; conv delay is 3 stored vectors, not a length-4 buffer with a current-token slot as extra math.
+- Logical values do not imply allocation; a candidate layout is not a CUDA buffer. Checkpoint orientation $(d_\text{out},d_\text{in})$ is the **source** rank, not a required physical order (`logical ≠ physical` still holds).
 - Unique weight bytes are counted **once** per complete decode/prefill. Layout does not restream the model.
 - Do not inspect Quartz, llama.cpp, or GGUF byte layouts to “confirm” tiles.
 - Do not select an ordering, tile extent, MMA shape, alignment grain, conversion pipeline, or parallel decomposition. Do not import TASK-16 occupancy algebra to rank candidates.
@@ -123,7 +123,7 @@ Bullets required under that heading:
 - Analysis dimensions are complete: logical dimensions, consumers, access, tiling, alignment, conversion (`n_analysis_dimensions` 6).
 - GDN, convolution, and KV are included (`n_persistent_state_coverages` 3).
 - Prefill and decode share one artifact; distinct views remain unselected (`decode_prefill_distinct_views_selected` false).
-- Activations are out of layout scope (`activations_in_layout_scope` false). \(T\) on prefill GEMM is a consumer axis of weight layouts.
+- Activations are out of layout scope (`activations_in_layout_scope` false). $T$ on prefill GEMM is a consumer axis of weight layouts.
 - Unique weights are counted once (`weight_unique_counted_once` true).
 - Fan-out ≠ must-store and logical ≠ physical still hold.
 - Primary coverage includes MTP KV (17 instances) and 48 GDN/conv instances. Hardware mapping is TASK-17. Fusion winners remain TASK-12 hypotheses. Ideal byte sequence remains TASK-09 open. `seq_specialized_tile` candidates are named here without selecting that sequence.
@@ -190,13 +190,13 @@ JSON array `layout_object_ids` in this exact order (7 ids) — **same as** TASK-
 
 | id | Rank | Axes (logical, checkpoint-facing) | Source rank |
 | --- | ---: | --- | --- |
-| `gather_row` | 2 | `vocab`, `hidden` | \(E\in\mathbb{R}^{V\times H}=(248320,5120)\) |
-| `dense_gemm` | 2 | `d_out`, `d_in` | \(W\in\mathbb{R}^{d_\text{out}\times d_\text{in}}\), \(y=Wx\) |
-| `depthwise_conv` | 2 | `channel`, `tap` | squeezed \((10240,4)\); checkpoint \((10240,1,4)\) |
-| `vector_param` | 1 | `width` | \(\gamma\in\mathbb{R}^{H}\) or \(A_\log,d_t\in\mathbb{R}^{48}\) or \(\gamma^z\in\mathbb{R}^{128}\) or \(\gamma_{q,k}\in\mathbb{R}^{256}\) |
-| `state_kv` | 3 | `n_kv`, `T`, `d_h` | \(K,V\in\mathbb{R}^{4\times T\times 256}\) each |
-| `state_c` | 2 | `delay`, `channel` | \(C\in\mathbb{R}^{3\times 10240}\) |
-| `state_s` | 3 | `n_v`, `d_k`, `d_v` | \(S\in\mathbb{R}^{48\times 128\times 128}\) conceptual F32 |
+| `gather_row` | 2 | `vocab`, `hidden` | $E\in\mathbb{R}^{V\times H}=(248320,5120)$ |
+| `dense_gemm` | 2 | `d_out`, `d_in` | $W\in\mathbb{R}^{d_\text{out}\times d_\text{in}}$, $y=Wx$ |
+| `depthwise_conv` | 2 | `channel`, `tap` | squeezed $(10240,4)$; checkpoint $(10240,1,4)$ |
+| `vector_param` | 1 | `width` | $\gamma\in\mathbb{R}^{H}$ or $A_\log,d_t\in\mathbb{R}^{48}$ or $\gamma^z\in\mathbb{R}^{128}$ or $\gamma_{q,k}\in\mathbb{R}^{256}$ |
+| `state_kv` | 3 | `n_kv`, `T`, `d_h` | $K,V\in\mathbb{R}^{4\times T\times 256}$ each |
+| `state_c` | 2 | `delay`, `channel` | $C\in\mathbb{R}^{3\times 10240}$ |
+| `state_s` | 3 | `n_v`, `d_k`, `d_v` | $S\in\mathbb{R}^{48\times 128\times 128}$ conceptual F32 |
 
 JSON `layout_object_ranks` `[2,2,2,1,3,2,3]`. JSON `layout_object_axes`:
 
@@ -220,7 +220,7 @@ Family mapping: copy TASK-09 `policy_families` and `family_access_class` / `fami
 
 Instantiated widths (OBSERVED / DERIVED from `text_config`): `hidden_size` 5120, `intermediate_size` 17408, `vocab_size` 248320, `head_dim` 256, `num_attention_heads` 24, `num_key_value_heads` 4, `g_qa` 6, `linear_key_head_dim` / `linear_value_head_dim` 128, `linear_num_value_heads` 48, `linear_conv_kernel_dim` 4, `linear_conv_delay` 3, `d_qkv` 10240, `n_full_layers_with_kv` 17, `n_linear_layers` 48. JSON `g_qa` = `num_attention_heads // num_key_value_heads` = 6. JSON `d_qkv` = 10240. JSON `linear_conv_delay` = `linear_conv_kernel_dim - 1` = 3.
 
-Prose required: checkpoint orientation is the **logical** rank. Physical order is an unselected candidate. GQA repeat is **not** a stored axis of `state_kv`. Paper \(S^\top\) is not a second state object; it is an unselected ordering of `state_s`.
+Prose required: checkpoint orientation is the **logical** rank. Physical order is an unselected candidate. GQA repeat is **not** a stored axis of `state_kv`. Paper $S^\top$ is not a second state object; it is an unselected ordering of `state_s`.
 
 ### Consumers (lock; heading 4)
 
@@ -234,13 +234,13 @@ Implementation copies these rows; do not add objects.
 
 | Object | Decode consumer | Prefill consumer | Primary sequence |
 | --- | --- | --- | --- |
-| `gather_row` | One (language) or two (complete) rows of shared \(E\); table not streamed | \(T\) or \(2T\) rows | `seq_gather_row` |
-| `dense_gemm` | GEMV \(x\in\mathbb{R}^{H}\); unique weights once; `lm_head` streams 2542796800 B-class table (`seq_lm_head_full`) | GEMM with sequence axis \(T\); unique weights once per prompt, reused across \(T\) | `seq_gemm_codes_then_scales`; `lm_head` stages use `seq_lm_head_full` |
-| `depthwise_conv` | FIR `(14)` on one token; 4 taps, delay 3 | FIR over the length-\(T\) stream; delay still 3 stored | none of the seven sequences is conv-specific; `seq_specialized_tile` is an unselected view |
-| `vector_param` | Elementwise \(\gamma\), \(A_\log\), \(d_t\) | Same, rank \(T\) on the activation, not on the parameter | none |
-| `state_kv` | Read length \(T-1\), write 1 token; GQA consume with 24 queries | Triangular read, write \(T\) tokens; causal MM | none dedicated |
+| `gather_row` | One (language) or two (complete) rows of shared $E$; table not streamed | $T$ or $2T$ rows | `seq_gather_row` |
+| `dense_gemm` | GEMV $x\in\mathbb{R}^{H}$; unique weights once; `lm_head` streams 2542796800 B-class table (`seq_lm_head_full`) | GEMM with sequence axis $T$; unique weights once per prompt, reused across $T$ | `seq_gemm_codes_then_scales`; `lm_head` stages use `seq_lm_head_full` |
+| `depthwise_conv` | FIR `(14)` on one token; 4 taps, delay 3 | FIR over the length-$T$ stream; delay still 3 stored | none of the seven sequences is conv-specific; `seq_specialized_tile` is an unselected view |
+| `vector_param` | Elementwise $\gamma$, $A_\log$, $d_t$ | Same, rank $T$ on the activation, not on the parameter | none |
+| `state_kv` | Read length $T-1$, write 1 token; GQA consume with 24 queries | Triangular read, write $T$ tokens; causal MM | none dedicated |
 | `state_c` | Read 3 taps, write 1 QKV vector | From zeros (0 physical on first token); write each step | none dedicated |
-| `state_s` | Read/write full \(S\) 150994944 B/step conceptual F32 | From zeros; write \(S_t\) each step; surviving store is not \(T\times B_S\) | `seq_state_s_dense` |
+| `state_s` | Read/write full $S$ 150994944 B/step conceptual F32 | From zeros; write $S_t$ each step; surviving store is not $T\times B_S$ | `seq_state_s_dense` |
 
 JSON `layout_object_primary_sequence_ids` in `layout_object_ids` order:
 
@@ -261,12 +261,12 @@ JSON array `consumer_sequence_ids` copied from TASK-09 in TASK-09 order (7 ids).
 Access identities (DERIVED citations, not a new traffic study):
 
 - Embed gather is 0 MAC, 10240 B/row BF16 (TASK-06). `row_addressable` remains a required packing **capability**; stride/pad remain open (TASK-09).
-- Decode GEMMs have TASK-06 \(I=1\) vs unique weights for MLP/`lm_head` (citation; bottleneck label `weight_memory` / `vocab_memory` remains HYPOTHESIS).
-- Prefill reuses those unique bytes across \(T\) (`weight_unique_counted_once`; TASK-06 `compute` label remains HYPOTHESIS).
-- GQA: 24 query heads read 4 stored KV heads with \(g_\text{qa}=6\). Stored rank stays \((4,T,256)\); repeated KV is not stored (`gqa_repeat_not_stored` true).
-- RoPE is baked into stored \(K\) before the cache (`kv_rope_baked_into_k` true). Stored \(K\) has no extra rotary axis.
-- GDN \(S\) access is the dense recurrent update (17) plus \(S^\top \tilde q\) (18). `seq_state_s_dense` names that dense read/write; it is not a selected layout.
-- Conv access is per-channel FIR over 4 taps. \(z\) does not enter the convolution.
+- Decode GEMMs have TASK-06 $I=1$ vs unique weights for MLP/`lm_head` (citation; bottleneck label `weight_memory` / `vocab_memory` remains HYPOTHESIS).
+- Prefill reuses those unique bytes across $T$ (`weight_unique_counted_once`; TASK-06 `compute` label remains HYPOTHESIS).
+- GQA: 24 query heads read 4 stored KV heads with $g_\text{qa}=6$. Stored rank stays $(4,T,256)$; repeated KV is not stored (`gqa_repeat_not_stored` true).
+- RoPE is baked into stored $K$ before the cache (`kv_rope_baked_into_k` true). Stored $K$ has no extra rotary axis.
+- GDN $S$ access is the dense recurrent update (17) plus $S^\top \tilde q$ (18). `seq_state_s_dense` names that dense read/write; it is not a selected layout.
+- Conv access is per-channel FIR over 4 taps. $z$ does not enter the convolution.
 
 Prose required: a packing convenient for `seq_gemm_interleaved_group` may break `seq_gather_row` (HYPOTHESIS, cite TASK-09 `f_gather_stride`). Do not rank sequences by wall time. Do not name CUDA kernels. `seq_specialized_tile` is a **view** sequence, not an eighth access class; this document names candidates it could store (`seq_specialized_tile_candidates_named` true) without selecting it.
 
@@ -276,8 +276,8 @@ JSON array `ordering_ids` in this exact order (14 ids). JSON `n_orderings` = 14.
 
 | id | Object | Axis order (fastest last) | Meaning |
 | --- | --- | --- | --- |
-| `ord_gemm_out_major` | `dense_gemm` | `d_out`, `d_in` | Checkpoint orientation; row of \(W\) contiguous |
-| `ord_gemm_in_major` | `dense_gemm` | `d_in`, `d_out` | Transpose pack; \(d_\text{in}\) contiguous |
+| `ord_gemm_out_major` | `dense_gemm` | `d_out`, `d_in` | Checkpoint orientation; row of $W$ contiguous |
+| `ord_gemm_in_major` | `dense_gemm` | `d_in`, `d_out` | Transpose pack; $d_\text{in}$ contiguous |
 | `ord_embed_vocab_major` | `gather_row` | `vocab`, `hidden` | One vocab row contiguous (`row_addressable`-friendly) |
 | `ord_embed_hidden_major` | `gather_row` | `hidden`, `vocab` | Hidden-major; gather may be strided (pairs with `f_gather_stride`) |
 | `ord_conv_channel_tap` | `depthwise_conv` | `channel`, `tap` | 4 taps of one channel contiguous (FIR inner sum) |
@@ -286,10 +286,10 @@ JSON array `ordering_ids` in this exact order (14 ids). JSON `n_orderings` = 14.
 | `ord_kv_n_t_dh` | `state_kv` | `n_kv`, `T`, `d_h` | TASK-02 rank |
 | `ord_kv_n_dh_t` | `state_kv` | `n_kv`, `d_h`, `T` | Token index last |
 | `ord_kv_t_n_dh` | `state_kv` | `T`, `n_kv`, `d_h` | Sequence-major |
-| `ord_c_delay_channel` | `state_c` | `delay`, `channel` | TASK-02 \(3\times 10240\) |
+| `ord_c_delay_channel` | `state_c` | `delay`, `channel` | TASK-02 $3\times 10240$ |
 | `ord_c_channel_delay` | `state_c` | `channel`, `delay` | 3 taps of one channel contiguous |
-| `ord_s_n_dk_dv` | `state_s` | `n_v`, `d_k`, `d_v` | TASK-02 \(S\) (17)–(18) |
-| `ord_s_n_dv_dk` | `state_s` | `n_v`, `d_v`, `d_k` | Paper \(S^\top\) store (19); same map |
+| `ord_s_n_dk_dv` | `state_s` | `n_v`, `d_k`, `d_v` | TASK-02 $S$ (17)–(18) |
+| `ord_s_n_dv_dk` | `state_s` | `n_v`, `d_v`, `d_k` | Paper $S^\top$ store (19); same map |
 
 JSON `ordering_object_ids` `["dense_gemm","dense_gemm","gather_row","gather_row","depthwise_conv","depthwise_conv","vector_param","state_kv","state_kv","state_kv","state_c","state_c","state_s","state_s"]`.
 
@@ -300,12 +300,12 @@ JSON array `tile_family_ids` in this exact order (9 ids). JSON `n_tile_families`
 | id | Objects | Meaning |
 | --- | --- | --- |
 | `tile_none` | all seven | No blocking beyond the ordering |
-| `tile_2d_mn` | `dense_gemm` | 2D tiles on \((d_\text{out},d_\text{in})\) |
+| `tile_2d_mn` | `dense_gemm` | 2D tiles on $(d_\text{out},d_\text{in})$ |
 | `tile_1d_row` | `gather_row` | Tiles along `hidden` inside one vocab row |
 | `tile_conv_channel` | `depthwise_conv`, `state_c` | Tiles along 10240 channels |
-| `tile_kv_t` | `state_kv` | Tiles along stored length \(T\) |
+| `tile_kv_t` | `state_kv` | Tiles along stored length $T$ |
 | `tile_kv_dh` | `state_kv` | Tiles along `d_h` |
-| `tile_s_head` | `state_s` | One \(128\times 128\) head as the tile |
+| `tile_s_head` | `state_s` | One $128\times 128$ head as the tile |
 | `tile_s_block` | `state_s` | Blocks inside a head matrix |
 | `tile_mma_shaped` | `dense_gemm` | MMA-ready extents; **extents unselected** (SKU MMA shapes are TASK-16 UNKNOWN / TASK-17) |
 
@@ -325,7 +325,7 @@ JSON array `tile_extent_candidates` `[16, 32, 64, 128, 256]`. These are the TASK
 
 Divisibility (DERIVED; checker recomputes from `text_config`; do not use to pick a winner):
 
-| Extent | \(H=5120\) | \(I=17408\) | \(d_\text{qkv}=10240\) | \(d_h=256\) | \(d_k=128\) |
+| Extent | $H=5120$ | $I=17408$ | $d_\text{qkv}=10240$ | $d_h=256$ | $d_k=128$ |
 | ---: | --- | --- | --- | --- | --- |
 | 16 | yes | yes | yes | yes | yes |
 | 32 | yes | yes | yes | yes | yes |
@@ -335,7 +335,7 @@ Divisibility (DERIVED; checker recomputes from `text_config`; do not use to pick
 
 JSON `tile_extent_divides_hidden` all true. JSON `tile_extent_divides_intermediate` all true. JSON `tile_extent_divides_d_qkv` all true. JSON `tile_extent_divides_head_dim` all true. JSON `tile_extent_divides_dk` `[true,true,true,true,false]`. JSON `n_v_divides_none_of_extents_as_head_count` true (48 is not 16/32/64/128/256); `tile_s_head` uses one head, not an extent from that list.
 
-Prose required: naming an extent that divides a width is not selecting it. Prefill’s sequence axis \(T\) is a **tile axis** of activations and of `state_kv`; it is not a weight-tensor axis. Decode GEMV has no sequence tile on weights (`diff_tiling` citation). `tile_mma_shaped` must not instantiate an MMA \((M,N,K)\) from a datasheet.
+Prose required: naming an extent that divides a width is not selecting it. Prefill’s sequence axis $T$ is a **tile axis** of activations and of `state_kv`; it is not a weight-tensor axis. Decode GEMV has no sequence tile on weights (`diff_tiling` citation). `tile_mma_shaped` must not instantiate an MMA $(M,N,K)$ from a datasheet.
 
 ### Alignment and conversion (lock; heading 7)
 
@@ -368,9 +368,9 @@ Do not select a conversion pipeline. Dual-view **size** may be cited from TASK-0
 
 Align identity (citation of TASK-09, not a selected grain):
 
-\[
+$$
 B_{\text{aligned}}=\Bigl\lceil B_{\text{payload,pack}}/A\Bigr\rceil A.
-\]
+$$
 
 Prose required: int3 g32 is 12 bytes, not a power of two (DERIVED). Whether that forbids a specialized grain is HYPOTHESIS (`l_int3_grain`). int4 g32 is 16 bytes (DERIVED). Whether specialized views must pad to a multiple of 16 is HYPOTHESIS, not a close of `alignment_grain`.
 
@@ -378,13 +378,13 @@ Prose required: int3 g32 is 12 bytes, not a power of two (DERIVED). Whether that
 
 Required `###` subheadings in this exact order: `GDN`, `Convolution`, `KV persistent state`. Checker substring-matches those three heading titles. Completes ledger checkbox 2. JSON `includes_gdn` / `includes_convolution` / `includes_kv` true.
 
-**GDN.** Consumers: 48 `gated_delta_net` language mixers (TASK-13/14 xor). Weights: \(W_\text{qkv}\in\mathbb{R}^{10240\times 5120}\) (`dense_gemm`), \(W_z\in\mathbb{R}^{6144\times 5120}\) (`dense_gemm`), \(W_a,W_b\in\mathbb{R}^{48\times 5120}\) (`dense_gemm`, family `gdn_gate_proj`), \(A_\log,d_t\in\mathbb{R}^{48}\) (`vector_param`, family `gdn_time_param`), \(W^{\text{conv}}\) (`depthwise_conv`), \(W_\text{out}\in\mathbb{R}^{5120\times 6144}\) (`dense_gemm`). State \(S\): rank \((48,128,128)\) F32, 3145728 B/layer, 150994944 B all-48 (`s_bytes_per_layer`, `s_f32_bytes`). Decode reads and writes the full matrix each step; prefill starts from zeros (0 physical on the first token) and writes \(S_t\) each step. Primary recurrence is (17)–(18). Paper (19) \(S^\top\) is the same map (`paper_s_transpose_same_map`). Chunkwise GDN is not zero \(S\) traffic. Candidate orderings `ord_s_n_dk_dv`, `ord_s_n_dv_dk`. Candidate tiles `tile_s_head`, `tile_s_block`. Sequence attachment `seq_state_s_dense`. TASK-06 `i_gdn_vs_s_rw` 0.75 and bottleneck label `state_memory` remain HYPOTHESIS citations.
+**GDN.** Consumers: 48 `gated_delta_net` language mixers (TASK-13/14 xor). Weights: $W_\text{qkv}\in\mathbb{R}^{10240\times 5120}$ (`dense_gemm`), $W_z\in\mathbb{R}^{6144\times 5120}$ (`dense_gemm`), $W_a,W_b\in\mathbb{R}^{48\times 5120}$ (`dense_gemm`, family `gdn_gate_proj`), $A_\log,d_t\in\mathbb{R}^{48}$ (`vector_param`, family `gdn_time_param`), $W^{\text{conv}}$ (`depthwise_conv`), $W_\text{out}\in\mathbb{R}^{5120\times 6144}$ (`dense_gemm`). State $S$: rank $(48,128,128)$ F32, 3145728 B/layer, 150994944 B all-48 (`s_bytes_per_layer`, `s_f32_bytes`). Decode reads and writes the full matrix each step; prefill starts from zeros (0 physical on the first token) and writes $S_t$ each step. Primary recurrence is (17)–(18). Paper (19) $S^\top$ is the same map (`paper_s_transpose_same_map`). Chunkwise GDN is not zero $S$ traffic. Candidate orderings `ord_s_n_dk_dv`, `ord_s_n_dv_dk`. Candidate tiles `tile_s_head`, `tile_s_block`. Sequence attachment `seq_state_s_dense`. TASK-06 `i_gdn_vs_s_rw` 0.75 and bottleneck label `state_memory` remain HYPOTHESIS citations.
 
-**Convolution.** Weight \(W^{\text{conv}}\in\mathbb{R}^{10240\times 1\times 4}\) squeezed \((10240,4)\), family `conv1d`, access `depthwise_conv`. FIR (14) over \(k_\text{conv}=4\) taps; stored delay \(k_\text{conv}-1=3\). \(z\) does not enter the convolution. State \(C\): rank \((3,10240)\) BF16, 61440 B/layer, 2949120 B all-48 (`c_bytes_per_layer`, `c_bytes_all`). Decode reads 3 taps and writes one new QKV vector (do not count rewriting retained taps as new writes). Prefill from zeros: first-token physical read 0. Candidate orderings `ord_conv_channel_tap`, `ord_conv_tap_channel`, `ord_c_delay_channel`, `ord_c_channel_delay`. Candidate tile `tile_conv_channel`. No dedicated TASK-09 sequence.
+**Convolution.** Weight $W^{\text{conv}}\in\mathbb{R}^{10240\times 1\times 4}$ squeezed $(10240,4)$, family `conv1d`, access `depthwise_conv`. FIR (14) over $k_\text{conv}=4$ taps; stored delay $k_\text{conv}-1=3$. $z$ does not enter the convolution. State $C$: rank $(3,10240)$ BF16, 61440 B/layer, 2949120 B all-48 (`c_bytes_per_layer`, `c_bytes_all`). Decode reads 3 taps and writes one new QKV vector (do not count rewriting retained taps as new writes). Prefill from zeros: first-token physical read 0. Candidate orderings `ord_conv_channel_tap`, `ord_conv_tap_channel`, `ord_c_delay_channel`, `ord_c_channel_delay`. Candidate tile `tile_conv_channel`. No dedicated TASK-09 sequence.
 
-**KV persistent state.** \(K,V\) each \((4,T,256)\) BF16; 4096 B/token/instance; 69632 B/token across 17 instances including MTP (`kv_bytes_per_full_layer_per_token`, `kv_bytes_all_per_token`). Full-attention layers only; linear layers have no KV. RoPE baked into stored \(K\). GQA repeat not stored. Decode: read \(T-1\), write 1. Prefill: triangular read \(69632\cdot T(T-1)/2\), write \(69632T\). Attention consumer is (9) with 24 queries against 4 KV heads. Candidate orderings `ord_kv_n_t_dh`, `ord_kv_n_dh_t`, `ord_kv_t_n_dh`. Candidate tiles `tile_kv_t`, `tile_kv_dh`. Writes are not optional.
+**KV persistent state.** $K,V$ each $(4,T,256)$ BF16; 4096 B/token/instance; 69632 B/token across 17 instances including MTP (`kv_bytes_per_full_layer_per_token`, `kv_bytes_all_per_token`). Full-attention layers only; linear layers have no KV. RoPE baked into stored $K$. GQA repeat not stored. Decode: read $T-1$, write 1. Prefill: triangular read $69632\cdot T(T-1)/2$, write $69632T$. Attention consumer is (9) with 24 queries against 4 KV heads. Candidate orderings `ord_kv_n_t_dh`, `ord_kv_n_dh_t`, `ord_kv_t_n_dh`. Candidate tiles `tile_kv_t`, `tile_kv_dh`. Writes are not optional.
 
-Prose required: omitting a KV/\(C\)/\(S\) write changes the map. Surviving store after prefill is TASK-04 \(B_\text{store}(T)=69632T+153944064\), not \(T\times B_S\). Layout of state is independent of whether zero templates live in the artifact (`state_payload_in_artifact_selected` false remains TASK-09 open).
+Prose required: omitting a KV/$C$/$S$ write changes the map. Surviving store after prefill is TASK-04 $B_\text{store}(T)=69632T+153944064$, not $T\times B_S$. Layout of state is independent of whether zero templates live in the artifact (`state_payload_in_artifact_selected` false remains TASK-09 open).
 
 ### Parallel decompositions (lock; heading 9)
 
@@ -396,9 +396,9 @@ JSON array `parallel_decomposition_ids` in this exact order (9 ids). JSON `n_par
 | --- | --- | --- |
 | `par_gemm_d_out` | `d_out` | decode GEMV / prefill GEMM |
 | `par_gemm_d_in` | `d_in` (partial reduction) | same |
-| `par_gemm_T` | sequence \(T\) | prefill GEMM only |
+| `par_gemm_T` | sequence $T$ | prefill GEMM only |
 | `par_attn_head` | 24 query heads | gated attention core |
-| `par_attn_T` | stored length \(T\) | attention vs KV |
+| `par_attn_T` | stored length $T$ | attention vs KV |
 | `par_gdn_head` | 48 value heads | GDN (17)–(18) |
 | `par_conv_channel` | 10240 channels | FIR (14) |
 | `par_kv_head` | 4 KV heads | KV layout vs GQA consume |
@@ -408,15 +408,15 @@ JSON array `justification_hypothesis_ids` in this exact order (10 ids). JSON `n_
 
 | id | Ordering or tile | Decomposition | Claim (must remain HYPOTHESIS) |
 | --- | --- | --- | --- |
-| `j_gemm_out_major_par_d_out` | `ord_gemm_out_major` | `par_gemm_d_out` | Out-major matches a \(d_\text{out}\) split |
-| `j_gemm_in_major_par_d_in` | `ord_gemm_in_major` | `par_gemm_d_in` | In-major matches a \(K\)-split |
-| `j_gemm_tile_2d_par_T` | `tile_2d_mn` | `par_gemm_T` | 2D weight tiles match a prefill \(T\) split |
+| `j_gemm_out_major_par_d_out` | `ord_gemm_out_major` | `par_gemm_d_out` | Out-major matches a $d_\text{out}$ split |
+| `j_gemm_in_major_par_d_in` | `ord_gemm_in_major` | `par_gemm_d_in` | In-major matches a $K$-split |
+| `j_gemm_tile_2d_par_T` | `tile_2d_mn` | `par_gemm_T` | 2D weight tiles match a prefill $T$ split |
 | `j_embed_vocab_major_par_row` | `ord_embed_vocab_major` | `par_embed_row` | Vocab-major matches row gather |
 | `j_conv_channel_tap_par_channel` | `ord_conv_channel_tap` | `par_conv_channel` | Channel-tap matches a channel split |
 | `j_kv_n_t_dh_par_head` | `ord_kv_n_t_dh` | `par_kv_head` | TASK-02 KV order matches a KV-head split |
 | `j_kv_n_dh_t_par_T` | `ord_kv_n_dh_t` | `par_attn_T` | Token-last KV matches a sequence split |
-| `j_s_n_dk_dv_par_head` | `ord_s_n_dk_dv` | `par_gdn_head` | \(S\) as (17) matches a head split |
-| `j_s_n_dv_dk_par_head` | `ord_s_n_dv_dk` | `par_gdn_head` | \(S^\top\) store matches a head split |
+| `j_s_n_dk_dv_par_head` | `ord_s_n_dk_dv` | `par_gdn_head` | $S$ as (17) matches a head split |
+| `j_s_n_dv_dk_par_head` | `ord_s_n_dv_dk` | `par_gdn_head` | $S^\top$ store matches a head split |
 | `j_mma_shaped_unselected_par` | `tile_mma_shaped` | (unspecified CUDA) | MMA tiles need TASK-17 to name a decomposition |
 
 Required closing sentence (checker substring):
@@ -433,8 +433,8 @@ Layout-risk hypotheses (every severity is HYPOTHESIS). JSON array `layout_risk_i
 | --- | --- | --- | --- |
 | `l_gemm_vs_gather` | `f_gather_stride` | medium | A GEMM-friendly order may make embed-row gather non-contiguous |
 | `l_decode_vs_prefill_view` | TASK-14 views | medium | One order may not serve GEMV and GEMM equally; this does **not** select distinct views |
-| `l_s_transpose` | (17) vs (19) | medium | Storing \(S\) vs \(S^\top\) changes inner-loop axes |
-| `l_kv_append` | KV orderings | medium | \(T\)-last vs \(T\)-middle changes append versus scan |
+| `l_s_transpose` | (17) vs (19) | medium | Storing $S$ vs $S^\top$ changes inner-loop axes |
+| `l_kv_append` | KV orderings | medium | $T$-last vs $T$-middle changes append versus scan |
 | `l_conv_fir_stride` | conv orderings | medium | Tap-major vs channel-major changes FIR stride |
 | `l_convert_cost` | `f_unpack_portable` | high | Compile/load/in-kernel conversion may add decode traffic |
 | `l_int3_grain` | `f_3bit_shift` | medium | int3 12-byte groups may not match power-of-two tiles |
@@ -448,15 +448,15 @@ JSON `layout_risk_severities` `["medium","medium","medium","medium","medium","hi
 
 Cite; do not recopy TASK-06 symbolic tables. Checker **recomputes** state bytes from `text_config` with the same identities as TASK-04/06:
 
-- `kv_bytes_per_full_layer_per_token` = \(2\cdot n_\text{kv}\cdot d_h\cdot 2=4096\)
-- `kv_bytes_all_per_token` = \(4096\times 17=69632\)
-- `c_bytes_per_layer` = \(3\cdot d_\text{qkv}\cdot 2=61440\)
-- `c_bytes_all` = \(61440\times 48=2949120\)
-- `s_bytes_per_layer` = \(n_v\cdot d_k\cdot d_v\cdot 4=3145728\)
-- `s_f32_bytes` = \(3145728\times 48=150994944\)
+- `kv_bytes_per_full_layer_per_token` = $2\cdot n_\text{kv}\cdot d_h\cdot 2=4096$
+- `kv_bytes_all_per_token` = $4096\times 17=69632$
+- `c_bytes_per_layer` = $3\cdot d_\text{qkv}\cdot 2=61440$
+- `c_bytes_all` = $61440\times 48=2949120$
+- `s_bytes_per_layer` = $n_v\cdot d_k\cdot d_v\cdot 4=3145728$
+- `s_f32_bytes` = $3145728\times 48=150994944$
 - `s_bf16_bytes` = 75497472 (TASK-09 illustration D; **not** a selected store dtype)
-- `weight_bytes_lm_head` = \(V\cdot H\cdot 2=2542796800\)
-- `embed_gather_bf16_bytes` = \(H\cdot 2=10240\)
+- `weight_bytes_lm_head` = $V\cdot H\cdot 2=2542796800$
+- `embed_gather_bf16_bytes` = $H\cdot 2=10240$
 - `dual_view_int4_g128_unique_non_embed_bytes` = 26863340064 (TASK-09 illustration F citation)
 
 JSON `bottleneck_labels` copied from TASK-06: `weight_memory`, `vocab_memory`, `state_memory`, `kv_memory`, `quadratic_attn`, `compute`. Restating a label here is a **citation**, still HYPOTHESIS. JSON `n_bottleneck_labels` = 6. JSON `i_mlp_weight_only` 1, `i_lm_head_weight_only` 1, `i_gdn_vs_s_rw` 0.75, `i_attn_core_vs_kv` 6 (decode identity cited; do not invent a layout-ridge winner).
@@ -465,7 +465,7 @@ Non-decisions (prose required): TASK-17 owns CUDA mappings per node type **and**
 
 ### Diagram format (lock)
 
-Exactly **one** fenced `mermaid` block, under heading 9 (Parallel decompositions). Fence body starts with `flowchart TB` or `flowchart LR`. Caption sits in markdown above the fence. Do not use `sequenceDiagram`, `stateDiagram-v2`, or `%%{init:...}%%`. Do not unroll 64 layers, 866 tensors, or \(T\) positions. Caption must contain the word `HYPOTHESIS` and the word `unresolved`.
+Exactly **one** fenced `mermaid` block, under heading 9 (Parallel decompositions). Fence body starts with `flowchart TB` or `flowchart LR`. Caption sits in markdown above the fence. Do not use `sequenceDiagram`, `stateDiagram-v2`, or `%%{init:...}%%`. Do not unroll 64 layers, 866 tensors, or $T$ positions. Caption must contain the word `HYPOTHESIS` and the word `unresolved`.
 
 Required IDs **inside that fence**: `gemm`, `gather`, `conv`, `kv`, `gdn`, `c_state`, `portable`, `specialized`, `open`.
 
@@ -477,7 +477,7 @@ Visual tokens may replace placeholders in the residual stream (`out_hidden_size`
 
 ### Tooling
 
-Create `scripts/check_layout_strategy.py` (Python 3.11+, stdlib only: `argparse`, `json`, `math`, `re`, `sys`, `pathlib`, Google docstrings, type annotations on public functions). No torch, safetensors, numpy, mermaid parser, uv, Ruff, or pytest. Do not import other `scripts/check_*.py`; duplicate the small `text_config` arithmetic needed for layer counts, `full_attention_indices`, \(d_\text{qkv}\), GQA, KV/\(C\)/\(S\) bytes, gather/lm-head bytes, group-payload grains, and tile-extent divisibility. Duplicate TASK-09 `consumer_sequence_ids` / `access_class_ids` / `policy_families` / `family_access_class_values` and TASK-13/14 `stage_kind_ids` as constants; do not import them.
+Create `scripts/check_layout_strategy.py` (Python 3.11+, stdlib only: `argparse`, `json`, `math`, `re`, `sys`, `pathlib`, Google docstrings, type annotations on public functions). No torch, safetensors, numpy, mermaid parser, uv, Ruff, or pytest. Do not import other `scripts/check_*.py`; duplicate the small `text_config` arithmetic needed for layer counts, `full_attention_indices`, $d_\text{qkv}$, GQA, KV/$C$/$S$ bytes, gather/lm-head bytes, group-payload grains, and tile-extent divisibility. Duplicate TASK-09 `consumer_sequence_ids` / `access_class_ids` / `policy_families` / `family_access_class_values` and TASK-13/14 `stage_kind_ids` as constants; do not import them.
 
 The ledger **Produces** line names only `docs/architecture/layout-strategy.md`. The checker is stdlib evidence tooling matching TASK-01–14 and the user-required stdlib checker; it is in scope for this increment.
 
@@ -495,7 +495,7 @@ python3 scripts/check_layout_strategy.py \
 
 Behavior:
 
-- Read `text_config` from `--config`. Build the summary object (schema below). Live fields from config: `hidden_size`, `intermediate_size`, `vocab_size`, layer counts, head dims, linear widths, `full_attention_indices`, `dtype`, `mamba_ssm_dtype`, `linear_conv_kernel_dim`. Derived: \(d_\text{qkv}\), \(g_\text{qa}\), conv delay, instance counts, KV/\(C\)/\(S\) bytes, gather/lm-head bytes, group grains, tile-extent divisibility. Constant fields: canonical sentences, layout/ordering/tile/decomposition/conversion/justification/risk lists, booleans.
+- Read `text_config` from `--config`. Build the summary object (schema below). Live fields from config: `hidden_size`, `intermediate_size`, `vocab_size`, layer counts, head dims, linear widths, `full_attention_indices`, `dtype`, `mamba_ssm_dtype`, `linear_conv_kernel_dim`. Derived: $d_\text{qkv}$, $g_\text{qa}$, conv delay, instance counts, KV/$C$/$S$ bytes, gather/lm-head bytes, group grains, tile-extent divisibility. Constant fields: canonical sentences, layout/ordering/tile/decomposition/conversion/justification/risk lists, booleans.
 - `--json`: print that object to stdout (pretty-printed, script key order); run internal asserts listed below; exit 0.
 - Default / `--layout-strategy PATH`: also require PATH to contain (1) every required `##` heading listed above **in order**, (2) the first fenced `json` block equal to the live object, (3) exactly one ` ```mermaid ` fence containing `flowchart`, (4) all five canonical sentences plus `canonical_sentence_justification` verbatim, (5) every `layout_object_ids`, `ordering_ids`, `tile_family_ids`, `parallel_decomposition_ids`, `conversion_hypothesis_ids`, `justification_hypothesis_ids`, `layout_risk_ids`, `analysis_dimension_ids`, `persistent_state_coverage_ids`, `consumer_sequence_ids`, `access_class_ids`, `policy_families`, `stage_kind_ids`, `bottleneck_labels` id present as a substring, (6) the diagram’s required IDs present **inside that mermaid fence**, (7) `### GDN`, `### Convolution`, and `### KV persistent state` present, (8) none of `TBD`, `TODO`, `???`, (9) no `UNKNOWN` except inside the Deferred vision section, (10) every locked document integer/decimal below present as a decimal or integer substring, (11) the words `HYPOTHESIS`, `hardware-independent`, `unresolved`, and `no optimality claim` present, (12) none of the forbidden winner/optimality phrases: `optimal layout`, `best tile`, `winning layout`, `selected tile is`, `selected ordering is`, `this layout is optimal`, `CUDA occupancy selects`, `should use this tile`, `recommend this layout`, `parallel decomposition justifies`, `MMA shape is required`, `ideal byte sequence is`, `artifact boundary is`, `selected winner`, `thread block`, `warp shuffle`, `Quartz layout`, `llama.cpp layout`, `GGUF is the layout`, `selected distinct views`, `prefill requires a distinct view` (allow the substring only inside `not a selected winner` / `not selected winners` / `not a CUDA mapping` / `makes no optimality claim` / `does not justify a candidate`). Exit 1 with a readable list on mismatch.
 - Missing config: exit 2 (blocked, not a content fail).
@@ -546,7 +546,7 @@ Locked document integers/decimals the `--layout-strategy` check must find:
 
 `5120`, `17408`, `248320`, `10240`, `6144`, `256`, `128`, `48`, `24`, `4`, `3`, `6`, `16`, `17`, `64`, `4096`, `69632`, `61440`, `2949120`, `3145728`, `150994944`, `75497472`, `2542796800`, `10240`, `2562`, `2560`, `3840`, `12`, `8`, `26863340064`, `0.75`
 
-(`10240` appears twice in this list as gather-row bytes and \(d_\text{qkv}\); the checker searches substrings, so once is enough in the document.)
+(`10240` appears twice in this list as gather-row bytes and $d_\text{qkv}$; the checker searches substrings, so once is enough in the document.)
 
 ### Instantiated summary JSON schema
 
@@ -598,12 +598,12 @@ Title: `# Physical tensor layouts from consumers` (not `TASK-15`).
 
 - Seven layout objects equal seven access classes; no eighth access class.
 - Every TASK-08 defined family except `vision_deferred` maps to one layout object.
-- GDN \(S\), conv \(W^{\text{conv}}\) / \(C\), and KV \(K,V\) each have named axes, orderings, tiles, and consumers.
+- GDN $S$, conv $W^{\text{conv}}$ / $C$, and KV $K,V$ each have named axes, orderings, tiles, and consumers.
 - Zero selected orderings, tiles, conversions, decompositions, justifications, views, or sequences.
 - No MEASURED tok/s, NLL, or layout ranking.
 - No thread geometry and no sitting-GPU / MMA-shape instantiation.
 - Logical ≠ physical; checkpoint orientation is not a required store order.
-- GQA repeat not stored; paper \(S^\top\) is an ordering, not a second state; chunkwise GDN is not zero \(S\) traffic.
+- GQA repeat not stored; paper $S^\top$ is an ordering, not a second state; chunkwise GDN is not zero $S$ traffic.
 - If live `text_config` disagrees with a cited integer, the earlier document / config wins.
 
 ### Rejected alternatives
@@ -612,11 +612,11 @@ Title: `# Physical tensor layouts from consumers` (not `TASK-15`).
 - Closing the parallel-decomposition question by treating the pairing table as justification: rejected; listing a hypothesis is not justification; CUDA analysis is TASK-17.
 - Using TASK-16 occupancy or a datasheet MMA shape to pick tiles: rejected; TASK-16 is not a dependency; optimality before CUDA is forbidden; `mma_tile_extents_selected` false.
 - Two compiled artifacts for decode vs prefill: rejected by TASK-09; one artifact, `view_binding` capability.
-- Treating checkpoint \((d_\text{out},d_\text{in})\) as the required physical layout: rejected; logical ≠ physical.
-- Storing GQA-repeated KV: rejected by TASK-03/02; stored rank stays \((4,T,256)\).
+- Treating checkpoint $(d_\text{out},d_\text{in})$ as the required physical layout: rejected; logical ≠ physical.
+- Storing GQA-repeated KV: rejected by TASK-03/02; stored rank stays $(4,T,256)$.
 - Treating length-4 conv buffers with a current-token slot as extra math: rejected by TASK-02; delay is 3.
-- Treating paper \(S^\top\) as extra state traffic: rejected; same map, unselected ordering.
-- Treating chunkwise GDN as zero \(S\) traffic: rejected by TASK-13/14.
+- Treating paper $S^\top$ as extra state traffic: rejected; same map, unselected ordering.
+- Treating chunkwise GDN as zero $S$ traffic: rejected by TASK-13/14.
 - Activation working-buffer layouts as first-class objects: rejected; ledger purpose is weights and persistent state.
 - Adding an eighth consumer sequence for conv or KV: rejected; TASK-09 sequence list is locked; use `seq_specialized_tile` as an unselected view.
 - Importing other `scripts/check_*.py` or restreaming safetensors: rejected.
@@ -684,7 +684,7 @@ Do not run Ruff, pytest, CMake, or CUDA; this increment does not introduce those
 
 - Agent/model: `cursor-grok-4.6-high` (this stage; parent/inherit mapping)
 - UTC/time/tokens/cost: `2026-09-20T15:40:00Z`; `telemetry_unavailable`
-- Outcome: Decision-complete dossier created at `docs/architecture/tasks/TASK-15.md`. Coupled IDs `none`. Document structure (12 headings), five canonical sentences plus justification sentence, seven layout objects (= access classes), six analysis dimensions, GDN/conv/KV coverage, 14 unselected orderings, 9 unselected tile families with extent candidates `[16,32,64,128,256]` and \(d_k\)-divisibility `256` false, 9 unselected parallel decompositions, 4 unselected conversion hypotheses, 10 unselected justification hypotheses, 8 layout-risk hypotheses, stdlib checker `scripts/check_layout_strategy.py`, JSON schema, and acceptance commands are closed. Ledger open question **kept unresolved** (`ledger_open_question_parallel_decomposition_closed` false; `parallel_decomposition_justifies_layout_selected` false; `optimality_claim_absent` true). `docs/architecture/layout-strategy.md` and the checker were **not** written in this stage. `plan.md` and `task_ledger.md` not edited. No commit. No implementation.
+- Outcome: Decision-complete dossier created at `docs/architecture/tasks/TASK-15.md`. Coupled IDs `none`. Document structure (12 headings), five canonical sentences plus justification sentence, seven layout objects (= access classes), six analysis dimensions, GDN/conv/KV coverage, 14 unselected orderings, 9 unselected tile families with extent candidates `[16,32,64,128,256]` and $d_k$-divisibility `256` false, 9 unselected parallel decompositions, 4 unselected conversion hypotheses, 10 unselected justification hypotheses, 8 layout-risk hypotheses, stdlib checker `scripts/check_layout_strategy.py`, JSON schema, and acceptance commands are closed. Ledger open question **kept unresolved** (`ledger_open_question_parallel_decomposition_closed` false; `parallel_decomposition_justifies_layout_selected` false; `optimality_claim_absent` true). `docs/architecture/layout-strategy.md` and the checker were **not** written in this stage. `plan.md` and `task_ledger.md` not edited. No commit. No implementation.
 - Performance evidence applied: N/A — layout-candidate documentation; ordering/tile/conversion/justification usefulness is hypothesis, not measured sink ranking or quality impact
 
 ### Implementation

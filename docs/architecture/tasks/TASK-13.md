@@ -14,19 +14,19 @@ Produce `docs/architecture/decode-plan.md` as the Phase 1 **hardware-independent
 
 - Constraints:
   - `docs/architecture/plan.md` is authoritative for study scope; do not modify it.
-  - Work/traffic minima and decode \(W=C+AT\) come from `docs/architecture/work-and-traffic.md` (TASK-06). Artifact capabilities and the seven consumer sequences come from `docs/architecture/runtime-format-design.md` (TASK-09); do not close portable-versus-specialized or ideal-sequence. Node types, instance counts, 14 sync edges, and mixer xor come from `docs/architecture/semantic-graph.md` (TASK-11). Physical-need classes and the 22 fusion hypotheses come from `docs/architecture/materialization-and-fusion.md` (TASK-12). Do not add node types, catalog IDs, or sync edges as **required** contracts.
-  - Label claims `OBSERVED` (sitting `text_config` / inventory already established), `DERIVED` (serial order from the DAG, stage multiplicities, stage-cut byte identities, cited TASK-06/04 integers), or `HYPOTHESIS` (hoist/overlap usefulness, second \(W_\text{lm}\) read, extra `h_64` consumer read, every packing/fusion **usefulness**). `UNKNOWN` only for vision-encoder internals deferred here. No `MEASURED` tok/s or NLL. No selected fusion, packing winner, tile, or kernel.
+  - Work/traffic minima and decode $W=C+AT$ come from `docs/architecture/work-and-traffic.md` (TASK-06). Artifact capabilities and the seven consumer sequences come from `docs/architecture/runtime-format-design.md` (TASK-09); do not close portable-versus-specialized or ideal-sequence. Node types, instance counts, 14 sync edges, and mixer xor come from `docs/architecture/semantic-graph.md` (TASK-11). Physical-need classes and the 22 fusion hypotheses come from `docs/architecture/materialization-and-fusion.md` (TASK-12). Do not add node types, catalog IDs, or sync edges as **required** contracts.
+  - Label claims `OBSERVED` (sitting `text_config` / inventory already established), `DERIVED` (serial order from the DAG, stage multiplicities, stage-cut byte identities, cited TASK-06/04 integers), or `HYPOTHESIS` (hoist/overlap usefulness, second $W_\text{lm}$ read, extra `h_64` consumer read, every packing/fusion **usefulness**). `UNKNOWN` only for vision-encoder internals deferred here. No `MEASURED` tok/s or NLL. No selected fusion, packing winner, tile, or kernel.
   - GitHub Markdown math. Cite TASK-02 equation tags via TASK-11 contracts, TASK-06 MAC/byte integers, TASK-09 sequence ids, TASK-11 node types / sync-edge ids, TASK-12 hypothesis ids. Do not rewrite forward math, recopy TASK-06 MAC tables as a new work study, recopy TASK-09 packing illustrations as a new format study, or recopy TASK-12’s 52-ID physical-need table as a new materialization study.
   - Allowed evidence: TASK-06 work/traffic, TASK-09 runtime-format, TASK-11 semantic-graph, TASK-12 materialization/fusion, sitting `config.json` `text_config`, plan evidence vocabulary, this dossier. TASK-03/04 integers already cited by those documents may be **cited** through them. No Quartz, llama.cpp/GGML Qwen, or `models/Qwen3.8-27B-Q4_K_M.gguf`. No TASK-16 occupancy/fusion-vs-occupancy algebra (not a dependency; this document is hardware-independent). No TASK-14 prefill schedule, TASK-15 tiles, or TASK-17 CUDA mappings.
   - Hardware-independent: stage kinds, catalog IDs, node types, sync-edge ids, byte identities. No thread geometry, warps, SMs, CUDA dtypes, kernel names, streams, shared-memory tiles, or sitting-GPU numbers.
 - Non-goals:
   - No fusion, split, reuse, or packing **winner**. Listing a hypothesis or attaching a TASK-09 sequence is not selecting it. `n_fusion_hypotheses_selected` = 0. `ideal_byte_sequence_selected` false.
-  - No prefill schedule (TASK-14). Prefill and decode share **one** graph; this document schedules \(T_\text{new}=1\) with populated incoming \((K,V,C,S)\). Do not compare every node with prefill.
+  - No prefill schedule (TASK-14). Prefill and decode share **one** graph; this document schedules $T_\text{new}=1$ with populated incoming $(K,V,C,S)$. Do not compare every node with prefill.
   - No physical layouts (TASK-15) and no CUDA mapping alternatives (TASK-17).
   - No quantization recipes, artifact-boundary winner, or compiler stages (TASK-08/09/10 already published; do not close their open decisions).
   - No quality/NLL experiments (TASK-18) and no tok/s (TASK-19).
   - No new operators, extra catalog IDs, extra required node types, or 64-layer / 135-instance unrolling in diagrams.
-  - No sampling softmax over \(V\) (out of scope, TASK-11).
+  - No sampling softmax over $V$ (out of scope, TASK-11).
   - No generic GEMM / softmax / RMSNorm kernel-fusion cookbook. Intra-node `fuse_internals` remain TASK-12 hypotheses.
   - No peak-memory claim and no summed CUDA live-set.
   - No `pyproject.toml` / uv package / Ruff / pytest suite (stdlib checker only, matching TASK-01–12). Evidence scripts under `scripts/` are not a Python package.
@@ -42,12 +42,12 @@ Produce `docs/architecture/decode-plan.md` as the Phase 1 **hardware-independent
 - `docs/architecture/plan.md:54-74` — evidence labels; hypotheses remain hypotheses; GitHub Markdown math.
 - `docs/architecture/plan.md:89-92` — TASK-11 derives semantic regions; TASK-12 fusion; TASK-13/14 independently schedule decode and prefill; TASK-17 CUDA-maps nodes.
 - `docs/architecture/task_ledger.md` TASK-13 row — produces `docs/architecture/decode-plan.md`; purpose is the ideal semantic schedule for one-token inference independent of current engines; open question is boundary-added traffic relative to mathematical minimum traffic (**closed here by DERIVED stage-cut identities versus TASK-06 minima, not by selecting a fusion or packing**); completion is loads/state/visibility/reuse per stage, unavoidable vs proposed-boundary traffic, packing and fusion hypotheses without thread geometry.
-- `docs/architecture/task_ledger.md` TASK-06 established results — decode \(W=C+AT\); \(C_\text{complete}=27433238528\), \(A_\text{complete}=208896\); unique non-embed `52098598912`; unique+gather decode complete `52098619392`; state write `152047616`; state read \(69632(T-1)+153944064\); forced activation complete `3123200`; region-cut complete `5847040`; six HYPOTHESIS bottleneck labels.
+- `docs/architecture/task_ledger.md` TASK-06 established results — decode $W=C+AT$; $C_\text{complete}=27433238528$, $A_\text{complete}=208896$; unique non-embed `52098598912`; unique+gather decode complete `52098619392`; state write `152047616`; state read $69632(T-1)+153944064$; forced activation complete `3123200`; region-cut complete `5847040`; six HYPOTHESIS bottleneck labels.
 - `docs/architecture/task_ledger.md` TASK-09 established results — seven consumer sequences without an ideal sequence; `ideal_byte_sequence_selected` false; one compiled artifact for prefill and decode; `seq_gather_row` / `seq_lm_head_full` / `seq_state_s_dense` access identities.
 - `docs/architecture/task_ledger.md` TASK-11 established results — six node types; 135 complete instances; mixer xor by `layer_types`; 14 sync edges; `g`/`z` internal; residual add inside mixer/`mlp`; `schedule_selected` false **there** (this task selects the decode serial order).
 - `docs/architecture/task_ledger.md` TASK-12 established results — seven physical-need classes; 22 unselected fusion hypotheses; state/output edges nonfusible; `fanout_h64_cannot_hide_from_one_consumer` true.
 - `docs/architecture/task_ledger.md` TASK-14/15/17 — consumers of this schedule; do not perform those designs here.
-- `docs/architecture/work-and-traffic.md` — decode vs prefill \(T\) convention; unique-weight+gather; state volumes; three activation views; second \(W_\text{lm}\) read is HYPOTHESIS.
+- `docs/architecture/work-and-traffic.md` — decode vs prefill $T$ convention; unique-weight+gather; state volumes; three activation views; second $W_\text{lm}$ read is HYPOTHESIS.
 - `docs/architecture/runtime-format-design.md` — seven `consumer_sequence_ids`; access classes; state schema required; state payload inclusion unselected.
 - `docs/architecture/semantic-graph.md` — six node types; catalog partition; 14 sync edges; per-node I/O/state; mixer xor; live-across internal.
 - `docs/architecture/materialization-and-fusion.md` — 22 fusion hypothesis ids; forbidden drops; default tactics; working-set byte identities.
@@ -75,10 +75,10 @@ N/A — decode **semantic-schedule** documentation. No prefill/decode/component 
 
 If a node I/O, state kind, catalog ID, layer count, or cited MAC/byte would disagree with TASK-06/09/11/12 or sitting `text_config`, the earlier document / config wins and this one is wrong.
 
-- Prefill and decode share **one** semantic graph (TASK-11). This document schedules decode only: \(T_\text{new}=1\), stored KV length \(T\) after append, incoming \((K,V,C,S)\) **populated** (zeros is prefill, TASK-14).
-- Primary schedule **includes MTP** (second embed, `mtp_mix`, one `gated_attn`, one `mlp`, second `lm_head`). Language-only instance counts are secondary. Omitting MTP when only \(\ell^{(0)}\) is required is a TASK-02 algebraic equivalent, not a second schedule and not the primary contract.
-- Both current and next `token_id` presentations are **inputs** to the complete map (teacher-forced or otherwise provided). Sampling over \(V\) is out of scope. Do not invent a catalog ID for the next token; two presentations of `token_id`.
-- Algebraic equivalents (chunkwise GDN, SDPA, GQA-as-repeat, omitting MTP) stay **inside** the owning node. They are not extra stages. GDN primary stays `(17)`–`(18)`; do not treat chunkwise as zero \(S\) traffic.
+- Prefill and decode share **one** semantic graph (TASK-11). This document schedules decode only: $T_\text{new}=1$, stored KV length $T$ after append, incoming $(K,V,C,S)$ **populated** (zeros is prefill, TASK-14).
+- Primary schedule **includes MTP** (second embed, `mtp_mix`, one `gated_attn`, one `mlp`, second `lm_head`). Language-only instance counts are secondary. Omitting MTP when only $\ell^{(0)}$ is required is a TASK-02 algebraic equivalent, not a second schedule and not the primary contract.
+- Both current and next `token_id` presentations are **inputs** to the complete map (teacher-forced or otherwise provided). Sampling over $V$ is out of scope. Do not invent a catalog ID for the next token; two presentations of `token_id`.
+- Algebraic equivalents (chunkwise GDN, SDPA, GQA-as-repeat, omitting MTP) stay **inside** the owning node. They are not extra stages. GDN primary stays `(17)`–`(18)`; do not treat chunkwise as zero $S$ traffic.
 - TASK-11 **node types** are the scheduled units. Do not split `gated_attn` / `gated_delta_net` into proj/core/out as required stages. `g`/`z` stay internal unless a TASK-12 split hypothesis is tried.
 - Fan-out ≠ must-store and node I/O ≠ must-store still hold. A stage-cut byte identity is not a CUDA store.
 - Unique weight bytes are counted **once** per complete decode. Per-stage “loads” name **which** unique bytes that stage consumes, not a 64× restream of the model.
@@ -92,12 +92,12 @@ Use these **level-2 headings in this order**. Compact tables + one Mermaid fence
 
 1. **Authority** — this dossier, work/traffic, runtime-format, semantic-graph, materialization-and-fusion, inventory via those docs, config, checker; evidence labels; in-scope (language+MTP one-token serial schedule + traffic split + unselected packing/fusion attachments) vs deferred (vision encoder; TASK-14 prefill; TASK-15 layouts; TASK-17 CUDA). State that the document specifies a **hardware-independent semantic schedule**, not kernels.
 2. **Decode schedule convention** — the four canonical sentences (exact text below); what a stage is; serial vs hoist; prefill identity deferred.
-3. **One-token setting** — \(T\), incoming populated state, MTP, two token presentations, complete vs language-only.
+3. **One-token setting** — $T$, incoming populated state, MTP, two token presentations, complete vs language-only.
 4. **Stage kinds and serial order** — the locked 9 kinds, multiplicities summing to 135, mixer xor, serial order, ready-set constraints. This heading **starts** the ledger completion “per stage.”
 5. **Per-stage loads, state, visibility, and reuse** — one table covering all 9 kinds (loads / state R/W / visibility / reuse). Completes the per-stage criterion.
 6. **Unavoidable versus proposed-boundary traffic** — TASK-06 minima vs stage-cut identities; weight extra 0; state extra 0; activation three-view comparison; this heading **closes** the ledger open question.
 7. **Packing and fusion hypotheses** — seven sequences attached unselected; 22 fusion hypotheses unselected; five hoist hypotheses; one Mermaid summary (diagram 1 of 1).
-8. **Work citations and non-decisions** — cited \(C,A,W(T)\); bottleneck labels remain HYPOTHESIS citations; what TASK-14/15/17 own.
+8. **Work citations and non-decisions** — cited $C,A,W(T)$; bottleneck labels remain HYPOTHESIS citations; what TASK-14/15/17 own.
 9. **Deferred vision** — residual-stream interface only.
 10. **Machine-checkable summary JSON** — one fenced `json` object copied from a fresh checker `--json` run.
 
@@ -120,7 +120,7 @@ Bullets required under that heading:
 - Nine stage kinds are complete for this task; their multiplicities sum to 135 complete node instances (`n_stage_kinds` 9, `n_stage_instances` 135).
 - A stage is a named execution of one TASK-11 node type (or mixer xor) with loads, state R/W, visibility I/O, and reuse.
 - This document selects one **serial** order (`schedule_serial_selected` true). Hoist and overlap remain HYPOTHESIS (`n_hoist_hypotheses_selected` 0).
-- Prefill is not scheduled here (`prefill_schedule_deferred` true). Decode \(T_\text{new}=1\); incoming state is populated (`incoming_state_populated` true).
+- Prefill is not scheduled here (`prefill_schedule_deferred` true). Decode $T_\text{new}=1$; incoming state is populated (`incoming_state_populated` true).
 - Residual add stays inside mixer/`mlp`; `g`/`z` stay internal; RMS stays inside the consumer (TASK-11 locks).
 - Unique weights are counted once per complete decode (`weight_unique_counted_once` true).
 - Fan-out ≠ must-store and node I/O ≠ must-store still hold.
@@ -129,13 +129,13 @@ Bullets required under that heading:
 
 ### One-token setting (lock)
 
-Let \(T\) be the stored KV length **after** appending the current token (TASK-04/06). Decode of one new token has incoming KV length \(T-1\) and attention contractions against **length \(T\)**. When \(T=1\), incoming KV is empty but \(C,S\) are still populated on a continuing decode; the **first** generated token after prefill has incoming KV length \(T-1\) from the prompt. This document does not schedule that prefill.
+Let $T$ be the stored KV length **after** appending the current token (TASK-04/06). Decode of one new token has incoming KV length $T-1$ and attention contractions against **length $T$**. When $T=1$, incoming KV is empty but $C,S$ are still populated on a continuing decode; the **first** generated token after prefill has incoming KV length $T-1$ from the prompt. This document does not schedule that prefill.
 
 JSON: `T_is_stored_length_after_append` true; `decode_T_new` 1; `example_T` `[1, 4096]`; `incoming_state_populated` true; `primary_includes_mtp` true; `mtp_omission_is_algebraic_equivalent` true (not the primary schedule).
 
 JSON `n_token_presentations` = 2. Current `token_id` feeds `embed_current`; next `token_id` feeds `embed_next`. Both are graph inputs to the complete map. Do not add a catalog ID.
 
-JSON `n_node_instances_complete` = 135; `n_node_instances_language` = 130 (citations of TASK-11). Mixer xor: language layer \(\ell\) uses `gated_attn` iff \(\ell\in\mathcal{L}_\text{full}\) (`full_attention_indices` \(\{3,7,\ldots,63\}\)), else `gated_delta_net`. Then `mlp`. Do not unroll 64 layers beyond this rule. JSON `mixer_xor_by_layer_types` true.
+JSON `n_node_instances_complete` = 135; `n_node_instances_language` = 130 (citations of TASK-11). Mixer xor: language layer $\ell$ uses `gated_attn` iff $\ell\in\mathcal{L}_\text{full}$ (`full_attention_indices` $\{3,7,\ldots,63\}$), else `gated_delta_net`. Then `mlp`. Do not unroll 64 layers beyond this rule. JSON `mixer_xor_by_layer_types` true.
 
 JSON booleans (lock true unless noted):
 
@@ -171,7 +171,7 @@ JSON array `stage_kind_ids` in this exact order (9 ids). JSON `n_stage_kinds` = 
 | id | Multiplicity | Node type | Serial rank |
 | --- | ---: | --- | ---: |
 | `embed_current` | 1 | `embed` | 1 |
-| `language_mixer` | 64 | `mixer_xor` (`gated_attn` iff \(\ell\in\mathcal{L}_\text{full}\), else `gated_delta_net`) | 2 (loop with next) |
+| `language_mixer` | 64 | `mixer_xor` (`gated_attn` iff $\ell\in\mathcal{L}_\text{full}$, else `gated_delta_net`) | 2 (loop with next) |
 | `language_mlp` | 64 | `mlp` | 2 (after matching mixer) |
 | `lm_head_primary` | 1 | `lm_head` | 3 |
 | `embed_next` | 1 | `embed` | 4 |
@@ -187,7 +187,7 @@ Instance-count cross-check (required prose + checker): `language_mixer` contribu
 **Serial order** (selected; one complete decode):
 
 1. `embed_current`
-2. For \(\ell=0,\ldots,63\): `language_mixer`[\(\ell\)] then `language_mlp`[\(\ell\)]
+2. For $\ell=0,\ldots,63$: `language_mixer`[$\ell$] then `language_mlp`[$\ell$]
 3. `lm_head_primary`
 4. `embed_next`
 5. `mtp_mix`
@@ -205,8 +205,8 @@ JSON array `ready_constraint_ids` in this exact order (10 ids). JSON `n_ready_co
 | --- | --- | --- |
 | `ready_embed_current` | `embed_current` | current `token_id` present |
 | `ready_language_mixer_0` | `language_mixer`[0] | `embed_current` (`identity_e_h0`) |
-| `ready_language_mlp` | `language_mlp`[\(\ell\)] | matching `language_mixer`[\(\ell\)] (`residual_h_mid`) |
-| `ready_language_mixer_next` | `language_mixer`[\(\ell>0\)] | `language_mlp`[\(\ell-1\)] (`residual_h`) |
+| `ready_language_mlp` | `language_mlp`[$\ell$] | matching `language_mixer`[$\ell$] (`residual_h_mid`) |
+| `ready_language_mixer_next` | `language_mixer`[$\ell>0$] | `language_mlp`[$\ell-1$] (`residual_h`) |
 | `ready_lm_head_primary` | `lm_head_primary` | `language_mlp`[63] (`fanout_h64`) |
 | `ready_embed_next` | `embed_next` | next `token_id` present (no language-stack data edge) |
 | `ready_mtp_mix` | `mtp_mix` | `language_mlp`[63] **and** `embed_next` |
@@ -224,15 +224,15 @@ Implementation copies these rows; do not add/remove stage kinds.
 
 | Stage | Loads | State read | State write | Visibility in | Visibility out | Reuse |
 | --- | --- | --- | --- | --- | --- | --- |
-| `embed_current` | One row of shared \(E\) (10240 B gather; table not streamed) | none | none | current `token_id` | `e` identified as \(h^{(0)}\) | `shared_E`; gather vs full table |
-| `language_mixer` | Mixer unique weights for that layer (self-attn **or** linear-attn family; counted once in the unique-weight total). Access `dense_gemm`; GDN also `depthwise_conv` | `gated_attn`: \(K,V\) of length \(T-1\) (4096 B/token/instance). `gated_delta_net`: \(C\) 61440 B and \(S\) 3145728 B per instance | `gated_attn`: append \(K,V\) 4096 B. `gated_delta_net`: write \(C\) and \(S_t\) | `h` (live until Mix add) | `h_mid` | Residual `h` until add; internals default inside (`g` live-across internal; `k_rope`/`v_full`/`qkv` reuse_or_recompute HYPOTHESIS; `k_hat` intra-equation) |
-| `language_mlp` | MLP unique weights for that layer (counted once in the unique-weight total). Access `dense_gemm` | none | none | `h_mid` (live until MLP add) | next `h`, or `h_64` at \(\ell=63\) | Residual `h_mid` until add; `h_post`/`swiglu` fuse_or_recompute HYPOTHESIS |
-| `lm_head_primary` | Shared \(W_\text{lm}\) 2542796800 B (`seq_lm_head_full`) plus final RMS gamma | none | none | `h_64` | `logits_0` | `shared_W_lm`; `h_64` also consumed by `mtp_mix` |
-| `embed_next` | One row of shared \(E\) (10240 B gather) | none | none | next `token_id` | `e_next` | `shared_E` (same payload as `embed_current`) |
+| `embed_current` | One row of shared $E$ (10240 B gather; table not streamed) | none | none | current `token_id` | `e` identified as $h^{(0)}$ | `shared_E`; gather vs full table |
+| `language_mixer` | Mixer unique weights for that layer (self-attn **or** linear-attn family; counted once in the unique-weight total). Access `dense_gemm`; GDN also `depthwise_conv` | `gated_attn`: $K,V$ of length $T-1$ (4096 B/token/instance). `gated_delta_net`: $C$ 61440 B and $S$ 3145728 B per instance | `gated_attn`: append $K,V$ 4096 B. `gated_delta_net`: write $C$ and $S_t$ | `h` (live until Mix add) | `h_mid` | Residual `h` until add; internals default inside (`g` live-across internal; `k_rope`/`v_full`/`qkv` reuse_or_recompute HYPOTHESIS; `k_hat` intra-equation) |
+| `language_mlp` | MLP unique weights for that layer (counted once in the unique-weight total). Access `dense_gemm` | none | none | `h_mid` (live until MLP add) | next `h`, or `h_64` at $\ell=63$ | Residual `h_mid` until add; `h_post`/`swiglu` fuse_or_recompute HYPOTHESIS |
+| `lm_head_primary` | Shared $W_\text{lm}$ 2542796800 B (`seq_lm_head_full`) plus final RMS gamma | none | none | `h_64` | `logits_0` | `shared_W_lm`; `h_64` also consumed by `mtp_mix` |
+| `embed_next` | One row of shared $E$ (10240 B gather) | none | none | next `token_id` | `e_next` | `shared_E` (same payload as `embed_current`) |
 | `mtp_mix` | `mtp.fc` contraction weights. Access `dense_gemm` | none | none | `h_64`, `e_next` | `mtp_u` as residual `h` | `h_64` fan-out reuse; `mtp_cat` split HYPOTHESIS |
-| `mtp_mixer` | MTP `gated_attn` unique weights. Access `dense_gemm` | MTP \(K,V\) of length \(T-1\) | MTP \(K,V\) append 4096 B | `mtp_u` as `h` | `h_mid` | Same gated-attn reuse as language full layers |
+| `mtp_mixer` | MTP `gated_attn` unique weights. Access `dense_gemm` | MTP $K,V$ of length $T-1$ | MTP $K,V$ append 4096 B | `mtp_u` as `h` | `h_mid` | Same gated-attn reuse as language full layers |
 | `mtp_mlp` | MTP MLP unique weights. Access `dense_gemm` | none | none | `h_mid` | `h_mtp` | Same MLP reuse as language |
-| `lm_head_mtp` | Shared \(W_\text{lm}\) (second physical read HYPOTHESIS, not unique bytes) | none | none | `h_mtp` | `logits_1` | `shared_W_lm` |
+| `lm_head_mtp` | Shared $W_\text{lm}$ (second physical read HYPOTHESIS, not unique bytes) | none | none | `h_mtp` | `logits_1` | `shared_W_lm` |
 
 JSON `stage_visibility_in` / `stage_visibility_out` keyed in `stage_kind_ids` order:
 
@@ -272,7 +272,7 @@ State volume citations (do not re-derive; checker recomputes from the same ident
 | `decode_read_fixed_bytes` | 153944064 |
 | `decode_read_kv_bytes_coeff_Tm1` | 69632 |
 
-Prose required: omitting a KV/\(C\)/\(S\) write changes the map (`state_write_not_optional`). Chunkwise GDN is not zero \(S\) traffic.
+Prose required: omitting a KV/$C$/$S$ write changes the map (`state_write_not_optional`). Chunkwise GDN is not zero $S$ traffic.
 
 ### Unavoidable versus proposed-boundary traffic (lock; heading 6; closes open question)
 
@@ -286,7 +286,7 @@ Three channels. **Unavoidable** = TASK-06 mathematical minimum for one complete 
 | Gather complete (`e_t` + `e_{t+1}`) | 20480 | unavoidable |
 | Unique+gather decode complete | 52098619392 | unavoidable |
 | Unique extra vs TASK-06 | 0 | DERIVED |
-| Second physical \(W_\text{lm}\) read | 2542796800 | HYPOTHESIS extra, not unique |
+| Second physical $W_\text{lm}$ read | 2542796800 | HYPOTHESIS extra, not unique |
 
 JSON: `weight_bytes_unique_non_embed` 52098598912, `weight_gather_bytes_decode_complete` 20480, `weight_unique_plus_gather_decode_complete` 52098619392, `weight_boundary_added_unique_bytes` 0, `weight_second_w_lm_read_bytes` 2542796800.
 
@@ -294,13 +294,13 @@ JSON: `weight_bytes_unique_non_embed` 52098598912, `weight_gather_bytes_decode_c
 
 | Item | Bytes | Label |
 | --- | --- | --- |
-| Write all \(K,V,C,S\) | 152047616 | unavoidable |
-| Read | \(69632(T-1)+153944064\) | unavoidable |
-| Read at \(T=1\) | 153944064 | DERIVED |
-| Read at \(T=4096\) | 439087104 | DERIVED |
+| Write all $K,V,C,S$ | 152047616 | unavoidable |
+| Read | $69632(T-1)+153944064$ | unavoidable |
+| Read at $T=1$ | 153944064 | DERIVED |
+| Read at $T=4096$ | 439087104 | DERIVED |
 | Extra vs TASK-06 | 0 | DERIVED |
 
-JSON arrays `decode_read_bytes_at_example_T`, `storage_bytes_at_example_T` follow `example_T`. Storage \(B_\text{store}(T)=69632T+153944064\) (154013696 at \(T=1\), 439156736 at \(T=4096\)). JSON `state_boundary_added_bytes` 0.
+JSON arrays `decode_read_bytes_at_example_T`, `storage_bytes_at_example_T` follow `example_T`. Storage $B_\text{store}(T)=69632T+153944064$ (154013696 at $T=1$, 439156736 at $T=4096$). JSON `state_boundary_added_bytes` 0.
 
 **Activation — three views plus this stage-cut**
 
@@ -315,9 +315,9 @@ JSON `n_fanout_h64_crossings` = 1.
 JSON `n_embed_e_next_crossings` = 1.
 JSON `n_mtp_u_crossings` = 1.
 JSON `n_h_mtp_crossings` = 1.
-JSON `n_residual_stage_crossings` = 133. Sum: 1 (`e` as \(h^{(0)}\)) + 65 (`h_mid`) + 63 (inter-layer `h`) + 1 (`h_64`) + 1 (`e_next`) + 1 (`mtp_u`) + 1 (`h_mtp`). Do **not** add a second MTP `h_mid` line; it is already inside `n_h_mid_crossings`.
+JSON `n_residual_stage_crossings` = 133. Sum: 1 (`e` as $h^{(0)}$) + 65 (`h_mid`) + 63 (inter-layer `h`) + 1 (`h_64`) + 1 (`e_next`) + 1 (`mtp_u`) + 1 (`h_mtp`). Do **not** add a second MTP `h_mid` line; it is already inside `n_h_mid_crossings`.
 
-JSON `residual_bytes` 10240. JSON `act_residual_stage_cut_bytes` = \(133\times 10240\) = 1361920.
+JSON `residual_bytes` 10240. JSON `act_residual_stage_cut_bytes` = $133\times 10240$ = 1361920.
 JSON `logits_bytes` 496640. JSON `n_logit_outputs` = 2. JSON `act_logits_stage_cut_bytes` = 993280.
 JSON `act_stage_cut_decode_complete_bytes` = 2355200.
 
@@ -325,18 +325,18 @@ Checker: `n_residual_stage_crossings == n_identity_e_h0_crossings + n_h_mid_cros
 Checker: `act_residual_stage_cut_bytes == n_residual_stage_crossings * residual_bytes`.
 Checker: `act_stage_cut_decode_complete_bytes == act_residual_stage_cut_bytes + act_logits_stage_cut_bytes`.
 
-`g`/`z` stay inside mixers: JSON `act_gz_local_bytes` = \(16\times 12288 + 48\times 12288 + 12288\) = 798720 (language `g` + language `z` + MTP `g`). These are **not** stage-cut bytes.
+`g`/`z` stay inside mixers: JSON `act_gz_local_bytes` = $16\times 12288 + 48\times 12288 + 12288$ = 798720 (language `g` + language `z` + MTP `g`). These are **not** stage-cut bytes.
 
-JSON `act_boundary_added_vs_forced` = \(2355200-3123200\) = \(-768000\).
-JSON `act_boundary_added_vs_region_cut` = \(2355200-5847040\) = \(-3491840\).
+JSON `act_boundary_added_vs_forced` = $2355200-3123200$ = $-768000$.
+JSON `act_boundary_added_vs_region_cut` = $2355200-5847040$ = $-3491840$.
 
 Negative values are DERIVED identities, not “the schedule is cheaper than liveness.” Forced includes live-across `g`/`z` as mathematical must-survive; region-cut includes intra-node internals (`h_tilde`, `mix_*`, `h_post`, …). The schedule keeps those **inside** stages. Proposed-boundary traffic is the **named stage-cut channel** 2355200 B, not a claim that `g`/`z` disappeared.
 
 JSON `act_h64_second_consumer_bytes` 10240 — extra physical read of `h_64` by the second of (`lm_head_primary`, `mtp_mix`) is HYPOTHESIS (`act_h64_second_consumer_is_hypothesis` true). Unique stage-cut counts `h_64` once.
 
-JSON `act_h_mid_stage_cut_bytes` = \(65\times 10240\) = 665600. `fuse_across_residual_h_mid` would remove this as **inter-stage** I/O (TASK-12 extra_sync \(-1\)) while keeping the add in a local working set. Usefulness HYPOTHESIS. Do not apply that fusion here.
+JSON `act_h_mid_stage_cut_bytes` = $65\times 10240$ = 665600. `fuse_across_residual_h_mid` would remove this as **inter-stage** I/O (TASK-12 extra_sync $-1$) while keeping the add in a local working set. Usefulness HYPOTHESIS. Do not apply that fusion here.
 
-Closing paragraph (required): this heading **closes** the ledger open question. Unavoidable unique-weight extra is 0. Unavoidable state extra is 0. Proposed-boundary activation is the stage-cut identity 2355200 B, compared with TASK-06 forced 3123200 B and region-cut 5847040 B. A second \(W_\text{lm}\) read, an extra `h_64` consumer read, hoist/overlap, and every TASK-12 fusion/split change to those extras remain HYPOTHESIS. This document does not authorize a merge, a split, a packing winner, or a CUDA mapping.
+Closing paragraph (required): this heading **closes** the ledger open question. Unavoidable unique-weight extra is 0. Unavoidable state extra is 0. Proposed-boundary activation is the stage-cut identity 2355200 B, compared with TASK-06 forced 3123200 B and region-cut 5847040 B. A second $W_\text{lm}$ read, an extra `h_64` consumer read, hoist/overlap, and every TASK-12 fusion/split change to those extras remain HYPOTHESIS. This document does not authorize a merge, a split, a packing winner, or a CUDA mapping.
 
 ### Packing and fusion hypotheses (lock; heading 7)
 
@@ -354,17 +354,17 @@ Default schedule **keeps TASK-11 node cuts** as stages. That is compatible with 
 | --- | --- |
 | `hoist_embed_next` | Issue `embed_next` as soon as next `token_id` is present (serial places it after `lm_head_primary`) |
 | `overlap_fanout_h64` | `lm_head_primary` and `mtp_mix` are both ready after `h_64` |
-| `reuse_E` | Two gathers of one \(E\) payload |
-| `reuse_W_lm` | Two `lm_head` instances of one \(W_\text{lm}\) payload; second physical read is HYPOTHESIS extra bytes |
+| `reuse_E` | Two gathers of one $E$ payload |
+| `reuse_W_lm` | Two `lm_head` instances of one $W_\text{lm}$ payload; second physical read is HYPOTHESIS extra bytes |
 | `reuse_h64` | Two consumers of one `h_64`; extra physical read is HYPOTHESIS 10240 B |
 
 JSON `hoist_usefulness_label` exactly `HYPOTHESIS`.
 
 ### Work citations and non-decisions (lock; heading 8)
 
-Cite; do not recopy TASK-06 symbolic tables. Checker **recomputes** \(C,A,W(T)\) from `text_config` with the same identities as TASK-06.
+Cite; do not recopy TASK-06 symbolic tables. Checker **recomputes** $C,A,W(T)$ from `text_config` with the same identities as TASK-06.
 
-JSON: `mac_C_complete` 27433238528, `mac_A_complete` 208896, `mac_decode_complete_at_example_T` `[27433447424, 28288876544]`. Language secondary: `mac_C_language` 25737166848, `mac_A_language` 196608. Identity \(W=C+AT\).
+JSON: `mac_C_complete` 27433238528, `mac_A_complete` 208896, `mac_decode_complete_at_example_T` `[27433447424, 28288876544]`. Language secondary: `mac_C_language` 25737166848, `mac_A_language` 196608. Identity $W=C+AT$.
 
 JSON `bottleneck_labels` copied from TASK-06: `weight_memory`, `vocab_memory`, `state_memory`, `kv_memory`, `quadratic_attn`, `compute`. Restating a label here is a **citation**, still HYPOTHESIS. JSON `n_bottleneck_labels` = 6. Decode does not use `quadratic_attn` as a one-token class (that label is prefill); still copy the six-id list, do not rank.
 
@@ -384,7 +384,7 @@ Visual tokens may replace placeholders on the `identity_e_h0` edge (`out_hidden_
 
 ### Tooling
 
-Create `scripts/check_decode_plan.py` (Python 3.11+, stdlib only: `argparse`, `json`, `math`, `re`, `sys`, `pathlib`, Google docstrings, type annotations on public functions). No torch, safetensors, numpy, mermaid parser, uv, Ruff, or pytest. Do not import other `scripts/check_*.py`; duplicate the small `text_config` arithmetic needed for layer counts, `full_attention_indices`, residual/`g`/`z`/`logits` bytes, cited TASK-06 \(C,A,W(T)\), unique-weight+gather, and TASK-04/06 state volumes. Duplicate TASK-11 node-type / sync-edge lists, TASK-09 `consumer_sequence_ids`, and TASK-12 `fusion_hypothesis_ids` as constants; do not import them.
+Create `scripts/check_decode_plan.py` (Python 3.11+, stdlib only: `argparse`, `json`, `math`, `re`, `sys`, `pathlib`, Google docstrings, type annotations on public functions). No torch, safetensors, numpy, mermaid parser, uv, Ruff, or pytest. Do not import other `scripts/check_*.py`; duplicate the small `text_config` arithmetic needed for layer counts, `full_attention_indices`, residual/`g`/`z`/`logits` bytes, cited TASK-06 $C,A,W(T)$, unique-weight+gather, and TASK-04/06 state volumes. Duplicate TASK-11 node-type / sync-edge lists, TASK-09 `consumer_sequence_ids`, and TASK-12 `fusion_hypothesis_ids` as constants; do not import them.
 
 CLI (cwd = repository root):
 
@@ -400,7 +400,7 @@ python3 scripts/check_decode_plan.py \
 
 Behavior:
 
-- Read `text_config` from `--config`. Build the summary object (schema below). Live fields from config: `hidden_size`, `intermediate_size`, `vocab_size`, layer counts, head dims, linear widths, `full_attention_indices`, `dtype`, `mamba_ssm_dtype`. Derived: instance counts, \(C,A,W(T)\), residual/`g`/`z`/`logits` bytes, stage-cut products, cited unique-weight+gather and state volumes. Constant fields: canonical sentences, stage/hoist/fusion/sequence lists, booleans.
+- Read `text_config` from `--config`. Build the summary object (schema below). Live fields from config: `hidden_size`, `intermediate_size`, `vocab_size`, layer counts, head dims, linear widths, `full_attention_indices`, `dtype`, `mamba_ssm_dtype`. Derived: instance counts, $C,A,W(T)$, residual/`g`/`z`/`logits` bytes, stage-cut products, cited unique-weight+gather and state volumes. Constant fields: canonical sentences, stage/hoist/fusion/sequence lists, booleans.
 - `--json`: print that object to stdout (pretty-printed, script key order); run internal asserts listed below; exit 0.
 - Default / `--decode-plan PATH`: also require PATH to contain (1) every required `##` heading listed above **in order**, (2) the first fenced `json` block equal to the live object, (3) exactly one ` ```mermaid ` fence containing `flowchart`, (4) all four canonical sentences verbatim, (5) every `stage_kind_ids`, `consumer_sequence_ids`, `fusion_hypothesis_ids`, `hoist_hypothesis_ids`, `ready_constraint_ids`, `sync_edge_ids`, `node_type_ids`, `bottleneck_labels` id present as a substring, (6) the diagram’s required IDs present **inside that mermaid fence**, (7) none of `TBD`, `TODO`, `???`, (8) no `UNKNOWN` except inside the Deferred vision section, (9) every locked document integer below present as a decimal or integer substring, (10) the words `HYPOTHESIS` and `hardware-independent` present, (11) none of the forbidden winner phrases: `selected fusion`, `selected packing`, `selected kernel`, `winning fusion`, `should fuse`, `recommend fusion`, `ideal byte sequence is`, `artifact boundary is`, `CUDA kernel fusion is required`, `thread block`, `warp shuffle`, `Quartz graph`, `llama.cpp graph`, `GGUF is the schedule` (allow the substring only inside `not a selected fusion` / `not a CUDA graph, kernel launch sequence, or selected fusion` / `none is a selected winner`). Exit 1 with a readable list on mismatch.
 - Missing config: exit 2 (blocked, not a content fail).
@@ -496,12 +496,12 @@ Duplicate key `fusion_selected` appears once as the boolean `false` at the boole
 
 - **Implementation** writes `scripts/check_decode_plan.py` **and** `docs/architecture/decode-plan.md` (nine stage kinds summing to 135 instances, serial order, per-stage loads/state/visibility/reuse, unavoidable vs stage-cut traffic that closes the ledger open question, 7 sequences + 22 fusion hypotheses + 5 hoist hypotheses all unselected, JSON fence). Runs `--json` and `--decode-plan` after the document exists. Records command outcomes in this dossier. Does not commit. Does not stream payloads.
 - **Documentation** performs a mechanical pass only: draft-status `unverified` banner (TASK-07 / `numerical-sensitivity.md` / `semantic-graph.md` style), Authority table links to this dossier / work-and-traffic / runtime-format / semantic-graph / materialization-and-fusion / plan evidence policy, heading/JSON fence consistency. Must not change locked integers, canonical sentences, stage-kind ids, sequence ids, fusion ids, or Mermaid node IDs. Does not edit TASK-06/09/11/12 artifacts.
-- **Verification** independently re-runs focused commands, recomputes \(C+AT\), residual/stage-cut bytes, unique+gather, and state volumes from sitting `text_config` (not from JSON echo), spot-checks cited TASK-06 integers against `docs/architecture/work-and-traffic.md` and sequence/fusion id lists against `docs/architecture/runtime-format-design.md` / `docs/architecture/materialization-and-fusion.md` (not from this JSON echo), reads the document against this dossier, and confirms no Quartz/llama.cpp/GGUF-as-schedule, no winner phrases, no `plan.md` or ledger edit, no payload I/O, that every fusion/hoist remains unselected, that contracts are hardware-independent (no CUDA kernel/thread/SKU decisions, `thread_geometry_absent` true), that `g`/`z` are not stage-cut I/O, that unique-weight and state extras are 0, and that the open question is closed by the stage-cut vs TASK-06 comparison. Prefill, layouts, and CUDA mapping remain open. Ideal byte sequence remains unselected.
+- **Verification** independently re-runs focused commands, recomputes $C+AT$, residual/stage-cut bytes, unique+gather, and state volumes from sitting `text_config` (not from JSON echo), spot-checks cited TASK-06 integers against `docs/architecture/work-and-traffic.md` and sequence/fusion id lists against `docs/architecture/runtime-format-design.md` / `docs/architecture/materialization-and-fusion.md` (not from this JSON echo), reads the document against this dossier, and confirms no Quartz/llama.cpp/GGUF-as-schedule, no winner phrases, no `plan.md` or ledger edit, no payload I/O, that every fusion/hoist remains unselected, that contracts are hardware-independent (no CUDA kernel/thread/SKU decisions, `thread_geometry_absent` true), that `g`/`z` are not stage-cut I/O, that unique-weight and state extras are 0, and that the open question is closed by the stage-cut vs TASK-06 comparison. Prefill, layouts, and CUDA mapping remain open. Ideal byte sequence remains unselected.
 
 - Invariants:
   - Ten level-2 headings in the locked order; four canonical sentences verbatim; 9 stage kinds; 135 instances; 10 ready constraints; 5 hoist hypotheses all unselected; 22 fusion hypotheses all unselected; 7 sequences attached unselected; one Mermaid flowchart with required IDs.
   - Serial order selected; hoist/overlap not required; primary includes MTP; mixer xor by `layer_types`; residual add inside mixer and `mlp`; `g`/`z` internal; unique weights counted once; state writes not optional.
-  - GDN numerical definition remains recurrent `(17)`–`(18)`; chunkwise is not zero \(S\) traffic.
+  - GDN numerical definition remains recurrent `(17)`–`(18)`; chunkwise is not zero $S$ traffic.
   - Unavoidable unique-weight extra 0; state extra 0; stage-cut activation 2355200 B; forced 3123200; region-cut 5847040.
   - Logical values do not imply allocation; packing/fusion usefulness is HYPOTHESIS; no thread geometry.
   - Vision encoder remains unexpanded and is not a stage.
@@ -514,8 +514,8 @@ Duplicate key `fusion_selected` appears once as the boolean `false` at the boole
   - Treating negative `act_boundary_added_vs_forced` as “g/z deleted”: rejected; they remain local working set.
   - Counting unique MLP/attn weights × 64 as decode traffic: rejected; unique counted once.
   - Streaming the full embed table: rejected; gather only (TASK-06).
-  - Second \(W_\text{lm}\) read as DERIVED unique bytes: rejected; TASK-06 HYPOTHESIS.
-  - Chunkwise GDN as zero \(S\) traffic or as extra stages: rejected; TASK-02/06/07/11.
+  - Second $W_\text{lm}$ read as DERIVED unique bytes: rejected; TASK-06 HYPOTHESIS.
+  - Chunkwise GDN as zero $S$ traffic or as extra stages: rejected; TASK-02/06/07/11.
   - Separate language-only primary schedule: rejected; complete map includes MTP.
   - Scheduling prefill here or comparing every node with prefill: TASK-14.
   - Importing TASK-16 occupancy / thread geometry: rejected; not a dependency; hardware-independent.
@@ -581,7 +581,7 @@ Do not run Ruff, pytest, CMake, or CUDA; this increment does not introduce those
 
 - Agent/model: `cursor-grok-4.6-high` (this stage; parent/inherit mapping)
 - UTC/time/tokens/cost: `2026-09-20T14:50:00Z`; `telemetry_unavailable`
-- Outcome: Decision-complete dossier created at `docs/architecture/tasks/TASK-13.md`. Coupled IDs `none`. Document structure (10 headings), four canonical sentences, nine stage kinds (multiplicities \(1+64+64+1+1+1+1+1+1=135\)), serial order, 10 ready constraints, per-stage loads/state/visibility/reuse, unavoidable unique-weight/state extra 0 plus stage-cut activation 2355200 B vs TASK-06 forced 3123200 / region-cut 5847040, 7 unselected sequences, 22 unselected fusion hypotheses, 5 unselected hoist hypotheses, stdlib checker `scripts/check_decode_plan.py`, JSON schema, and acceptance commands are closed. Ledger open question closed **by DERIVED stage-cut identities versus TASK-06 minima**, not by selecting a fusion or packing. `docs/architecture/decode-plan.md` and the checker were **not** written in this stage. `plan.md` and `task_ledger.md` not edited. No commit.
+- Outcome: Decision-complete dossier created at `docs/architecture/tasks/TASK-13.md`. Coupled IDs `none`. Document structure (10 headings), four canonical sentences, nine stage kinds (multiplicities $1+64+64+1+1+1+1+1+1=135$), serial order, 10 ready constraints, per-stage loads/state/visibility/reuse, unavoidable unique-weight/state extra 0 plus stage-cut activation 2355200 B vs TASK-06 forced 3123200 / region-cut 5847040, 7 unselected sequences, 22 unselected fusion hypotheses, 5 unselected hoist hypotheses, stdlib checker `scripts/check_decode_plan.py`, JSON schema, and acceptance commands are closed. Ledger open question closed **by DERIVED stage-cut identities versus TASK-06 minima**, not by selecting a fusion or packing. `docs/architecture/decode-plan.md` and the checker were **not** written in this stage. `plan.md` and `task_ledger.md` not edited. No commit.
 - Performance evidence applied: N/A — semantic-schedule documentation; packing/fusion/hoist usefulness is hypothesis, not measured sink ranking or quality impact
 
 ### Implementation
@@ -589,7 +589,7 @@ Do not run Ruff, pytest, CMake, or CUDA; this increment does not introduce those
 - Agent/model: `cursor-grok-4.6-high` (this stage; parent/inherit mapping)
 - Changes:
   - `scripts/check_decode_plan.py` (create) — stdlib checker; instantiates the locked 158-key summary from sitting `text_config`; `--json` asserts nine stage kinds / 135 instances, stage-cut 2355200 B versus TASK-06 forced 3123200 / region-cut 5847040, unique-weight extra 0, state extra 0, 22 fusion and 5 hoist hypotheses all unselected; `--decode-plan` checks headings, canonical sentences, JSON fence equality, one Mermaid flowchart, ids, locked integers, and forbidden winner phrases.
-  - `docs/architecture/decode-plan.md` (create) — ten level-2 headings; four canonical sentences verbatim; nine stage kinds (multiplicities \(1+64+64+1+1+1+1+1+1=135\)); selected serial order; per-stage loads/state/visibility/reuse; unavoidable unique-weight/state extra 0 plus stage-cut activation 2355200 B closing the ledger open question as DERIVED identities; 7 sequences + 22 fusion hypotheses + 5 hoist hypotheses all unselected; one Mermaid flowchart with required IDs; live JSON fence.
+  - `docs/architecture/decode-plan.md` (create) — ten level-2 headings; four canonical sentences verbatim; nine stage kinds (multiplicities $1+64+64+1+1+1+1+1+1=135$); selected serial order; per-stage loads/state/visibility/reuse; unavoidable unique-weight/state extra 0 plus stage-cut activation 2355200 B closing the ledger open question as DERIVED identities; 7 sequences + 22 fusion hypotheses + 5 hoist hypotheses all unselected; one Mermaid flowchart with required IDs; live JSON fence.
   - `docs/architecture/plan.md`, `task_ledger.md`, TASK-06/09/11/12 deliverables, and other `scripts/check_*.py` were not edited in this stage.
 - Commands:
   - `python3 -m py_compile scripts/check_decode_plan.py` — pass
