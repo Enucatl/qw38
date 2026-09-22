@@ -5,6 +5,7 @@
 #include <cmath>
 #include <cstdint>
 #include <iostream>
+#include <limits>
 #include <span>
 #include <string>
 #include <string_view>
@@ -370,6 +371,16 @@ void test_silu_sigmoid_gemv_argmax() {
   auto empty = qw38::reference::argmax_fp32({});
   expect(!empty && empty.error().code == ErrorCode::InvalidArgument,
          "empty argmax rejected");
+  float const nan = std::numeric_limits<float>::quiet_NaN();
+  float const inf = std::numeric_limits<float>::infinity();
+  for (std::vector<float> const& non_finite :
+       {std::vector<float>{nan, 1.0f}, std::vector<float>{1.0f, inf},
+        std::vector<float>{1.0f, -inf},
+        std::vector<float>{nan, inf, -inf}}) {
+    auto rejected = qw38::reference::argmax_fp32(non_finite);
+    expect(!rejected && rejected.error().code == ErrorCode::InvalidArgument,
+           "non-finite argmax rejected");
+  }
 }
 
 void test_gdn_conv_prepare() {

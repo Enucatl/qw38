@@ -1,5 +1,7 @@
 #include "cuda/activation.hpp"
 
+#include "cuda/copy.hpp"
+
 #include <cstddef>
 #include <cmath>
 #include <limits>
@@ -241,10 +243,20 @@ __device__ __forceinline__ void warp_maxloc(float& v, std::uint32_t& idx) {
 
 __global__ void argmax_fp32_kernel(float const* logits, std::uint32_t n,
                                    std::uint32_t* out_index) {
+  __shared__ std::uint32_t non_finite;
+  if (threadIdx.x == 0) {
+    non_finite = 0;
+  }
+  __syncthreads();
+
   float best = __int_as_float(0xff800000);
   std::uint32_t best_i = 0xffffffffu;
   for (std::uint32_t i = threadIdx.x; i < n; i += blockDim.x) {
     float const v = logits[i];
+    if (!isfinite(v)) {
+      atomicExch(&non_finite, 1u);
+      continue;
+    }
     if (v > best || (v == best && i < best_i)) {
       best = v;
       best_i = i;
@@ -265,7 +277,7 @@ __global__ void argmax_fp32_kernel(float const* logits, std::uint32_t n,
     best_i = (lane < 8) ? sm_i[lane] : 0xffffffffu;
     warp_maxloc(best, best_i);
     if (lane == 0) {
-      *out_index = best_i;
+      *out_index = non_finite == 0 ? best_i : 0xffffffffu;
     }
   }
 }
@@ -502,7 +514,22 @@ std::expected<void, Error> launch_argmax_fp32(float const* logits,
   }
   argmax_fp32_kernel<<<1, kHiddenRmsThreads, 0, stream.native()>>>(logits, n,
                                                                   out_index);
-  return check(cudaGetLastError(), "argmax_fp32_kernel");
+  if (auto launch = check(cudaGetLastError(), "argmax_fp32_kernel"); !launch) {
+    return launch;
+  }
+  std::uint32_t host_index = 0xffffffffu;
+  if (auto copy = copy_d2h(&host_index, out_index, sizeof(host_index), stream);
+      !copy) {
+    return copy;
+  }
+  if (auto sync = stream.sync(); !sync) {
+    return sync;
+  }
+  if (host_index == 0xffffffffu) {
+    return std::unexpected(make_error(ErrorCode::InvalidArgument, "argmax_fp32",
+                                      "logits must contain only finite values"));
+  }
+  return {};
 }
 
 }  // namespace qw38::cuda

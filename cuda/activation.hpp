@@ -58,7 +58,8 @@ inline constexpr int kHeadNormThreads = 128;   // T-03: one block/head
     std::int32_t position, std::uint32_t n_heads, std::uint16_t* out_bf16,
     Stream const& stream);
 
-// Deterministic argmax: lowest index of the maximum. Writes one uint32.
+// Deterministic argmax: lowest index of the maximum. Rejects any non-finite
+// input value and writes one uint32 only for valid input.
 [[nodiscard]] std::expected<void, Error> launch_argmax_fp32(
     float const* logits, std::uint32_t n, std::uint32_t* out_index,
     Stream const& stream);

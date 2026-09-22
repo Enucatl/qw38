@@ -348,7 +348,8 @@ struct AttnMixerReference {
     std::span<std::uint16_t const> weight, std::span<std::uint16_t const> input,
     std::uint32_t n, std::uint32_t k, std::span<double> out);
 
-// Lowest index of the maximum finite-comparable value. Ties keep the first.
+// Lowest index of the maximum. Ties keep the first. Rejects any non-finite
+// input value.
 [[nodiscard]] std::expected<std::uint32_t, Error> argmax_fp32(
     std::span<float const> logits);
 

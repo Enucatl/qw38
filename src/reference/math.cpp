@@ -1158,6 +1158,12 @@ std::expected<std::uint32_t, Error> argmax_fp32(std::span<float const> logits) {
   if (logits.empty()) {
     return std::unexpected(arg_error("logits", "logits must be non-empty"));
   }
+  for (float const v : logits) {
+    if (!std::isfinite(v)) {
+      return std::unexpected(
+          arg_error("logits", "logits must contain only finite values"));
+    }
+  }
   std::uint32_t best_i = 0;
   float best = logits[0];
   for (std::uint32_t i = 1; i < static_cast<std::uint32_t>(logits.size()); ++i) {

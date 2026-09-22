@@ -8,6 +8,7 @@
 #include <cmath>
 #include <cstdint>
 #include <iostream>
+#include <limits>
 #include <span>
 #include <string>
 #include <vector>
@@ -342,6 +343,30 @@ void test_argmax(Stream const& stream) {
   expect(static_cast<bool>(st), "launch argmax");
   auto got = download_vec<std::uint32_t>(*d_out, 1, stream);
   expect(static_cast<bool>(got) && (*got)[0] == 400, "cuda argmax matches");
+
+  float const nan = std::numeric_limits<float>::quiet_NaN();
+  float const inf = std::numeric_limits<float>::infinity();
+  for (std::vector<float> const& non_finite :
+       {std::vector<float>{nan, 1.0f}, std::vector<float>{1.0f, inf},
+        std::vector<float>{1.0f, -inf},
+        std::vector<float>{nan, inf, -inf}}) {
+    auto cpu_rejected = qw38::reference::argmax_fp32(non_finite);
+    expect(!cpu_rejected &&
+               cpu_rejected.error().code ==
+                   qw38::reference::ErrorCode::InvalidArgument,
+           "cpu rejects non-finite argmax");
+    auto d_bad = upload_vec(non_finite, stream);
+    expect(static_cast<bool>(d_bad), "non-finite argmax upload");
+    if (!d_bad) {
+      continue;
+    }
+    auto rejected = qw38::cuda::launch_argmax_fp32(
+        static_cast<float const*>(d_bad->data()),
+        static_cast<std::uint32_t>(non_finite.size()),
+        static_cast<std::uint32_t*>(d_out->data()), stream);
+    expect(!rejected && rejected.error().code == ErrorCode::InvalidArgument,
+           "cuda rejects non-finite argmax");
+  }
 }
 
 void test_adversarial_magnitudes(Stream const& stream) {

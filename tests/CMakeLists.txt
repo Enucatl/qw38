@@ -240,6 +240,9 @@ target_compile_features(qw38_activation_reference_test PRIVATE cxx_std_23)
 target_compile_options(qw38_activation_reference_test PRIVATE
   $<$<COMPILE_LANGUAGE:CXX>:-Wall -Wextra -Wpedantic>
 )
+add_custom_target(qw38_activation_unit_test
+  DEPENDS qw38_activation_reference_test
+)
 
 add_executable(qw38_activation_integration_test activation_integration_test.cpp)
 target_link_libraries(qw38_activation_integration_test PRIVATE qw38_reference qw38_cuda)
