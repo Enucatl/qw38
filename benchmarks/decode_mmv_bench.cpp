@@ -223,7 +223,7 @@ int main() {
     }
 
     float ms = 0.0f;
-    int const launches = 8;
+    int const iterations = 8;
     unsigned const grid = c.n / 8u;
     if (c.grouped_ab) {
       codes_b = DeviceBuffer::allocate(code_n);
@@ -253,25 +253,40 @@ int main() {
       auto t0 = Event::create_timing();
       auto t1 = Event::create_timing();
       if (!t0 || !t1) {
+        auto const& error = t0 ? t1.error() : t0.error();
+        std::cerr << c.name << ' ' << qw38::cuda::error_message(error) << '\n';
         return 1;
       }
-      (void)t0->record(*stream);
-      for (int i = 0; i < launches; ++i) {
+      auto r0 = t0->record(*stream);
+      if (!r0) {
+        std::cerr << c.name << ' ' << qw38::cuda::error_message(r0.error()) << '\n';
+        return 1;
+      }
+      for (int i = 0; i < iterations; ++i) {
         auto st = launch_decode_ab_bf16(p, *stream);
         if (!st) {
+          std::cerr << c.name << ' ' << qw38::cuda::error_message(st.error()) << '\n';
           return 1;
         }
       }
-      (void)t1->record(*stream);
-      (void)t1->sync();
+      auto r1 = t1->record(*stream);
+      if (!r1) {
+        std::cerr << c.name << ' ' << qw38::cuda::error_message(r1.error()) << '\n';
+        return 1;
+      }
+      auto s1 = t1->sync();
+      if (!s1) {
+        std::cerr << c.name << ' ' << qw38::cuda::error_message(s1.error()) << '\n';
+        return 1;
+      }
       auto elapsed = elapsed_ms(*t0, *t1);
       if (!elapsed) {
         std::cerr << qw38::cuda::error_message(elapsed.error()) << '\n';
         return 1;
       }
-      ms = *elapsed / static_cast<float>(launches);
+      ms = *elapsed / static_cast<float>(iterations);
     } else {
-      auto timed = time_launch(*stream, d, 2, launches);
+      auto timed = time_launch(*stream, d, 2, iterations);
       if (!timed) {
         std::cerr << c.name << ' ' << qw38::cuda::error_message(timed.error()) << '\n';
         return 1;
@@ -285,7 +300,8 @@ int main() {
     std::cout << c.name << " n=" << c.n << " k=" << c.k << " layout=0x" << std::hex
               << c.layout << std::dec << " code_bytes=" << code_n
               << " scale_bytes=" << scale_n << " traffic_bytes=" << bytes
-              << " grid=" << grid << " launches=" << launches
+              << " grid=" << grid << " iterations=" << iterations
+              << " kernel_launches=" << iterations << " device_copies=0"
               << " ms=" << ms << '\n';
   }
   return 0;

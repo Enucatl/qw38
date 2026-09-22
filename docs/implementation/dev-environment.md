@@ -87,3 +87,24 @@ docker run --gpus all --rm -u "$(id -u):$(id -g)" \
 ```
 
 Expected: `ELF file    1: qw38_cuda_runtime_smoke.1.sm_120.cubin`.
+
+## Diagnostic benchmark evidence
+
+Benchmarks remain separate `EXCLUDE_FROM_ALL` targets and are never registered
+with CTest. Run a benchmark through the evidence wrapper only from a clean
+source tree:
+
+```bash
+scripts/run_benchmark_evidence.sh \
+  qw38_decode_mmv_bench build/release/benchmarks/qw38_bench_decode_mmv
+scripts/run_benchmark_evidence.sh \
+  qw38_gdn_mixer_bench build/release/benchmarks/qw38_bench_gdn_mixer
+```
+
+The wrapper resolves the mutable development image tag to its immutable image
+content digest before building or running. It prints the source commit,
+executable SHA-256, ELF build ID, and container image digest immediately before
+the benchmark output. A completion report must preserve those four values with
+any reported measurement; a path, target name, or image tag is not an artifact
+identity. The wrapper refuses a dirty source tree so the recorded commit
+identifies the sources used to build the executable.

@@ -43,7 +43,7 @@ using qw38::runtime::kHidden;
 namespace {
 
 TensorView make_view(void* ptr, ArithmeticDtype dtype, PhysicalLayoutId layout,
-                     StorageClass storage, bool writable, std::uint8_t rank,
+                     StorageClass storage, bool /*writable*/, std::uint8_t rank,
                      std::uint64_t e0, std::uint64_t e1 = 0) {
   TensorView v{};
   v.pointer = ptr;
@@ -51,7 +51,6 @@ TensorView make_view(void* ptr, ArithmeticDtype dtype, PhysicalLayoutId layout,
   v.layout = layout;
   v.storage = storage;
   v.space = MemorySpace::Device;
-  v.writable = writable;
   v.rank = rank;
   v.extent[0] = e0;
   v.extent[1] = e1;
@@ -205,7 +204,9 @@ int main() {
   }
 
   int const warmup = 2;
-  int const launches = 8;
+  int const iterations = 8;
+  int const kernel_launches_per_iteration = 9;
+  int const device_copies_per_iteration = 1;
   for (int i = 0; i < warmup; ++i) {
     cursor = 0;
     auto st = execute_decode_gdn(*plan);
@@ -225,7 +226,7 @@ int main() {
   if (!r0) {
     return 1;
   }
-  for (int i = 0; i < launches; ++i) {
+  for (int i = 0; i < iterations; ++i) {
     auto st = execute_decode_gdn(*plan);
     if (!st) {
       std::cerr << qw38::runtime::error_message(st.error()) << '\n';
@@ -245,12 +246,12 @@ int main() {
     std::cerr << qw38::cuda::error_message(ms.error()) << '\n';
     return 1;
   }
-  float const avg = *ms / static_cast<float>(launches);
+  float const avg = *ms / static_cast<float>(iterations);
 
   cursor = 0;
   GdnRegionTimings regions{};
   GdnRegionTimings acc{};
-  for (int i = 0; i < launches; ++i) {
+  for (int i = 0; i < iterations; ++i) {
     auto st = execute_decode_gdn_timed(*plan, regions);
     if (!st) {
       std::cerr << qw38::runtime::error_message(st.error()) << '\n';
@@ -271,12 +272,18 @@ int main() {
   std::cout << "decode-gdn q4 hidden=" << kHidden << " qkv=" << kConvChannels
             << " z=" << kGdnZWidth << " regions=" << kGdnMixerRegions
             << " (rms, qkvz, ab, conv, prep, recur, gated, out-residual)"
-            << " weight_bytes=" << weight_bytes << " launches=" << launches
+            << " weight_bytes=" << weight_bytes << " iterations=" << iterations
+            << " kernel_launches="
+            << iterations * kernel_launches_per_iteration
+            << " device_copies="
+            << iterations * device_copies_per_iteration
+            << " kernels_per_iteration=" << kernel_launches_per_iteration
+            << " copies_per_iteration=" << device_copies_per_iteration
             << " ms=" << avg << '\n';
   std::cout << "region_ms";
   for (int r = 0; r < kGdnMixerRegions; ++r) {
     std::cout << " " << kGdnMixerRegionNames[r] << "="
-              << (acc.ms[r] / static_cast<float>(launches));
+              << (acc.ms[r] / static_cast<float>(iterations));
   }
   std::cout << '\n';
   return 0;

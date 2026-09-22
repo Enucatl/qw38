@@ -84,7 +84,15 @@ docker run --gpus all --rm -u "$(id -u):$(id -g)" \
 Result: 34/34 tests passed (`gdn_unit` 1.09s, `gdn_reference` 1.87s, `gdn_integration` 4.13s).
 
 ### Benchmark results
-Identity: `qw38_bench_gdn_mixer` Release, container `qw38-dev:cuda13.4.1`, device NVIDIA GeForce RTX 5090 `sm_120`. Q4 decode mixer, eight regions, 8 timed launches after 2 warmup. Command:
+Historical diagnostic run: source revision `7661c46`; Release target
+`qw38_bench_gdn_mixer`, mutable container tag `qw38-dev:cuda13.4.1`, device
+NVIDIA GeForce RTX 5090 `sm_120`. The executable SHA-256/build ID and immutable
+container image digest were not preserved. Consequently, the timing below is
+retained only as a historical log and is **withdrawn as reproducible measurement
+evidence**. Future reported measurements must use the identity-bound wrapper in
+`docs/implementation/dev-environment.md`. Q4 decode mixer, eight regions, 8
+timed mixer iterations after 2 warmups; each iteration issued 9 kernel launches
+and 1 device copy. Historical command:
 
 ```text
 docker run --gpus all --rm -u "$(id -u):$(id -g)" \
@@ -92,9 +100,9 @@ docker run --gpus all --rm -u "$(id -u):$(id -g)" \
   bash -lc 'cmake --build build/release --target qw38_bench_gdn_mixer && ./build/release/benchmarks/qw38_bench_gdn_mixer'
 ```
 
-| Case | weight_bytes | launches | ms |
-|---| ---:| ---:| ---:|
-| decode GDN mixer (8 regions) | 62351808 | 8 | 0.128784 |
+| Case | weight_bytes | iterations | kernel launches | device copies | ms |
+|---| ---:| ---:| ---:| ---:| ---:|
+| decode GDN mixer (8 regions) | 62351808 | 8 | 72 | 8 | 0.128784 |
 
 Region mean ms: rms=0.009988, qkvz=0.081184, ab=0.01182, conv=0.002232, prep=0.004096, recur=0.004068, gated=0.004124, out-residual=0.032768.
 

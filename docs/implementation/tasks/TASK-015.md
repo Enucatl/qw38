@@ -71,7 +71,9 @@ lengths 512, 4096, and 32768 with 5 warmups and 20 repetitions).
   uncertainty. It explicitly labels itself diagnostic-only.
 ### Tests run
 Hardware: NVIDIA GeForce RTX 5090 (32,607 MiB), driver 590.48.01, `sm_120`.
-Artifact: Docker image `qw38-dev:cuda13.4.1`, image ID
+Source revision:
+`90a2816fb3dad0933395f5c19d44eb81fcfa5eb9`.
+Artifact: Docker image tag `qw38-dev:cuda13.4.1`, immutable image digest
 `sha256:be0903b40ab2e14ec1b5ba285655219cc9e521cd1455b070a6dfdb68ed4e4bfb`;
 CUDA 13.4.1 (`nvcc` 13.4.59), CMake 3.28.3, GCC 14.2.0.
 

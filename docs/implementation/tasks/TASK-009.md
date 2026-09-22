@@ -85,7 +85,14 @@ docker run --gpus all --rm -u "$(id -u):$(id -g)" \
 
 Result: 28/28 tests passed (`decode_mmv_unit` 0.17s, `decode_mmv_reference` 0.17s, `decode_mmv_integration` 12.25s).
 ### Benchmark results
-Identity: `qw38_bench_decode_mmv` Release, container `qw38-dev:cuda13.4.1`, device NVIDIA GeForce RTX 5090 `sm_120`. Geometry: 8 warps/block, 256 threads, K tile 256, max K 17408. Command:
+Historical diagnostic run: source revision `beacd98`; Release target
+`qw38_bench_decode_mmv`, mutable container tag `qw38-dev:cuda13.4.1`, device
+NVIDIA GeForce RTX 5090 `sm_120`. The executable SHA-256/build ID and immutable
+container image digest were not preserved. Consequently, the timing rows below
+are retained only as a historical log and are **withdrawn as reproducible
+measurement evidence**. Future reported measurements must use the identity-bound
+wrapper in `docs/implementation/dev-environment.md`. Geometry: 8 warps/block,
+256 threads, K tile 256, max K 17408. Historical command:
 
 ```text
 docker run --gpus all --rm -u "$(id -u):$(id -g)" \
@@ -93,13 +100,13 @@ docker run --gpus all --rm -u "$(id -u):$(id -g)" \
   bash -lc 'cmake --build build/release --target qw38_bench_decode_mmv && ./build/release/benchmarks/qw38_bench_decode_mmv'
 ```
 
-| Case | N×K | code_bytes | scale_bytes | launches | ms |
-|---|---| ---:| ---:| ---:| ---:|
-| q4-8x256 | 8×256 | 1024 | 64 | 8 | 0.002368 |
-| q4-mlp-down | 5120×17408 | 44564480 | 2785280 | 8 | 0.081916 |
-| q4-mlp-gate | 17408×5120 | 44564480 | 2785280 | 8 | 0.07424 |
-| q8-head | 248320×5120 | 1271398400 | 79462400 | 8 | 1.38918 |
-| bf16-ab | 48×5120 | 491520 | 0 | 8 | 0.009056 |
+| Case | N×K | code_bytes | scale_bytes | iterations | kernel launches | ms |
+|---|---| ---:| ---:| ---:| ---:| ---:|
+| q4-8x256 | 8×256 | 1024 | 64 | 8 | 8 | 0.002368 |
+| q4-mlp-down | 5120×17408 | 44564480 | 2785280 | 8 | 8 | 0.081916 |
+| q4-mlp-gate | 17408×5120 | 44564480 | 2785280 | 8 | 8 | 0.07424 |
+| q8-head | 248320×5120 | 1271398400 | 79462400 | 8 | 8 | 1.38918 |
+| bf16-ab | 48×5120 | 491520 | 0 | 8 | 8 | 0.009056 |
 
 Diagnostic only; does not authorize repack or geometry change.
 ### Architecture blocker
