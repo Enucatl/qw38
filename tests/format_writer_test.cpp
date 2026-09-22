@@ -32,6 +32,7 @@ using qw38::format::LogicalQuantizerId;
 using qw38::format::MappingKind;
 using qw38::format::PhysicalLayoutId;
 using qw38::format::sha256;
+using qw38::format::SharedBinding;
 using qw38::format::SpanKind;
 using qw38::format::StorageClass;
 using qw38::format::TensorRecord;
@@ -353,6 +354,30 @@ void test_overflow_and_inconsistent() {
          "payload length mismatch is rejected");
 }
 
+void test_invalid_shared_ownership_rejected_before_writing() {
+  auto schema = base_schema();
+  schema.tensors = {
+      unplaced_bf16_vector(1, "a", 4),
+      unplaced_bf16_vector(2, "b", 4),
+      unplaced_bf16_vector(3, "c", 4),
+  };
+  schema.shared_bindings = {
+      SharedBinding{.owner_tensor_id = 1, .alias_tensor_id = 2},
+      SharedBinding{.owner_tensor_id = 3, .alias_tensor_id = 2},
+  };
+  auto writer = ArtifactWriter::create("/tmp/unused.qw38", schema);
+  expect(!writer && writer.error().code == FormatErrorCode::SharedBinding,
+         "writer rejects multiple owners before creating a file");
+
+  schema.shared_bindings = {
+      SharedBinding{.owner_tensor_id = 1, .alias_tensor_id = 2},
+      SharedBinding{.owner_tensor_id = 2, .alias_tensor_id = 3},
+  };
+  writer = ArtifactWriter::create("/tmp/unused.qw38", schema);
+  expect(!writer && writer.error().code == FormatErrorCode::SharedBinding,
+         "writer rejects alias ownership chains before creating a file");
+}
+
 void test_failure_cleanup() {
   ScratchDir dir;
   auto dest = dir.file("cleanup.qw38");
@@ -493,6 +518,7 @@ int main() {
   test_deterministic_repeat();
   test_empty_duplicate_missing();
   test_overflow_and_inconsistent();
+  test_invalid_shared_ownership_rejected_before_writing();
   test_failure_cleanup();
   test_writer_interleaving_owns_publication();
   test_chunked_stream();

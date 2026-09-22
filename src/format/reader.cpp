@@ -152,15 +152,6 @@ class MappedFile {
   std::size_t size_{0};
 };
 
-bool is_alias(ArtifactSchema const& schema, std::uint32_t tensor_id) noexcept {
-  for (auto const& b : schema.shared_bindings) {
-    if (b.alias_tensor_id == tensor_id) {
-      return true;
-    }
-  }
-  return false;
-}
-
 TensorRecord const* tensor_by_id(ArtifactSchema const& schema,
                                  std::uint32_t id) noexcept {
   for (auto const& t : schema.tensors) {
@@ -250,24 +241,36 @@ std::expected<void, FormatError> validate_file_layout(
   occupied.push_back(Occupied{header.manifest_offset, header.manifest_length,
                               "manifest"});
 
+  std::unordered_set<std::uint32_t> checked_owners;
   for (auto const& tensor : schema.tensors) {
-    if (is_alias(schema, tensor.tensor_id)) {
+    auto const owner_id =
+        canonical_owner_tensor_id(schema, tensor.tensor_id);
+    if (!owner_id) {
+      return std::unexpected(owner_id.error());
+    }
+    if (!checked_owners.insert(*owner_id).second) {
       continue;
     }
-    if (auto st = require_in_file(tensor.payload, file_size, "tensor.payload");
+    auto const* owner = tensor_by_id(schema, *owner_id);
+    if (owner == nullptr) {
+      return std::unexpected(make_error(FormatErrorCode::SharedBinding, 0,
+                                        "shared.owner",
+                                        "canonical owner is missing"));
+    }
+    if (auto st = require_in_file(owner->payload, file_size, "tensor.payload");
         !st) {
       return st;
     }
-    if (auto st = require_in_file(tensor.scales, file_size, "tensor.scales");
+    if (auto st = require_in_file(owner->scales, file_size, "tensor.scales");
         !st) {
       return st;
     }
-    if (!tensor.payload.empty()) {
-      occupied.push_back(Occupied{tensor.payload.offset, tensor.payload.length,
+    if (!owner->payload.empty()) {
+      occupied.push_back(Occupied{owner->payload.offset, owner->payload.length,
                                   "tensor.payload"});
     }
-    if (!tensor.scales.empty()) {
-      occupied.push_back(Occupied{tensor.scales.offset, tensor.scales.length,
+    if (!owner->scales.empty()) {
+      occupied.push_back(Occupied{owner->scales.offset, owner->scales.length,
                                   "tensor.scales"});
     }
   }
@@ -331,13 +334,24 @@ std::expected<void, FormatError> require_span_integrity(
           FormatErrorCode::InvalidSpan, rec.region.offset, "integrity.tensor",
           "integrity record references a missing tensor"));
     }
+    auto const owner_id =
+        canonical_owner_tensor_id(schema, tensor->tensor_id);
+    if (!owner_id) {
+      return std::unexpected(owner_id.error());
+    }
+    auto const* owner = tensor_by_id(schema, *owner_id);
+    if (owner == nullptr) {
+      return std::unexpected(make_error(FormatErrorCode::SharedBinding, 0,
+                                        "shared.owner",
+                                        "canonical owner is missing"));
+    }
     if (rec.kind == IntegrityKind::Sha256PayloadSpan) {
       if (!payload_seen.insert(rec.tensor_id).second) {
         return std::unexpected(make_error(
             FormatErrorCode::DuplicateId, rec.region.offset, "integrity.tensor",
             "duplicate payload digest for tensor"));
       }
-      if (rec.region != tensor->payload) {
+      if (rec.region != owner->payload) {
         return std::unexpected(make_error(
             FormatErrorCode::InvalidSpan, rec.region.offset, "integrity.region",
             "payload digest region must match the tensor payload span"));
@@ -348,7 +362,7 @@ std::expected<void, FormatError> require_span_integrity(
             FormatErrorCode::DuplicateId, rec.region.offset, "integrity.tensor",
             "duplicate scale digest for tensor"));
       }
-      if (rec.region != tensor->scales || tensor->scales.empty()) {
+      if (rec.region != owner->scales || owner->scales.empty()) {
         return std::unexpected(make_error(
             FormatErrorCode::InvalidSpan, rec.region.offset, "integrity.region",
             "scale digest region must match a nonempty tensor scale span"));

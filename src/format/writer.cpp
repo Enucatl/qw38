@@ -129,13 +129,9 @@ bool is_alias(ArtifactSchema const& schema, std::uint32_t tensor_id) {
   return false;
 }
 
-std::uint32_t owner_of(ArtifactSchema const& schema, std::uint32_t tensor_id) {
-  for (auto const& b : schema.shared_bindings) {
-    if (b.alias_tensor_id == tensor_id) {
-      return b.owner_tensor_id;
-    }
-  }
-  return tensor_id;
+std::expected<std::uint32_t, FormatError> owner_of(
+    ArtifactSchema const& schema, std::uint32_t tensor_id) {
+  return canonical_owner_tensor_id(schema, tensor_id);
 }
 
 bool spans_overlap(ByteSpan const& a, ByteSpan const& b) noexcept {
@@ -199,7 +195,10 @@ std::expected<void, FormatError> assign_spans(ArtifactSchema& schema) {
       continue;
     }
     auto const owner_id = owner_of(schema, tensor.tensor_id);
-    auto const* owner = find_tensor(schema, owner_id);
+    if (!owner_id) {
+      return std::unexpected(owner_id.error());
+    }
+    auto const* owner = find_tensor(schema, *owner_id);
     if (owner == nullptr) {
       return std::unexpected(make_error(FormatErrorCode::SharedBinding, 0,
                                         "shared.owner",
@@ -282,6 +281,9 @@ std::expected<ArtifactSchema, FormatError> prepare_schema(
         "writer owns integrity records; input must leave them empty"));
   }
   ArtifactSchema schema = input;
+  if (auto st = validate_shared_binding_ownership(schema); !st) {
+    return std::unexpected(st.error());
+  }
   std::vector<ByteSpan> input_unique_spans;
   for (auto const& tensor : schema.tensors) {
     auto const payload_n = expected_payload_bytes(tensor);
@@ -492,11 +494,15 @@ std::expected<ArtifactWriter, FormatError> ArtifactWriter::create(
 
   for (auto const& tensor : impl->schema.tensors) {
     auto const owner_id = owner_of(impl->schema, tensor.tensor_id);
-    auto const payload_it = payload_index.find(owner_id);
+    if (!owner_id) {
+      impl->abandon();
+      return std::unexpected(owner_id.error());
+    }
+    auto const payload_it = payload_index.find(*owner_id);
     if (payload_it != payload_index.end()) {
       impl->payload_by_name.emplace(tensor.logical_name, payload_it->second);
     }
-    auto const scale_it = scale_index.find(owner_id);
+    auto const scale_it = scale_index.find(*owner_id);
     if (scale_it != scale_index.end()) {
       impl->scales_by_name.emplace(tensor.logical_name, scale_it->second);
     }
@@ -580,8 +586,11 @@ std::expected<ArtifactIdentity, FormatError> ArtifactWriter::finalize() {
   records.reserve(impl_->schema.tensors.size() * 2 + 1);
   for (auto const& tensor : impl_->schema.tensors) {
     auto const owner_id = owner_of(impl_->schema, tensor.tensor_id);
+    if (!owner_id) {
+      return fail(owner_id.error());
+    }
     for (auto const& span : impl_->spans) {
-      if (span.owner_tensor_id != owner_id) {
+      if (span.owner_tensor_id != *owner_id) {
         continue;
       }
       if (span.kind == SpanKind::Payload) {

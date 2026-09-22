@@ -485,6 +485,65 @@ void test_shared_bindings() {
   expect(static_cast<bool>(st), "MTP embedding alias of the untied table is valid");
 }
 
+void test_shared_binding_ownership_graph() {
+  auto make_schema = [] {
+    auto schema = base_schema();
+    auto a = bf16_vector(1, "a", 4, 256);
+    auto b = a;
+    b.tensor_id = 2;
+    b.logical_name = "b";
+    auto c = a;
+    c.tensor_id = 3;
+    c.logical_name = "c";
+    schema.tensors = {a, b, c};
+    return schema;
+  };
+  auto rejects = [](ArtifactSchema const& schema, std::string_view what) {
+    auto st = validate_schema(schema);
+    expect(!st && st.error().code == FormatErrorCode::SharedBinding, what);
+  };
+
+  auto schema = make_schema();
+  schema.shared_bindings = {
+      SharedBinding{.owner_tensor_id = 1, .alias_tensor_id = 2},
+      SharedBinding{.owner_tensor_id = 2, .alias_tensor_id = 1},
+  };
+  rejects(schema, "reverse shared-binding pairs are rejected");
+
+  schema = make_schema();
+  schema.shared_bindings = {
+      SharedBinding{.owner_tensor_id = 1, .alias_tensor_id = 3},
+      SharedBinding{.owner_tensor_id = 2, .alias_tensor_id = 3},
+  };
+  rejects(schema, "an alias cannot have multiple owners");
+
+  schema = make_schema();
+  schema.shared_bindings = {
+      SharedBinding{.owner_tensor_id = 1, .alias_tensor_id = 2},
+      SharedBinding{.owner_tensor_id = 2, .alias_tensor_id = 3},
+  };
+  rejects(schema, "alias-as-owner chains are rejected");
+
+  auto const n = encoded_size(schema);
+  expect(static_cast<bool>(n), "invalid graph still has a wire size");
+  if (n) {
+    std::vector<std::byte> bytes(*n);
+    expect(static_cast<bool>(encode(schema, bytes)),
+           "invalid graph can be encoded for decoder rejection testing");
+    auto decoded = decode_schema(bytes);
+    expect(!decoded && decoded.error().code == FormatErrorCode::SharedBinding,
+           "decoder rejects an encoded ownership chain");
+  }
+
+  schema = make_schema();
+  schema.shared_bindings = {
+      SharedBinding{.owner_tensor_id = 1, .alias_tensor_id = 2},
+      SharedBinding{.owner_tensor_id = 2, .alias_tensor_id = 3},
+      SharedBinding{.owner_tensor_id = 3, .alias_tensor_id = 1},
+  };
+  rejects(schema, "long shared-binding cycles are rejected");
+}
+
 void test_schema_roundtrip_and_object_layout_independence() {
   auto schema = base_schema();
   schema.tensors.push_back(bf16_vector(7, "dt_bias", 48, 256));
@@ -541,6 +600,7 @@ int main() {
   test_overflow_and_alignment();
   test_invalid_shape_and_span();
   test_shared_bindings();
+  test_shared_binding_ownership_graph();
   test_schema_roundtrip_and_object_layout_independence();
   test_truncated_input();
   if (g_failures != 0) {

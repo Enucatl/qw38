@@ -189,6 +189,16 @@ struct ArtifactSchema {
 [[nodiscard]] std::expected<std::uint64_t, FormatError> expected_scale_bytes(
     TensorRecord const& tensor, std::uint64_t offset = 0);
 
+// V0 shared bindings are a one-level ownership graph: every alias has exactly
+// one canonical owner, and that owner must not itself be an alias.
+[[nodiscard]] std::expected<void, FormatError>
+validate_shared_binding_ownership(ArtifactSchema const& schema,
+                                  std::uint64_t offset = 0);
+[[nodiscard]] std::expected<std::uint32_t, FormatError>
+canonical_owner_tensor_id(ArtifactSchema const& schema,
+                          std::uint32_t tensor_id,
+                          std::uint64_t offset = 0);
+
 [[nodiscard]] std::expected<std::size_t, FormatError> encoded_size(
     ContainerHeader const& header);
 [[nodiscard]] std::expected<void, FormatError> encode(

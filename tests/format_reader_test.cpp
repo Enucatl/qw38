@@ -8,7 +8,9 @@
 using qw38::format::Artifact;
 using qw38::format::error_message;
 using qw38::format::FormatErrorCode;
+using qw38::format::IntegrityKind;
 using qw38::format::PhysicalLayoutId;
+using qw38::format::SharedBinding;
 using qw38::format::StorageClass;
 using qw38::format::test::mutate_schema;
 using qw38::format::test::read_all;
@@ -268,6 +270,19 @@ void test_invalid_pairs_shapes_scales_shared_state() {
   expect_code(Artifact::parse(*shared), FormatErrorCode::SharedBinding,
               "self shared binding");
 
+  auto reverse = mutate_schema(file, [](auto& schema) {
+    auto const binding = schema.shared_bindings[0];
+    schema.shared_bindings.push_back(
+        SharedBinding{.owner_tensor_id = binding.alias_tensor_id,
+                      .alias_tensor_id = binding.owner_tensor_id});
+  });
+  if (!reverse) {
+    fail(error_message(reverse.error()));
+    return;
+  }
+  expect_code(Artifact::parse(*reverse), FormatErrorCode::SharedBinding,
+              "reverse shared-binding pair");
+
   auto state = mutate_schema(file, [](auto& schema) {
     schema.state[0].layer_count = 7;
   });
@@ -287,6 +302,49 @@ void test_invalid_pairs_shapes_scales_shared_state() {
   }
   expect_code(Artifact::parse(*live), FormatErrorCode::LiveStateForbidden,
               "live state forbidden");
+}
+
+void test_canonical_owner_range_and_integrity_validation() {
+  ScratchDir dir("qw38-reader-owner");
+  auto fx = write_task003(dir.file("owner.qw38"));
+  auto file = read_all(fx.path);
+
+  auto missing_owner_digest = mutate_schema(file, [](auto& schema) {
+    std::erase_if(schema.integrity, [](auto const& rec) {
+      return rec.kind == IntegrityKind::Sha256PayloadSpan &&
+             rec.tensor_id == 1;
+    });
+    for (auto& rec : schema.integrity) {
+      if (rec.kind == IntegrityKind::Sha256Manifest) {
+        rec.region.length -= qw38::format::kIntegrityRecordBytes;
+      }
+    }
+  });
+  if (!missing_owner_digest) {
+    fail(error_message(missing_owner_digest.error()));
+    return;
+  }
+  expect_code(Artifact::parse(*missing_owner_digest),
+              FormatErrorCode::MissingIntegrity,
+              "canonical owner payload digest is required");
+
+  auto header_overlap = mutate_schema(file, [](auto& schema) {
+    schema.tensors[0].payload.offset = 0;
+    schema.tensors[3].payload.offset = 0;
+    for (auto& rec : schema.integrity) {
+      if (rec.kind == IntegrityKind::Sha256PayloadSpan &&
+          (rec.tensor_id == 1 || rec.tensor_id == 4)) {
+        rec.region.offset = 0;
+      }
+    }
+  });
+  if (!header_overlap) {
+    fail(error_message(header_overlap.error()));
+    return;
+  }
+  expect_code(Artifact::parse(*header_overlap),
+              FormatErrorCode::OverlappingSpan,
+              "canonical alias payload cannot overlap the header");
 }
 
 void test_bad_hash_and_leftover() {
@@ -324,6 +382,7 @@ int main() {
   test_bad_magic_version_enum();
   test_misalignment_overflow_overlap();
   test_invalid_pairs_shapes_scales_shared_state();
+  test_canonical_owner_range_and_integrity_validation();
   test_bad_hash_and_leftover();
   if (g_failures != 0) {
     std::cerr << g_failures << " reader unit checks failed\n";

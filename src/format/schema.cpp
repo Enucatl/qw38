@@ -2,6 +2,8 @@
 
 #include <iterator>
 #include <limits>
+#include <unordered_map>
+#include <unordered_set>
 #include <utility>
 
 namespace qw38::format {
@@ -1352,6 +1354,69 @@ std::expected<std::uint64_t, FormatError> expected_scale_bytes(
   return checked_mul(*count, kFp16Size, offset, "tensor.scales");
 }
 
+std::expected<void, FormatError> validate_shared_binding_ownership(
+    ArtifactSchema const& schema, std::uint64_t offset) {
+  std::unordered_map<std::uint32_t, std::uint32_t> owner_by_alias;
+  std::unordered_set<std::uint32_t> aliases;
+  std::unordered_set<std::uint32_t> owners;
+  owner_by_alias.reserve(schema.shared_bindings.size());
+  aliases.reserve(schema.shared_bindings.size());
+  owners.reserve(schema.shared_bindings.size());
+
+  for (auto const& binding : schema.shared_bindings) {
+    if (binding.owner_tensor_id == binding.alias_tensor_id) {
+      return std::unexpected(make_error(FormatErrorCode::SharedBinding, offset,
+                                        "shared.alias",
+                                        "owner and alias must differ"));
+    }
+    if (find_tensor(schema, binding.owner_tensor_id) == nullptr ||
+        find_tensor(schema, binding.alias_tensor_id) == nullptr) {
+      return std::unexpected(make_error(
+          FormatErrorCode::SharedBinding, offset, "shared.owner",
+          "shared binding references a missing tensor"));
+    }
+    auto const [it, inserted] = owner_by_alias.emplace(
+        binding.alias_tensor_id, binding.owner_tensor_id);
+    if (!inserted) {
+      return std::unexpected(make_error(
+          FormatErrorCode::SharedBinding, offset, "shared.alias",
+          it->second == binding.owner_tensor_id
+              ? "duplicate shared binding for alias"
+              : "alias has multiple owners"));
+    }
+    aliases.insert(binding.alias_tensor_id);
+    owners.insert(binding.owner_tensor_id);
+  }
+
+  for (auto owner : owners) {
+    if (aliases.contains(owner)) {
+      return std::unexpected(make_error(
+          FormatErrorCode::SharedBinding, offset, "shared.owner",
+          "an alias cannot own another alias; chains and cycles are forbidden"));
+    }
+  }
+  return {};
+}
+
+std::expected<std::uint32_t, FormatError> canonical_owner_tensor_id(
+    ArtifactSchema const& schema, std::uint32_t tensor_id,
+    std::uint64_t offset) {
+  if (find_tensor(schema, tensor_id) == nullptr) {
+    return std::unexpected(make_error(FormatErrorCode::SharedBinding, offset,
+                                      "shared.tensor",
+                                      "tensor is missing"));
+  }
+  if (auto st = validate_shared_binding_ownership(schema, offset); !st) {
+    return std::unexpected(st.error());
+  }
+  for (auto const& binding : schema.shared_bindings) {
+    if (binding.alias_tensor_id == tensor_id) {
+      return binding.owner_tensor_id;
+    }
+  }
+  return tensor_id;
+}
+
 std::expected<std::size_t, FormatError> encoded_size(
     ContainerHeader const&) {
   return static_cast<std::size_t>(kHeaderSizeV0);
@@ -1872,6 +1937,9 @@ std::expected<void, FormatError> validate_schema(ArtifactSchema const& schema,
       }
     }
   }
+  if (auto st = validate_shared_binding_ownership(schema, offset); !st) {
+    return st;
+  }
   for (auto const& g : schema.graph_bindings) {
     if (find_tensor(schema, g.tensor_id) == nullptr) {
       return std::unexpected(make_error(FormatErrorCode::InvalidGraphBinding,
@@ -1946,20 +2014,9 @@ std::expected<void, FormatError> validate_schema(ArtifactSchema const& schema,
       }
     }
   }
-  for (std::size_t i = 0; i < schema.shared_bindings.size(); ++i) {
-    auto const& b = schema.shared_bindings[i];
-    if (b.owner_tensor_id == b.alias_tensor_id) {
-      return std::unexpected(make_error(FormatErrorCode::SharedBinding, offset,
-                                        "shared.alias",
-                                        "owner and alias must differ"));
-    }
+  for (auto const& b : schema.shared_bindings) {
     auto const* owner = find_tensor(schema, b.owner_tensor_id);
     auto const* alias = find_tensor(schema, b.alias_tensor_id);
-    if (owner == nullptr || alias == nullptr) {
-      return std::unexpected(make_error(FormatErrorCode::SharedBinding, offset,
-                                        "shared.owner",
-                                        "shared binding references missing tensor"));
-    }
     if (!tensors_share_payload(*owner, *alias)) {
       return std::unexpected(make_error(
           FormatErrorCode::SharedBinding, offset, "shared.payload",
@@ -2006,14 +2063,6 @@ std::expected<void, FormatError> validate_schema(ArtifactSchema const& schema,
         return std::unexpected(make_error(
             FormatErrorCode::SharedBinding, offset, "shared.owner",
             "MTP head alias must bind to lm_head"));
-      }
-    }
-    for (std::size_t j = i + 1; j < schema.shared_bindings.size(); ++j) {
-      if (schema.shared_bindings[j].owner_tensor_id == b.owner_tensor_id &&
-          schema.shared_bindings[j].alias_tensor_id == b.alias_tensor_id) {
-        return std::unexpected(make_error(FormatErrorCode::SharedBinding, offset,
-                                          "shared",
-                                          "duplicate shared binding"));
       }
     }
   }
