@@ -75,6 +75,9 @@ std::expected<Session, Error> Session::create(
     Model const& model, std::shared_ptr<qw38::cuda::Stream> stream,
     std::uint64_t kv_capacity) {
   try {
+  if (auto st = validate_kv_capacity(kv_capacity); !st) {
+    return std::unexpected(st.error());
+  }
   if (auto st = require_language_state(model.state()); !st) {
     return std::unexpected(st.error());
   }

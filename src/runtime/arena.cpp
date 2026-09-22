@@ -219,6 +219,9 @@ std::expected<std::vector<ScratchRequest>, Error> v0_scratch_requests(
                                       "arena.token_capacity",
                                       "arena token capacity must be > 0"));
   }
+  if (auto st = validate_kv_capacity(attention_capacity); !st) {
+    return std::unexpected(st.error());
+  }
   auto scale = [&](std::uint64_t per_token,
                    std::string_view field) -> std::expected<std::uint64_t, Error> {
     auto r = checked_mul(per_token, token_capacity, 0, field);

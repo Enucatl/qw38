@@ -374,10 +374,8 @@ std::expected<AttentionPrepPlan, Error> bind_attention_prep_plan(
     return std::unexpected(
         arg_error("populated", "host populated-length pointer is required"));
   }
-  if (views.kv_capacity == 0) {
-    return std::unexpected(
-        make_error(ErrorCode::InvalidCapacity, "kv.capacity",
-                   "capacity must be > 0"));
+  if (auto st = validate_kv_capacity(views.kv_capacity); !st) {
+    return std::unexpected(st.error());
   }
   if (*views.host_populated > views.kv_capacity) {
     return std::unexpected(make_error(ErrorCode::InvalidPopulatedLength,
@@ -491,9 +489,13 @@ std::expected<AttentionCorePlan, Error> bind_attention_core_plan(
   if (views.host_populated == nullptr) {
     return std::unexpected(arg_error("populated", "missing populated pointer"));
   }
-  if (views.kv_capacity == 0 || *views.host_populated > views.kv_capacity) {
-    return std::unexpected(make_error(ErrorCode::InvalidCapacity, "kv.capacity",
-                                      "invalid capacity/populated length"));
+  if (auto st = validate_kv_capacity(views.kv_capacity); !st) {
+    return std::unexpected(st.error());
+  }
+  if (*views.host_populated > views.kv_capacity) {
+    return std::unexpected(make_error(ErrorCode::InvalidPopulatedLength,
+                                      "kv.populated",
+                                      "populated length exceeds capacity"));
   }
   auto attn_i = attn_state_index(views.language_layer);
   if (!attn_i) return std::unexpected(attn_i.error());

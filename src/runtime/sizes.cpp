@@ -53,6 +53,15 @@ std::expected<std::uint64_t, Error> residual_bytes(
   return mul(kResidualBytesPerToken, token_capacity, "residual.bytes");
 }
 
+std::expected<void, Error> validate_kv_capacity(std::uint64_t capacity) {
+  if (capacity == 0 || capacity > kMaxKvCapacity) {
+    return std::unexpected(make_error(
+        ErrorCode::InvalidCapacity, "kv.capacity",
+        "capacity must be within the supported V0 context horizon"));
+  }
+  return {};
+}
+
 std::expected<std::uint64_t, Error> attn_workspace_bytes_for_capacity(
     std::uint64_t capacity) {
   // Quotient/remainder avoids an unchecked capacity + (segment - 1) ceil.

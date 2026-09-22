@@ -19,6 +19,7 @@ using qw38::runtime::kFixedPersistentBytes;
 using qw38::runtime::kGdnWorkspaceBytesPerToken;
 using qw38::runtime::kKvBytesPerToken;
 using qw38::runtime::kLogitsBytesPerToken;
+using qw38::runtime::kMaxKvCapacity;
 using qw38::runtime::kNormalizedBytesPerToken;
 using qw38::runtime::kv_cache_bytes;
 using qw38::runtime::LiveInterval;
@@ -26,6 +27,7 @@ using qw38::runtime::persistent_state_bytes;
 using qw38::runtime::plan_scratch_arena;
 using qw38::runtime::plan_v0_arena;
 using qw38::runtime::ScratchRequest;
+using qw38::runtime::validate_kv_capacity;
 using qw38::runtime::v0_scratch_requests;
 
 namespace {
@@ -118,9 +120,10 @@ int main() {
     std::uint64_t workspace_bytes;
   };
   constexpr std::array kAttentionCapacityCases{
+      AttentionCapacityCase{1, kAttentionWorkspaceBytesPerToken},
       AttentionCapacityCase{205824, 19966720},
       AttentionCapacityCase{205825, 19991488},
-      AttentionCapacityCase{262144, 25415680},
+      AttentionCapacityCase{kMaxKvCapacity, 25415680},
   };
   for (auto const& c : kAttentionCapacityCases) {
     auto plan = plan_v0_arena(kArenaTokenCapacity, c.capacity);
@@ -132,6 +135,21 @@ int main() {
     expect(attention && attention->bytes == c.workspace_bytes,
            "attention partial workspace covers requested KV capacity");
   }
+  auto min_capacity = validate_kv_capacity(1);
+  auto max_capacity = validate_kv_capacity(kMaxKvCapacity);
+  auto zero_capacity = validate_kv_capacity(0);
+  auto over_capacity = validate_kv_capacity(kMaxKvCapacity + 1);
+  expect(static_cast<bool>(min_capacity), "minimum KV capacity accepted");
+  expect(static_cast<bool>(max_capacity), "maximum KV capacity accepted");
+  expect(!zero_capacity && zero_capacity.error().code == ErrorCode::InvalidCapacity,
+         "zero KV capacity rejected");
+  expect(!over_capacity && over_capacity.error().code == ErrorCode::InvalidCapacity,
+         "one-past-maximum KV capacity rejected");
+  auto over_capacity_plan =
+      plan_v0_arena(kArenaTokenCapacity, kMaxKvCapacity + 1);
+  expect(!over_capacity_plan &&
+             over_capacity_plan.error().code == ErrorCode::InvalidCapacity,
+         "arena rejects one-past-maximum attention capacity");
   auto attention_overflow = qw38::runtime::attn_workspace_bytes_for_capacity(
       std::numeric_limits<std::uint64_t>::max());
   expect(!attention_overflow && attention_overflow.error().code == ErrorCode::Overflow,

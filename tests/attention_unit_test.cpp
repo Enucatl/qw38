@@ -188,6 +188,13 @@ void test_bind_errors(Stream const& stream) {
   auto bad_cap = bind_attention_prep_plan(cap0, stream);
   expect(!bad_cap && bad_cap.error().code == qw38::runtime::ErrorCode::InvalidCapacity,
          "zero capacity is typed");
+  auto unsupported_cap = views;
+  unsupported_cap.kv_capacity = qw38::runtime::kMaxKvCapacity + 1;
+  auto bad_unsupported = bind_attention_prep_plan(unsupported_cap, stream);
+  expect(!bad_unsupported &&
+             bad_unsupported.error().code ==
+                 qw38::runtime::ErrorCode::InvalidCapacity,
+         "unsupported capacity is typed");
 
   populated = 9;
   auto over = dummy_ok_views(&populated, 8);

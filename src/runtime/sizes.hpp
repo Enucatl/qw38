@@ -52,6 +52,8 @@ inline constexpr std::uint64_t kKvBytesPerToken = 65536;
 
 // T-02 tuning: scratch/residual arena provision, not an architecture contract.
 inline constexpr std::uint64_t kArenaTokenCapacity = 256;
+// V0 model context horizon from max_position_embeddings.
+inline constexpr std::uint64_t kMaxKvCapacity = 262144;
 
 inline constexpr std::uint64_t kResidualBytesPerToken = 20480;
 inline constexpr std::uint64_t kNormalizedBytesPerToken = 10240;
@@ -151,6 +153,8 @@ inline constexpr float kAttnScale = 1.0f / 16.0f;  // 1/sqrt(256)
 // capacity.
 [[nodiscard]] std::expected<std::uint64_t, Error>
 attn_workspace_bytes_for_capacity(std::uint64_t capacity);
+[[nodiscard]] std::expected<void, Error> validate_kv_capacity(
+    std::uint64_t capacity);
 
 static_assert(kAttnOffK == kAttnOffQg + kAttnBytesQg);
 static_assert(kAttnOffV == kAttnOffK + kAttnBytesK);

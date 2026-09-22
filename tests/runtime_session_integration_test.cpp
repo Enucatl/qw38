@@ -10,7 +10,6 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
-#include <limits>
 #include <string_view>
 #include <utility>
 #include <vector>
@@ -18,6 +17,7 @@
 using qw38::runtime::ErrorCode;
 using qw38::runtime::kFixedPersistentBytes;
 using qw38::runtime::kKvBytesPerToken;
+using qw38::runtime::kMaxKvCapacity;
 using qw38::runtime::Runtime;
 using qw38::runtime::Session;
 using qw38::runtime::test::write_language_fixture;
@@ -98,13 +98,16 @@ int main() {
 
   constexpr std::uint64_t kCap = 8;
   auto const mallocs_before_sessions = qw38::cuda::malloc_count();
-  auto overflow_t =
-      std::numeric_limits<std::uint64_t>::max() / kKvBytesPerToken + 1;
-  auto overflow = rt->create_session(*model, overflow_t);
-  expect(!overflow && overflow.error().code == ErrorCode::Overflow,
-         "capacity overflow rejected before alloc");
+  auto zero_capacity = rt->create_session(*model, 0);
+  expect(!zero_capacity &&
+             zero_capacity.error().code == ErrorCode::InvalidCapacity,
+         "zero capacity rejected before alloc");
+  auto unsupported = rt->create_session(*model, kMaxKvCapacity + 1);
+  expect(!unsupported &&
+             unsupported.error().code == ErrorCode::InvalidCapacity,
+         "one-past-maximum capacity rejected before alloc");
   expect(qw38::cuda::malloc_count() == mallocs_before_sessions,
-         "overflow does not allocate");
+         "invalid capacities do not allocate");
 
   auto s1 = rt->create_session(*model, kCap);
   auto s2 = rt->create_session(*model, kCap);
