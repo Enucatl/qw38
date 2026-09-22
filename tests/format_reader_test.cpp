@@ -1,6 +1,8 @@
 #include "format_reader_support.hpp"
 
 #include <algorithm>
+#include <array>
+#include <cstdint>
 #include <iostream>
 #include <string>
 #include <string_view>
@@ -439,6 +441,48 @@ void test_bad_hash_and_leftover() {
               "trailing leftover bytes");
 }
 
+void test_manifest_record_field_corruption() {
+  ScratchDir dir("qw38-reader-manifest-record");
+  auto fx = write_minimal(dir.file("manifest-record.qw38"));
+  auto const pristine = read_all(fx.path);
+  auto opened = Artifact::open(fx.path);
+  if (!opened) {
+    fail(std::string("open manifest record fixture: ") +
+         error_message(opened.error()));
+    return;
+  }
+
+  auto const record_offset = opened->header().manifest_offset +
+                             opened->header().manifest_length -
+                             qw38::format::kIntegrityRecordBytes;
+  struct Field {
+    std::string_view name;
+    std::uint64_t offset;
+    FormatErrorCode expected;
+  };
+  // IntegrityRecord is kind:u16, reserved:u16, tensor_id:u32,
+  // region.offset:u64, region.length:u64, digest:32 bytes.
+  std::array<Field, 6> const fields{{
+      {"kind", 0, FormatErrorCode::UnknownEnum},
+      {"reserved", 2, FormatErrorCode::ReservedNonzero},
+      {"tensor id", 4, FormatErrorCode::IntegrityDigestMismatch},
+      {"region offset", 8, FormatErrorCode::InvalidSpan},
+      {"region length", 16, FormatErrorCode::InvalidSpan},
+      {"digest", 24, FormatErrorCode::IntegrityDigestMismatch},
+  }};
+  for (auto const& field : fields) {
+    auto corrupted = pristine;
+    auto const byte_offset = record_offset + field.offset;
+    corrupted[static_cast<std::size_t>(byte_offset)] =
+        static_cast<std::byte>(static_cast<std::uint8_t>(
+                                    corrupted[static_cast<std::size_t>(byte_offset)]) ^
+                                0x01u);
+    expect_code(Artifact::parse(corrupted), field.expected,
+                std::string("manifest record ") + std::string(field.name) +
+                    " byte corruption");
+  }
+}
+
 void test_manifest_limit_precedes_span_copy() {
   ScratchDir dir("qw38-reader-limit");
   auto fx = write_minimal(dir.file("limit.qw38"));
@@ -529,6 +573,7 @@ int main() {
   test_required_state_scratch_and_precision_schema();
   test_canonical_owner_range_and_integrity_validation();
   test_bad_hash_and_leftover();
+  test_manifest_record_field_corruption();
   test_manifest_limit_precedes_span_copy();
   test_quantized_payload_domains();
   if (g_failures != 0) {

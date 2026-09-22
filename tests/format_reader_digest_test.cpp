@@ -1,8 +1,10 @@
 #include "format_reader_support.hpp"
 
+#include <algorithm>
 #include <iostream>
 #include <string>
 #include <string_view>
+#include <vector>
 
 using qw38::format::Artifact;
 using qw38::format::error_message;
@@ -64,12 +66,18 @@ int main() {
     } else if (rec.kind == IntegrityKind::Sha256Manifest) {
       auto const bytes = read_all(min.path);
       expect(rec.region.length ==
-                 art->header().manifest_length - kIntegrityRecordBytes,
-             "manifest digest region is prefix excluding final record");
-      region = std::span<std::byte const>{
-          bytes.data() + static_cast<std::size_t>(rec.region.offset),
-          static_cast<std::size_t>(rec.region.length)};
+                 art->header().manifest_length,
+             "manifest digest region is the complete manifest");
+      std::vector<std::byte> canonical(
+          bytes.begin() + static_cast<std::ptrdiff_t>(rec.region.offset),
+          bytes.begin() + static_cast<std::ptrdiff_t>(rec.region.offset +
+                                                      rec.region.length));
+      std::fill(canonical.end() - qw38::format::kHashBytes, canonical.end(),
+                std::byte{});
+      expect(sha256(canonical) == rec.digest,
+             "independent SHA-256 zeroes only self-digest bytes");
       saw_manifest = true;
+      continue;
     } else {
       fail("unexpected integrity kind on minimal artifact");
       continue;
@@ -87,6 +95,17 @@ int main() {
   }
   auto file = read_all(fx.path);
   for (auto const& rec : multi->schema().integrity) {
+    if (rec.kind == IntegrityKind::Sha256Manifest) {
+      std::vector<std::byte> canonical(
+          file.begin() + static_cast<std::ptrdiff_t>(rec.region.offset),
+          file.begin() + static_cast<std::ptrdiff_t>(rec.region.offset +
+                                                     rec.region.length));
+      std::fill(canonical.end() - qw38::format::kHashBytes, canonical.end(),
+                std::byte{});
+      expect(sha256(canonical) == rec.digest,
+             "multi manifest digest zeroes only self-digest bytes");
+      continue;
+    }
     auto region = std::span<std::byte const>{
         file.data() + static_cast<std::size_t>(rec.region.offset),
         static_cast<std::size_t>(rec.region.length)};

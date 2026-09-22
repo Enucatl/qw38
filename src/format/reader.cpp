@@ -294,10 +294,9 @@ std::expected<Hash256, FormatError> require_manifest_integrity(
         FormatErrorCode::InvalidSpan, header.manifest_offset, "manifest",
         "manifest is smaller than one integrity record"));
   }
-  std::uint64_t const prefix =
-      header.manifest_length - kIntegrityRecordBytes;
   IntegrityRecord const* manifest_rec = nullptr;
-  for (auto const& rec : schema.integrity) {
+  for (std::size_t i = 0; i < schema.integrity.size(); ++i) {
+    auto const& rec = schema.integrity[i];
     if (rec.kind != IntegrityKind::Sha256Manifest) {
       continue;
     }
@@ -307,6 +306,11 @@ std::expected<Hash256, FormatError> require_manifest_integrity(
                                         "duplicate manifest digest record"));
     }
     manifest_rec = &rec;
+    if (i + 1 != schema.integrity.size()) {
+      return std::unexpected(make_error(
+          FormatErrorCode::InvalidSpan, rec.region.offset, "integrity.kind",
+          "manifest digest record must be the final integrity record"));
+    }
   }
   if (manifest_rec == nullptr) {
     return std::unexpected(make_error(FormatErrorCode::MissingIntegrity,
@@ -314,11 +318,13 @@ std::expected<Hash256, FormatError> require_manifest_integrity(
                                       "manifest SHA-256 record is required"));
   }
   if (manifest_rec->region.offset != header.manifest_offset ||
-      manifest_rec->region.length != prefix) {
+      manifest_rec->region.length != header.manifest_length) {
+    // Prefix-hashed artifacts from before complete manifest coverage are not
+    // accepted by this corrected protocol and must be regenerated.
     return std::unexpected(make_error(
         FormatErrorCode::InvalidSpan, manifest_rec->region.offset,
         "integrity.region",
-        "manifest digest must cover the prefix excluding the final 56-byte record"));
+        "manifest digest must cover the complete manifest"));
   }
   return manifest_rec->digest;
 }
@@ -400,7 +406,14 @@ std::expected<void, FormatError> verify_digests(
     if (!region) {
       return std::unexpected(region.error());
     }
-    Hash256 const actual = sha256(*region);
+    Hash256 actual{};
+    if (rec.kind == IntegrityKind::Sha256Manifest) {
+      std::vector<std::byte> canonical(region->begin(), region->end());
+      std::fill(canonical.end() - kHashBytes, canonical.end(), std::byte{});
+      actual = sha256(canonical);
+    } else {
+      actual = sha256(*region);
+    }
     if (actual != rec.digest) {
       return std::unexpected(make_error(
           FormatErrorCode::IntegrityDigestMismatch, rec.region.offset,

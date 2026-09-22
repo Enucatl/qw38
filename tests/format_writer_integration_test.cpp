@@ -321,10 +321,21 @@ int main() {
   int payload_hashes = 0;
   int scale_hashes = 0;
   for (auto const& rec : decoded->integrity) {
-    auto region = std::span<std::byte const>{
-        file.data() + rec.region.offset,
-        static_cast<std::size_t>(rec.region.length)};
-    Hash256 const independent = sha256(region);
+    Hash256 independent{};
+    if (rec.kind == IntegrityKind::Sha256Manifest) {
+      std::vector<std::byte> canonical(
+          file.begin() + static_cast<std::ptrdiff_t>(rec.region.offset),
+          file.begin() + static_cast<std::ptrdiff_t>(rec.region.offset +
+                                                     rec.region.length));
+      std::fill(canonical.end() - qw38::format::kHashBytes, canonical.end(),
+                std::byte{});
+      independent = sha256(canonical);
+    } else {
+      auto region = std::span<std::byte const>{
+          file.data() + rec.region.offset,
+          static_cast<std::size_t>(rec.region.length)};
+      independent = sha256(region);
+    }
     expect(independent == rec.digest,
            "integrity digest matches independent SHA-256 of declared region");
     if (rec.kind == IntegrityKind::Sha256Manifest) {

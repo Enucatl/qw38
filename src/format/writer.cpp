@@ -624,20 +624,20 @@ std::expected<ArtifactIdentity, FormatError> ArtifactWriter::finalize() {
     return fail(make_error(FormatErrorCode::InvalidSpan, 0, "manifest",
                            "encoded manifest is smaller than one record"));
   }
-  std::uint64_t const prefix_len =
-      static_cast<std::uint64_t>(*encoded_n) - kIntegrityRecordBytes;
   impl_->schema.integrity.back().region = ByteSpan{
       .offset = impl_->manifest_offset,
-      .length = prefix_len,
+      .length = static_cast<std::uint64_t>(*encoded_n),
   };
 
   std::vector<std::byte> manifest(*encoded_n);
   if (auto st = encode(impl_->schema, manifest); !st) {
     return fail(st.error());
   }
+  // The final integrity digest is self-referential.  Encode its zero-initialized
+  // bytes while hashing so the record's kind, tensor id, and region remain
+  // integrity-protected without changing the fixed-width wire record.
   Hash256 const digest =
-      sha256(std::span<std::byte const>{manifest.data(),
-                                        static_cast<std::size_t>(prefix_len)});
+      sha256(std::span<std::byte const>{manifest.data(), manifest.size()});
   impl_->schema.integrity.back().digest = digest;
   if (auto st = encode(impl_->schema, manifest); !st) {
     return fail(st.error());

@@ -1,5 +1,6 @@
 #include "format/format.hpp"
 
+#include <algorithm>
 #include <array>
 #include <cstdint>
 #include <cstdlib>
@@ -226,13 +227,20 @@ void test_golden_alignment_and_offsets() {
          "Sha256Manifest is last integrity record");
   auto const& mrec = manifest->integrity.back();
   expect(mrec.region.offset == header->manifest_offset, "manifest hash region");
-  expect(mrec.region.length == header->manifest_length - kIntegrityRecordBytes,
-         "manifest hash excludes the self-digest record");
-  Hash256 const prefix = sha256(std::span<std::byte const>{
-      bytes.data() + mrec.region.offset,
-      static_cast<std::size_t>(mrec.region.length)});
-  expect(prefix == mrec.digest, "independent SHA-256 of hashed prefix");
-  expect(prefix == id->manifest_digest, "identity digest matches record");
+  expect(mrec.region.length == header->manifest_length,
+         "manifest hash covers the complete manifest");
+  std::vector<std::byte> canonical(bytes.begin() +
+                                       static_cast<std::ptrdiff_t>(mrec.region.offset),
+                                   bytes.begin() + static_cast<std::ptrdiff_t>(
+                                                       mrec.region.offset +
+                                                       mrec.region.length));
+  std::fill(canonical.end() - qw38::format::kHashBytes, canonical.end(),
+            std::byte{});
+  Hash256 const manifest_digest = sha256(canonical);
+  expect(manifest_digest == mrec.digest,
+         "independent SHA-256 of manifest with self-digest zeroed");
+  expect(manifest_digest == id->manifest_digest,
+         "identity digest matches record");
 }
 
 void test_deterministic_repeat() {
