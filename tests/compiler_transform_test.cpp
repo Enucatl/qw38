@@ -102,11 +102,40 @@ int main() {
     expect(static_cast<bool>(back) && *back == conv, "exact conv inverse");
   }
 
+  // These bits are independently rounded from ω_j = 10,000,000^(-2j/64),
+  // rather than recomputing the implementation's pow expression. They belong
+  // to the current identity-compiler revision; a numerical-convention change
+  // must advance that revision and replace this complete payload deliberately.
+  constexpr std::array<std::uint32_t, kRopeFreqs> kRopeBits{
+      0x3f800000u, 0x3f5e8d27u, 0x3f41791du, 0x3f2831b4u,
+      0x3f1237d7u, 0x3efe3a16u, 0x3edd028bu, 0x3ec02211u,
+      0x3ea7077au, 0x3e913494u, 0x3e7c7751u, 0x3e5b7aacu,
+      0x3e3ecd65u, 0x3e25df51u, 0x3e10331eu, 0x3dfab7abu,
+      0x3dd9f583u, 0x3dbd7b15u, 0x3da4b936u, 0x3d8f336fu,
+      0x3d78fb1fu, 0x3d58730du, 0x3d3c2b1du, 0x3d239523u,
+      0x3d0e3586u, 0x3cf741a7u, 0x3cd6f343u, 0x3cbadd79u,
+      0x3ca27317u, 0x3c8d3960u, 0x3c758b3eu, 0x3c557622u};
+  qw38::format::CompilerRevision const kRopeGoldenRevision{
+      .ident = "qw38-bf16-identity", .major = 0, .minor = 1, .patch = 1};
+  qw38::format::CompilerRevision const kCurrentRevision{
+      .ident = qw38::compiler::kCompilerIdent,
+      .major = qw38::compiler::kCompilerMajor,
+      .minor = qw38::compiler::kCompilerMinor,
+      .patch = qw38::compiler::kCompilerPatch};
+  expect(kRopeGoldenRevision == kCurrentRevision,
+         "RoPE golden payload is tied to compiler revision");
+  auto revision_drift = kCurrentRevision;
+  ++revision_drift.patch;
+  expect(revision_drift != kRopeGoldenRevision,
+         "RoPE golden rejects compiler revision drift");
+
   auto rope = generate_rope_inv_freq();
   expect(rope.size() == kRopeFreqs * 4, "32 FP32 frequencies");
-  std::uint32_t first = 0;
-  std::memcpy(&first, rope.data(), 4);
-  expect(first == 0x3f800000u, "ω_0 is FP32 1.0");
+  for (std::uint32_t j = 0; j < kRopeFreqs; ++j) {
+    std::uint32_t bits = 0;
+    std::memcpy(&bits, rope.data() + j * 4, 4);
+    expect(bits == kRopeBits[j], "RoPE FP32 golden word");
+  }
   float prev = 1.0f;
   for (std::uint32_t j = 1; j < kRopeFreqs; ++j) {
     std::uint32_t bits = 0;

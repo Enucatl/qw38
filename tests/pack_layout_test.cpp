@@ -116,6 +116,67 @@ std::vector<std::byte> golden_q4_scales(LogicalWeightCodes const& m) {
   return out;
 }
 
+// Independent Q8 encoder from the V0 layout contract. Keep this separate from
+// the production packer so the full physical payload remains a byte-level
+// authority for tile, row, scale, and padding order.
+std::vector<std::byte> golden_q8_codes(LogicalWeightCodes const& m) {
+  auto const pn = dense_pad_n(m.n);
+  auto const pk = dense_pad_k(m.k);
+  auto const tiles_n = pn / kDenseTileRows;
+  auto const tiles_k = pk / kDenseTileK;
+  std::vector<std::byte> out(static_cast<std::size_t>(
+      tiles_n * tiles_k * kDenseTileRows * kQ8PackedBytesPerTileRow));
+  for (std::uint64_t tn = 0; tn < tiles_n; ++tn) {
+    for (std::uint64_t tk = 0; tk < tiles_k; ++tk) {
+      for (std::uint32_t r = 0; r < kDenseTileRows; ++r) {
+        auto const row = tn * kDenseTileRows + r;
+        auto const base =
+            ((tn * tiles_k + tk) * kDenseTileRows + r) * kQ8PackedBytesPerTileRow;
+        for (std::uint32_t c = 0; c < kDenseTileK; ++c) {
+          auto const col = tk * kDenseTileK + c;
+          std::int8_t code = 0;
+          if (row < m.n && col < m.k) {
+            code = m.codes[static_cast<std::size_t>(row * m.k + col)];
+          }
+          out[static_cast<std::size_t>(base + c)] =
+              static_cast<std::byte>(static_cast<std::uint8_t>(code));
+        }
+      }
+    }
+  }
+  return out;
+}
+
+std::vector<std::byte> golden_q8_scales(LogicalWeightCodes const& m) {
+  auto const pn = dense_pad_n(m.n);
+  auto const pk = dense_pad_k(m.k);
+  auto const tiles_n = pn / kDenseTileRows;
+  auto const tiles_k = pk / kDenseTileK;
+  constexpr std::uint32_t groups_tile = kDenseTileK / kQ8GroupSize;
+  std::vector<std::byte> out(static_cast<std::size_t>(
+      tiles_n * tiles_k * kDenseTileRows * groups_tile * 2));
+  auto const groups_row = m.k / m.group_size;
+  std::size_t cursor = 0;
+  for (std::uint64_t tn = 0; tn < tiles_n; ++tn) {
+    for (std::uint64_t tk = 0; tk < tiles_k; ++tk) {
+      for (std::uint32_t r = 0; r < kDenseTileRows; ++r) {
+        auto const row = tn * kDenseTileRows + r;
+        for (std::uint32_t g = 0; g < groups_tile; ++g) {
+          auto const col0 = tk * kDenseTileK + g * kQ8GroupSize;
+          std::uint16_t bits = 0;
+          if (row < m.n && col0 < m.k) {
+            auto const logical_group = col0 / m.group_size;
+            bits = m.scales[static_cast<std::size_t>(row * groups_row + logical_group)];
+          }
+          store_u16_le(out.data() + cursor, bits);
+          cursor += 2;
+        }
+      }
+    }
+  }
+  return out;
+}
+
 }  // namespace
 
 int main() {
@@ -225,9 +286,57 @@ int main() {
       fail(error_message(packed.error()));
     } else {
       expect(packed->codes.size() == 8 * 256, "Q8 256 bytes/row");
+      expect(packed->scales.size() == 8 * 8 * 2, "Q8 eight scales/row");
       expect(static_cast<std::uint8_t>(packed->codes[0]) == 1, "Q8 +1");
       expect(static_cast<std::uint8_t>(packed->codes[1]) == 0xFF, "Q8 two's complement -1");
       expect(static_cast<std::uint8_t>(packed->codes[2]) == 0x81, "Q8 two's complement -127");
+      expect(packed->codes == golden_q8_codes(m), "Q8 complete golden codes");
+      expect(packed->scales == golden_q8_scales(m), "Q8 complete golden scales");
+    }
+  }
+
+  {
+    // Covers all four physical tiles, Q8 scale order, and determinism at the
+    // representative 16x512 matrix geometry.
+    auto m = make_logical(LogicalQuantizerId::Q8G32V0, 16, 512);
+    m.codes[9 * 512 + 300] = -127;
+    m.codes[15 * 512 + 511] = 126;
+    m.scales[9 * (512 / 32) + (300 / 32)] = 0x4200;
+    m.scales[15 * (512 / 32) + (511 / 32)] = 0x3555;
+    auto a = pack_cuda_v0(LogicalQuantizerId::Q8G32V0,
+                          PhysicalLayoutId::CudaQ8G32V0, m);
+    auto b = pack_cuda_v0(LogicalQuantizerId::Q8G32V0,
+                          PhysicalLayoutId::CudaQ8G32V0, m);
+    if (!a || !b) {
+      fail("16x512 Q8 pack");
+    } else {
+      expect(a->codes.size() == 2 * 2 * 8 * 256, "16x512 Q8 complete code size");
+      expect(a->scales.size() == 2 * 2 * 8 * 8 * 2,
+             "16x512 Q8 complete scale size");
+      expect(a->codes == golden_q8_codes(m), "16x512 Q8 golden codes");
+      expect(a->scales == golden_q8_scales(m), "16x512 Q8 golden scales");
+      expect(a->codes == b->codes && a->scales == b->scales,
+             "16x512 Q8 deterministic bytes");
+    }
+  }
+
+  {
+    auto m = make_logical(LogicalQuantizerId::Q8G32V0, 5, 192);
+    m.codes[4 * 192 + 191] = -127;
+    m.scales[4 * (192 / 32) + 5] = 0x3C00;
+    auto packed = pack_cuda_v0(LogicalQuantizerId::Q8G32V0,
+                               PhysicalLayoutId::CudaQ8G32V0, m);
+    if (!packed) {
+      fail(error_message(packed.error()));
+    } else {
+      expect(packed->padded_n == 8 && packed->padded_k == 256,
+             "Q8 padding to one tile");
+      expect(packed->codes == golden_q8_codes(m), "padded Q8 golden codes");
+      expect(packed->scales == golden_q8_scales(m), "padded Q8 golden scales");
+      expect(static_cast<std::uint8_t>(packed->codes[4 * 256 + 191]) == 0x81,
+             "Q8 padded logical edge code retained");
+      expect(load_u16_le(packed->scales.data() + (4 * 8 + 5) * 2) == 0x3C00,
+             "Q8 padded scale order");
     }
   }
 

@@ -63,7 +63,9 @@ inline constexpr char const kCompilerIdent[] = "qw38-bf16-identity";
 inline constexpr char const kProductionCompilerIdent[] = "qw38-v0";
 inline constexpr std::uint32_t kCompilerMajor = 0;
 inline constexpr std::uint32_t kCompilerMinor = 1;
-inline constexpr std::uint32_t kCompilerPatch = 0;
+// Patch 1 freezes generated RoPE FP32 bytes rather than delegating rounding to
+// the host math library.
+inline constexpr std::uint32_t kCompilerPatch = 1;
 
 [[nodiscard]] constexpr bool is_full_attention_layer(std::uint32_t layer) noexcept {
   return layer < kLayers && (layer % kFullInterval) == (kFullInterval - 1);

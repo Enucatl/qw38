@@ -2,7 +2,6 @@
 
 #include "format/constants.hpp"
 
-#include <cmath>
 #include <cstring>
 
 namespace qw38::compiler {
@@ -159,14 +158,21 @@ std::expected<std::vector<std::byte>, CompilerError> conv_from_tap_major(
 }
 
 std::array<std::byte, kRopeFreqs * 4> generate_rope_inv_freq() {
+  // Correctly rounded IEEE-754 FP32 values of 10,000,000^(-2j/64), derived
+  // independently of the host libm. These bytes are part of the compiler's
+  // revisioned artifact contract, not a platform-specific pow result.
+  constexpr std::array<std::uint32_t, kRopeFreqs> kBits{
+      0x3f800000u, 0x3f5e8d27u, 0x3f41791du, 0x3f2831b4u,
+      0x3f1237d7u, 0x3efe3a16u, 0x3edd028bu, 0x3ec02211u,
+      0x3ea7077au, 0x3e913494u, 0x3e7c7751u, 0x3e5b7aacu,
+      0x3e3ecd65u, 0x3e25df51u, 0x3e10331eu, 0x3dfab7abu,
+      0x3dd9f583u, 0x3dbd7b15u, 0x3da4b936u, 0x3d8f336fu,
+      0x3d78fb1fu, 0x3d58730du, 0x3d3c2b1du, 0x3d239523u,
+      0x3d0e3586u, 0x3cf741a7u, 0x3cd6f343u, 0x3cbadd79u,
+      0x3ca27317u, 0x3c8d3960u, 0x3c758b3eu, 0x3c557622u};
   std::array<std::byte, kRopeFreqs * 4> out{};
   for (std::uint32_t j = 0; j < kRopeFreqs; ++j) {
-    double const exponent = -2.0 * static_cast<double>(j) /
-                            static_cast<double>(kRotaryDim);
-    auto const value = static_cast<float>(std::pow(kRopeTheta, exponent));
-    std::uint32_t bits = 0;
-    static_assert(sizeof(float) == 4);
-    std::memcpy(&bits, &value, sizeof(bits));
+    auto const bits = kBits[j];
     out[j * 4 + 0] = static_cast<std::byte>(bits & 0xFFu);
     out[j * 4 + 1] = static_cast<std::byte>((bits >> 8) & 0xFFu);
     out[j * 4 + 2] = static_cast<std::byte>((bits >> 16) & 0xFFu);
