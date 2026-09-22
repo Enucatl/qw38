@@ -332,6 +332,34 @@ void test_silu_sigmoid_gemv_argmax() {
                    qw38::reference::tol::kGemvRel * std::fabs(y[i]),
            "gemv fp32 vs double");
   }
+
+  // Independent row-major orientation oracle. The first three rows are
+  // coordinate sentinels; the final asymmetric row catches shared stride or
+  // transpose mistakes in the FP32 and FP64 implementations.
+  std::array<std::uint16_t, 12> const orientation_w{
+      bf16(1.0f), bf16(0.0f), bf16(0.0f),
+      bf16(0.0f), bf16(10.0f), bf16(0.0f),
+      bf16(0.0f), bf16(0.0f), bf16(100.0f),
+      bf16(2.0f), bf16(-4.0f), bf16(8.0f)};
+  std::array<std::uint16_t, 3> const orientation_x{
+      bf16(2.0f), bf16(-3.0f), bf16(5.0f)};
+  std::array<float, 4> orientation_y{};
+  std::array<double, 4> orientation_y64{};
+  std::array<float, 4> const orientation_expected{
+      2.0f, -30.0f, 500.0f, 56.0f};
+  expect(static_cast<bool>(qw38::reference::dense_gemv_bf16(
+             orientation_w, orientation_x, 4, 3, orientation_y)),
+         "gemv orientation fp32");
+  expect(static_cast<bool>(qw38::reference::dense_gemv_bf16_f64(
+             orientation_w, orientation_x, 4, 3, orientation_y64)),
+         "gemv orientation f64");
+  for (std::size_t i = 0; i < orientation_expected.size(); ++i) {
+    expect(orientation_y[i] == orientation_expected[i],
+           "gemv row-major orientation fp32");
+    expect(orientation_y64[i] == static_cast<double>(orientation_expected[i]),
+           "gemv row-major orientation f64");
+  }
+
   auto gemv_bad = qw38::reference::dense_gemv_bf16(w, x, n, k + 1, y);
   expect(!gemv_bad && gemv_bad.error().code == ErrorCode::InvalidShape,
          "gemv shape rejected");
