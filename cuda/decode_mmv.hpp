@@ -6,6 +6,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <expected>
+#include <limits>
 #include <span>
 
 namespace qw38::cuda {
@@ -16,6 +17,10 @@ inline constexpr int kDecodeThreads = 256;
 inline constexpr int kDecodeTileRows = 8;
 inline constexpr int kDecodeTileK = 256;
 inline constexpr int kDecodeMaxK = 17408;  // MLP down input width
+// Largest logical N whose row-tile padding is representable by padded_n.
+inline constexpr std::uint32_t kDecodeMaxN =
+    std::numeric_limits<std::uint32_t>::max() -
+    (static_cast<std::uint32_t>(kDecodeTileRows) - 1u);
 
 // Wire IDs match format::PhysicalLayoutId / LogicalQuantizerId (A-02).
 inline constexpr std::uint16_t kDecodeLayoutQ4G64V0 = 0x0201;
@@ -123,12 +128,14 @@ struct DecodeMmvRangeDesc {
   std::span<DecodeMmvDesc const> ranges{};
 };
 
-[[nodiscard]] constexpr std::uint32_t decode_pad_n(std::uint32_t n) noexcept {
+[[nodiscard]] constexpr std::uint64_t decode_pad_n(std::uint32_t n) noexcept {
   if (n == 0) {
     return 0;
   }
-  auto const rem = n % static_cast<std::uint32_t>(kDecodeTileRows);
-  return rem == 0 ? n : n + (static_cast<std::uint32_t>(kDecodeTileRows) - rem);
+  std::uint64_t const wide_n = n;
+  std::uint64_t const tile_rows = kDecodeTileRows;
+  std::uint64_t const rem = wide_n % tile_rows;
+  return rem == 0 ? wide_n : wide_n + (tile_rows - rem);
 }
 
 [[nodiscard]] constexpr std::uint32_t decode_pad_k(std::uint32_t k) noexcept {

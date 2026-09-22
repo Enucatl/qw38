@@ -323,6 +323,11 @@ std::expected<void, Error> validate_geometry(DecodeMmvDesc const& d,
     return std::unexpected(
         make_error(ErrorCode::InvalidArgument, op, "N and K must be nonzero"));
   }
+  if (d.n > kDecodeMaxN) {
+    return std::unexpected(make_error(
+        ErrorCode::Overflow, op,
+        "N exceeds the largest supported row-tile-padded value"));
+  }
   if (d.k > static_cast<std::uint32_t>(kDecodeMaxK) ||
       d.padded_k > static_cast<std::uint32_t>(kDecodeMaxK)) {
     return std::unexpected(make_error(ErrorCode::InvalidArgument, op,

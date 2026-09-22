@@ -2,25 +2,31 @@
 
 #include "cuda/error.hpp"
 
+#include <array>
+#include <limits>
 #include <string>
 
 using qw38::cuda::DecodeEpilogue;
 using qw38::cuda::DecodeMmvDesc;
 using qw38::cuda::DecodeMmvPairedDesc;
+using qw38::cuda::DecodeMmvRangeDesc;
 using qw38::cuda::DeviceBuffer;
 using qw38::cuda::ErrorCode;
 using qw38::cuda::Stream;
 using qw38::cuda::decode_code_bytes;
+using qw38::cuda::decode_pad_n;
 using qw38::cuda::decode_pad_k;
 using qw38::cuda::decode_scale_bytes;
 using qw38::cuda::kDecodeLayoutBf16DenseTileV0;
 using qw38::cuda::kDecodeLayoutQ4G64V0;
+using qw38::cuda::kDecodeMaxN;
 using qw38::cuda::kDecodeQuantizerNone;
 using qw38::cuda::kDecodeQuantizerQ4G64V0;
 using qw38::cuda::kDecodeQuantizerQ8G32V0;
 using qw38::cuda::launch_decode_ab_bf16;
 using qw38::cuda::launch_decode_mmv;
 using qw38::cuda::launch_decode_mmv_paired;
+using qw38::cuda::launch_decode_mmv_ranges;
 using qw38::decode_mmv::test::desc_from_packed;
 using qw38::decode_mmv::test::bind_input;
 using qw38::decode_mmv::test::bind_output;
@@ -97,6 +103,40 @@ void test_launch_validation(Stream const& stream) {
   expect(!bad_codes && bad_codes.error().code == ErrorCode::InvalidArgument,
          "code length mismatch rejects");
   d.codes.bytes = decode_code_bytes(kDecodeLayoutQ4G64V0, 8, 256);
+
+  expect(decode_pad_n(kDecodeMaxN) == kDecodeMaxN,
+         "maximum supported N pads exactly");
+  expect(decode_pad_n(kDecodeMaxN + 1u) ==
+             static_cast<std::uint64_t>(kDecodeMaxN) + 8u,
+         "one-past supported N padding stays wide");
+  expect(decode_pad_n(std::numeric_limits<std::uint32_t>::max()) ==
+             std::uint64_t{1} << 32,
+         "UINT32_MAX padding does not wrap");
+
+  auto zero_tiles = d;
+  zero_tiles.n = 0;
+  zero_tiles.padded_n = 0;
+  auto zero_single = launch_decode_mmv(zero_tiles, stream);
+  expect(!zero_single && zero_single.error().code == ErrorCode::InvalidArgument,
+         "single zero-tile geometry rejects");
+
+  auto overflow_tiles = d;
+  overflow_tiles.n = std::numeric_limits<std::uint32_t>::max();
+  overflow_tiles.padded_n = 0;
+  auto overflow_single = launch_decode_mmv(overflow_tiles, stream);
+  expect(!overflow_single && overflow_single.error().code == ErrorCode::Overflow,
+         "single overflowing N rejects before launch");
+
+  std::array<DecodeMmvDesc, 2> ranged{d, zero_tiles};
+  auto zero_ranged = launch_decode_mmv_ranges(DecodeMmvRangeDesc{ranged}, stream);
+  expect(!zero_ranged && zero_ranged.error().code == ErrorCode::InvalidArgument,
+         "ranged zero-tile geometry rejects");
+  ranged[1] = overflow_tiles;
+  auto overflow_ranged =
+      launch_decode_mmv_ranges(DecodeMmvRangeDesc{ranged}, stream);
+  expect(!overflow_ranged &&
+             overflow_ranged.error().code == ErrorCode::Overflow,
+         "ranged overflowing N rejects before launch");
 
   d.epilogue = DecodeEpilogue::ResidualAddFp32;
   d.output = {};
