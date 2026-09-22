@@ -1663,52 +1663,63 @@ std::expected<std::uint64_t, FormatError> expected_scale_bytes(
   return checked_mul(*count, kFp16Size, offset, "tensor.scales");
 }
 
-std::expected<void, FormatError> validate_shared_binding_ownership(
-    ArtifactSchema const& schema, std::uint64_t offset) {
+static std::expected<void, FormatError>
+validate_shared_binding_ownership_at_offsets(
+    ArtifactSchema const& schema, std::uint64_t offset,
+    std::span<std::uint64_t const> record_offsets) {
+  auto const binding_offset = [offset, record_offsets](std::size_t index) {
+    return index < record_offsets.size() ? record_offsets[index] : offset;
+  };
   std::unordered_map<std::uint32_t, std::uint32_t> owner_by_alias;
   std::unordered_set<std::uint32_t> aliases;
-  std::unordered_set<std::uint32_t> owners;
   owner_by_alias.reserve(schema.shared_bindings.size());
   aliases.reserve(schema.shared_bindings.size());
-  owners.reserve(schema.shared_bindings.size());
 
-  for (auto const& binding : schema.shared_bindings) {
+  for (std::size_t i = 0; i < schema.shared_bindings.size(); ++i) {
+    auto const& binding = schema.shared_bindings[i];
+    auto const current_offset = binding_offset(i);
     if (!is_known(binding.role)) {
-      return std::unexpected(make_error(FormatErrorCode::UnknownEnum, offset,
+      return std::unexpected(make_error(FormatErrorCode::UnknownEnum,
+                                        current_offset,
                                         "shared.role", "unknown shared binding role"));
     }
     if (binding.owner_tensor_id == binding.alias_tensor_id) {
-      return std::unexpected(make_error(FormatErrorCode::SharedBinding, offset,
+      return std::unexpected(make_error(FormatErrorCode::SharedBinding,
+                                        current_offset,
                                         "shared.alias",
                                         "owner and alias must differ"));
     }
     if (find_tensor(schema, binding.owner_tensor_id) == nullptr ||
         find_tensor(schema, binding.alias_tensor_id) == nullptr) {
       return std::unexpected(make_error(
-          FormatErrorCode::SharedBinding, offset, "shared.owner",
+          FormatErrorCode::SharedBinding, current_offset, "shared.owner",
           "shared binding references a missing tensor"));
     }
     auto const [it, inserted] = owner_by_alias.emplace(
         binding.alias_tensor_id, binding.owner_tensor_id);
     if (!inserted) {
       return std::unexpected(make_error(
-          FormatErrorCode::SharedBinding, offset, "shared.alias",
+          FormatErrorCode::SharedBinding, current_offset, "shared.alias",
           it->second == binding.owner_tensor_id
               ? "duplicate shared binding for alias"
               : "alias has multiple owners"));
     }
     aliases.insert(binding.alias_tensor_id);
-    owners.insert(binding.owner_tensor_id);
   }
 
-  for (auto owner : owners) {
-    if (aliases.contains(owner)) {
+  for (std::size_t i = 0; i < schema.shared_bindings.size(); ++i) {
+    if (aliases.contains(schema.shared_bindings[i].owner_tensor_id)) {
       return std::unexpected(make_error(
-          FormatErrorCode::SharedBinding, offset, "shared.owner",
+          FormatErrorCode::SharedBinding, binding_offset(i), "shared.owner",
           "an alias cannot own another alias; chains and cycles are forbidden"));
     }
   }
   return {};
+}
+
+std::expected<void, FormatError> validate_shared_binding_ownership(
+    ArtifactSchema const& schema, std::uint64_t offset) {
+  return validate_shared_binding_ownership_at_offsets(schema, offset, {});
 }
 
 std::expected<std::uint32_t, FormatError> canonical_owner_tensor_id(
@@ -2164,6 +2175,19 @@ std::expected<ArtifactSchema, FormatError> decode_schema(
   return decode_schema(in, 0);
 }
 
+struct SchemaRecordOffsets {
+  std::vector<std::uint64_t> tensors;
+  std::vector<std::uint64_t> shared_bindings;
+  std::vector<std::uint64_t> graph_bindings;
+  std::vector<std::uint64_t> state;
+  std::vector<std::uint64_t> scratch;
+  std::vector<std::uint64_t> integrity;
+};
+
+static std::expected<void, FormatError> validate_schema_at_offsets(
+    ArtifactSchema const& schema, std::uint64_t offset,
+    SchemaRecordOffsets const* record_offsets);
+
 std::expected<ArtifactSchema, FormatError> decode_schema(
     std::span<std::byte const> in, std::uint64_t base_offset) try {
   if (in.size() > kMaxManifestBytesV0) {
@@ -2217,6 +2241,7 @@ std::expected<ArtifactSchema, FormatError> decode_schema(
     return std::unexpected(decoded_scope.error());
   }
   schema.scope = *decoded_scope;
+  SchemaRecordOffsets record_offsets;
 
   auto const n_tensors = r.u32("tensor_count");
   if (!n_tensors) {
@@ -2228,7 +2253,9 @@ std::expected<ArtifactSchema, FormatError> decode_schema(
     return std::unexpected(st.error());
   }
   schema.tensors.reserve(*n_tensors);
+  record_offsets.tensors.reserve(*n_tensors);
   for (std::uint32_t i = 0; i < *n_tensors; ++i) {
+    record_offsets.tensors.push_back(r.offset());
     auto t = read_tensor(r);
     if (!t) {
       return std::unexpected(t.error());
@@ -2245,7 +2272,9 @@ std::expected<ArtifactSchema, FormatError> decode_schema(
     return std::unexpected(st.error());
   }
   schema.shared_bindings.reserve(*n_shared);
+  record_offsets.shared_bindings.reserve(*n_shared);
   for (std::uint32_t i = 0; i < *n_shared; ++i) {
+    record_offsets.shared_bindings.push_back(r.offset());
     auto b = read_shared(r);
     if (!b) {
       return std::unexpected(b.error());
@@ -2262,7 +2291,9 @@ std::expected<ArtifactSchema, FormatError> decode_schema(
     return std::unexpected(st.error());
   }
   schema.graph_bindings.reserve(*n_graph);
+  record_offsets.graph_bindings.reserve(*n_graph);
   for (std::uint32_t i = 0; i < *n_graph; ++i) {
+    record_offsets.graph_bindings.push_back(r.offset());
     auto b = read_graph(r);
     if (!b) {
       return std::unexpected(b.error());
@@ -2279,7 +2310,9 @@ std::expected<ArtifactSchema, FormatError> decode_schema(
     return std::unexpected(st.error());
   }
   schema.state.reserve(*n_state);
+  record_offsets.state.reserve(*n_state);
   for (std::uint32_t i = 0; i < *n_state; ++i) {
+    record_offsets.state.push_back(r.offset());
     auto s = read_state(r);
     if (!s) {
       return std::unexpected(s.error());
@@ -2296,7 +2329,9 @@ std::expected<ArtifactSchema, FormatError> decode_schema(
     return std::unexpected(st.error());
   }
   schema.scratch.reserve(*n_scratch);
+  record_offsets.scratch.reserve(*n_scratch);
   for (std::uint32_t i = 0; i < *n_scratch; ++i) {
+    record_offsets.scratch.push_back(r.offset());
     auto s = read_scratch(r);
     if (!s) {
       return std::unexpected(s.error());
@@ -2313,7 +2348,9 @@ std::expected<ArtifactSchema, FormatError> decode_schema(
     return std::unexpected(st.error());
   }
   schema.integrity.reserve(*n_int);
+  record_offsets.integrity.reserve(*n_int);
   for (std::uint32_t i = 0; i < *n_int; ++i) {
+    record_offsets.integrity.push_back(r.offset());
     auto rec = read_integrity(r);
     if (!rec) {
       return std::unexpected(rec.error());
@@ -2323,7 +2360,8 @@ std::expected<ArtifactSchema, FormatError> decode_schema(
   if (auto st = r.expect_consumed(); !st) {
     return std::unexpected(st.error());
   }
-  if (auto st = validate_schema(schema, base_offset); !st) {
+  if (auto st = validate_schema_at_offsets(schema, base_offset, &record_offsets);
+      !st) {
     return std::unexpected(st.error());
   }
   return schema;
@@ -2338,6 +2376,21 @@ std::expected<ArtifactSchema, FormatError> decode_schema(
 
 std::expected<void, FormatError> validate_schema(ArtifactSchema const& schema,
                                                  std::uint64_t offset) {
+  return validate_schema_at_offsets(schema, offset, nullptr);
+}
+
+static std::expected<void, FormatError> validate_schema_at_offsets(
+    ArtifactSchema const& schema, std::uint64_t offset,
+    SchemaRecordOffsets const* record_offsets) {
+  auto const record_offset =
+      [offset, record_offsets](std::vector<std::uint64_t> SchemaRecordOffsets::*member,
+                               std::size_t index) {
+        if (record_offsets == nullptr) {
+          return offset;
+        }
+        auto const& offsets = record_offsets->*member;
+        return index < offsets.size() ? offsets[index] : offset;
+      };
   if (schema.manifest_version != kManifestVersionV0) {
     return std::unexpected(make_error(
         FormatErrorCode::UnsupportedManifestVersion, offset, "manifest.version",
@@ -2370,46 +2423,63 @@ std::expected<void, FormatError> validate_schema(ArtifactSchema const& schema,
     return st;
   }
   for (std::size_t i = 0; i < schema.tensors.size(); ++i) {
-    if (auto st = validate_tensor(schema.tensors[i], offset); !st) {
+    auto const tensor_offset =
+        record_offset(&SchemaRecordOffsets::tensors, i);
+    if (auto st = validate_tensor(schema.tensors[i], tensor_offset); !st) {
       auto error = st.error();
       error.field = schema.tensors[i].logical_name + "." + error.field;
       return std::unexpected(std::move(error));
     }
     for (std::size_t j = i + 1; j < schema.tensors.size(); ++j) {
       if (schema.tensors[i].tensor_id == schema.tensors[j].tensor_id) {
-        return std::unexpected(make_error(FormatErrorCode::DuplicateId, offset,
-                                          "tensor.id",
-                                          "tensor ids must be unique"));
+        return std::unexpected(make_error(
+            FormatErrorCode::DuplicateId,
+            record_offset(&SchemaRecordOffsets::tensors, j),
+            schema.tensors[j].logical_name + ".tensor.id",
+            "tensor ids must be unique"));
       }
       if (schema.tensors[i].logical_name == schema.tensors[j].logical_name) {
-        return std::unexpected(make_error(FormatErrorCode::DuplicateId, offset,
-                                          "tensor.logical_name",
-                                          "logical identities must be unique"));
+        return std::unexpected(make_error(
+            FormatErrorCode::DuplicateId,
+            record_offset(&SchemaRecordOffsets::tensors, j),
+            schema.tensors[j].logical_name + ".tensor.logical_name",
+            "logical identities must be unique"));
       }
     }
   }
   for (std::size_t i = 1; i < schema.tensors.size(); ++i) {
     if (schema.tensors[i - 1].tensor_id > schema.tensors[i].tensor_id) {
       return std::unexpected(make_error(
-          FormatErrorCode::InvalidSpan, offset, "tensor.order",
+          FormatErrorCode::InvalidSpan,
+          record_offset(&SchemaRecordOffsets::tensors, i),
+          schema.tensors[i].logical_name + ".tensor.order",
           "tensor directory must be ordered by ascending tensor id"));
     }
   }
-  if (auto st = validate_shared_binding_ownership(schema, offset); !st) {
+  if (auto st = validate_shared_binding_ownership_at_offsets(
+          schema, offset,
+          record_offsets == nullptr
+              ? std::span<std::uint64_t const>{}
+              : std::span<std::uint64_t const>{
+                    record_offsets->shared_bindings});
+      !st) {
     return st;
   }
-  for (auto const& g : schema.graph_bindings) {
+  for (std::size_t i = 0; i < schema.graph_bindings.size(); ++i) {
+    auto const& g = schema.graph_bindings[i];
+    auto const graph_offset =
+        record_offset(&SchemaRecordOffsets::graph_bindings, i);
     if (!is_known(g.kind)) {
-      return std::unexpected(make_error(FormatErrorCode::UnknownEnum, offset,
+      return std::unexpected(make_error(FormatErrorCode::UnknownEnum, graph_offset,
                                         "graph.kind", "unknown semantic node kind"));
     }
     if (!is_known(g.role)) {
-      return std::unexpected(make_error(FormatErrorCode::UnknownEnum, offset,
+      return std::unexpected(make_error(FormatErrorCode::UnknownEnum, graph_offset,
                                         "graph.role", "unknown tensor role"));
     }
     if (find_tensor(schema, g.tensor_id) == nullptr) {
       return std::unexpected(make_error(FormatErrorCode::InvalidGraphBinding,
-                                        offset, "graph.tensor",
+                                        graph_offset, "graph.tensor",
                                         "graph binding references missing tensor"));
     }
     if ((g.kind == SemanticNodeKind::GatedAttention ||
@@ -2417,19 +2487,19 @@ std::expected<void, FormatError> validate_schema(ArtifactSchema const& schema,
          g.kind == SemanticNodeKind::Mlp) &&
         g.layer_index == kNoLayerIndex) {
       return std::unexpected(make_error(FormatErrorCode::InvalidGraphBinding,
-                                        offset, "graph.layer",
+                                        graph_offset, "graph.layer",
                                         "layer-scoped nodes need a layer index"));
     }
     if (g.kind == SemanticNodeKind::MtpMix &&
         schema.scope != SemanticScope::LanguagePlusMtpDescriptors) {
       return std::unexpected(make_error(
-          FormatErrorCode::InvalidGraphBinding, offset, "graph.kind",
+          FormatErrorCode::InvalidGraphBinding, graph_offset, "graph.kind",
           "MTP nodes require language-plus-MTP descriptor scope"));
     }
     if (g.kind == SemanticNodeKind::Embed &&
         g.role != TensorRole::EmbeddingTable) {
       return std::unexpected(make_error(FormatErrorCode::InvalidGraphBinding,
-                                        offset, "graph.role",
+                                        graph_offset, "graph.role",
                                         "EMBED binds an embedding table"));
     }
     if (g.kind == SemanticNodeKind::LmHead &&
@@ -2437,7 +2507,7 @@ std::expected<void, FormatError> validate_schema(ArtifactSchema const& schema,
         g.role != TensorRole::FinalLanguageNorm &&
         g.role != TensorRole::MtpNorm) {
       return std::unexpected(make_error(FormatErrorCode::InvalidGraphBinding,
-                                        offset, "graph.role",
+                                        graph_offset, "graph.role",
                                         "LM_HEAD binds its vocabulary matrix and norm"));
     }
     bool const valid_norm_node =
@@ -2456,38 +2526,42 @@ std::expected<void, FormatError> validate_schema(ArtifactSchema const& schema,
          g.kind == SemanticNodeKind::LmHead);
     if (!valid_norm_node) {
       return std::unexpected(make_error(FormatErrorCode::InvalidGraphBinding,
-                                        offset, "graph.role",
+                                        graph_offset, "graph.role",
                                         "norm role is invalid for graph node"));
     }
   }
   bool seen_gdn = false;
   bool seen_conv = false;
   bool seen_kv = false;
-  for (auto const& s : schema.state) {
-    if (auto st = validate_state(s, offset); !st) {
+  for (std::size_t i = 0; i < schema.state.size(); ++i) {
+    auto const& s = schema.state[i];
+    auto const state_offset = record_offset(&SchemaRecordOffsets::state, i);
+    if (auto st = validate_state(s, state_offset); !st) {
       auto error = st.error();
-      error.field = "state[" + std::to_string(std::to_underlying(s.kind)) +
-                    "]." + error.field;
+      error.field = "state[" + std::to_string(i) + "]." + error.field;
       return std::unexpected(std::move(error));
     }
     if (s.kind == StateKind::GdnS) {
       if (seen_gdn) {
-        return std::unexpected(make_error(FormatErrorCode::DuplicateId, offset,
-                                          "state.kind",
-                                          "duplicate GDN S allocation"));
+        return std::unexpected(make_error(
+            FormatErrorCode::DuplicateId, state_offset,
+            "state[" + std::to_string(i) + "].kind",
+            "duplicate GDN S allocation"));
       }
       seen_gdn = true;
     } else if (s.kind == StateKind::ConvolutionHistory) {
       if (seen_conv) {
-        return std::unexpected(make_error(FormatErrorCode::DuplicateId, offset,
-                                          "state.kind",
-                                          "duplicate convolution history"));
+        return std::unexpected(make_error(
+            FormatErrorCode::DuplicateId, state_offset,
+            "state[" + std::to_string(i) + "].kind",
+            "duplicate convolution history"));
       }
       seen_conv = true;
     } else if (s.kind == StateKind::KvCache) {
       if (seen_kv) {
-        return std::unexpected(make_error(FormatErrorCode::DuplicateId, offset,
-                                          "state.kind", "duplicate KV cache"));
+        return std::unexpected(make_error(
+            FormatErrorCode::DuplicateId, state_offset,
+            "state[" + std::to_string(i) + "].kind", "duplicate KV cache"));
       }
       seen_kv = true;
     }
@@ -2498,14 +2572,20 @@ std::expected<void, FormatError> validate_schema(ArtifactSchema const& schema,
         "V0 language state requires exactly GDN S, convolution history, and KV"));
   }
   for (std::size_t i = 0; i < schema.scratch.size(); ++i) {
-    if (auto st = validate_scratch(schema.scratch[i], offset); !st) {
-      return st;
+    auto const scratch_offset =
+        record_offset(&SchemaRecordOffsets::scratch, i);
+    if (auto st = validate_scratch(schema.scratch[i], scratch_offset); !st) {
+      auto error = st.error();
+      error.field = "scratch[" + std::to_string(i) + "]." + error.field;
+      return std::unexpected(std::move(error));
     }
     for (std::size_t j = i + 1; j < schema.scratch.size(); ++j) {
       if (schema.scratch[i].kind == schema.scratch[j].kind) {
-        return std::unexpected(make_error(FormatErrorCode::DuplicateId, offset,
-                                          "scratch.kind",
-                                          "duplicate scratch kind"));
+        return std::unexpected(make_error(
+            FormatErrorCode::DuplicateId,
+            record_offset(&SchemaRecordOffsets::scratch, j),
+            "scratch[" + std::to_string(j) + "].kind",
+            "duplicate scratch kind"));
       }
     }
   }
@@ -2514,12 +2594,15 @@ std::expected<void, FormatError> validate_schema(ArtifactSchema const& schema,
         FormatErrorCode::InvalidScratchAllocation, offset, "scratch",
         "V0 language scratch requires every declared scratch kind exactly once"));
   }
-  for (auto const& b : schema.shared_bindings) {
+  for (std::size_t i = 0; i < schema.shared_bindings.size(); ++i) {
+    auto const& b = schema.shared_bindings[i];
+    auto const shared_offset =
+        record_offset(&SchemaRecordOffsets::shared_bindings, i);
     auto const* owner = find_tensor(schema, b.owner_tensor_id);
     auto const* alias = find_tensor(schema, b.alias_tensor_id);
     if (!tensors_share_payload(*owner, *alias)) {
       return std::unexpected(make_error(
-          FormatErrorCode::SharedBinding, offset, "shared.payload",
+          FormatErrorCode::SharedBinding, shared_offset, "shared.payload",
           "alias must reuse the owner's shape, layout, and spans"));
     }
     bool const owner_embed =
@@ -2538,81 +2621,102 @@ std::expected<void, FormatError> validate_schema(ArtifactSchema const& schema,
         (owner_head && (alias_embed || owner_embed)) ||
         (alias_embed && alias_head)) {
       return std::unexpected(make_error(
-          FormatErrorCode::SharedBinding, offset, "shared.role",
+          FormatErrorCode::SharedBinding, shared_offset, "shared.role",
           "embeddings and lm_head remain untied"));
     }
     if (b.role == SharedBindingRole::MtpEmbeddingAlias) {
       if (schema.scope != SemanticScope::LanguagePlusMtpDescriptors) {
         return std::unexpected(make_error(
-            FormatErrorCode::SharedBinding, offset, "shared.role",
+            FormatErrorCode::SharedBinding, shared_offset, "shared.role",
             "MTP embedding alias requires MTP descriptor scope"));
       }
       if (!owner_embed) {
         return std::unexpected(make_error(
-            FormatErrorCode::SharedBinding, offset, "shared.owner",
+            FormatErrorCode::SharedBinding, shared_offset, "shared.owner",
             "MTP embedding alias must bind to the embedding table"));
       }
     }
     if (b.role == SharedBindingRole::MtpLmHeadAlias) {
       if (schema.scope != SemanticScope::LanguagePlusMtpDescriptors) {
         return std::unexpected(make_error(
-            FormatErrorCode::SharedBinding, offset, "shared.role",
+            FormatErrorCode::SharedBinding, shared_offset, "shared.role",
             "MTP head alias requires MTP descriptor scope"));
       }
       if (!owner_head) {
         return std::unexpected(make_error(
-            FormatErrorCode::SharedBinding, offset, "shared.owner",
+            FormatErrorCode::SharedBinding, shared_offset, "shared.owner",
             "MTP head alias must bind to lm_head"));
       }
     }
   }
   for (std::size_t i = 0; i < schema.tensors.size(); ++i) {
     auto const& a = schema.tensors[i];
-    if (auto st = validate_span_overlap(a.payload, a.scales, false, offset,
+    auto const a_offset = record_offset(&SchemaRecordOffsets::tensors, i);
+    if (auto st = validate_span_overlap(a.payload, a.scales, false, a_offset,
                                         "tensor.payload/scales");
         !st) {
-      return st;
+      auto error = st.error();
+      error.field = a.logical_name + "." + error.field;
+      return std::unexpected(std::move(error));
     }
     for (std::size_t j = i + 1; j < schema.tensors.size(); ++j) {
       auto const& b = schema.tensors[j];
+      auto const b_offset = record_offset(&SchemaRecordOffsets::tensors, j);
       bool const authorized = has_shared_binding(schema, a.tensor_id, b.tensor_id);
       if (auto st = validate_span_overlap(a.payload, b.payload, authorized,
-                                          offset, "tensor.payload");
+                                          b_offset, "tensor.payload");
           !st) {
-        return st;
+        auto error = st.error();
+        error.field = b.logical_name + "." + error.field;
+        return std::unexpected(std::move(error));
       }
-      if (auto st = validate_span_overlap(a.payload, b.scales, false, offset,
+      if (auto st = validate_span_overlap(a.payload, b.scales, false, b_offset,
                                           "tensor.payload/scales");
           !st) {
-        return st;
+        auto error = st.error();
+        error.field = b.logical_name + "." + error.field;
+        return std::unexpected(std::move(error));
       }
-      if (auto st = validate_span_overlap(a.scales, b.payload, false, offset,
+      if (auto st = validate_span_overlap(a.scales, b.payload, false, b_offset,
                                           "tensor.scales/payload");
           !st) {
-        return st;
+        auto error = st.error();
+        error.field = b.logical_name + "." + error.field;
+        return std::unexpected(std::move(error));
       }
       if (auto st = validate_span_overlap(a.scales, b.scales, authorized,
-                                          offset, "tensor.scales");
+                                          b_offset, "tensor.scales");
           !st) {
-        return st;
+        auto error = st.error();
+        error.field = b.logical_name + "." + error.field;
+        return std::unexpected(std::move(error));
       }
     }
   }
-  for (auto const& rec : schema.integrity) {
+  for (std::size_t i = 0; i < schema.integrity.size(); ++i) {
+    auto const& rec = schema.integrity[i];
+    auto const integrity_offset =
+        record_offset(&SchemaRecordOffsets::integrity, i);
     if (!is_known(rec.kind)) {
-      return std::unexpected(make_error(FormatErrorCode::UnknownEnum, offset,
-                                        "integrity.kind", "unknown integrity kind"));
+      return std::unexpected(make_error(
+          FormatErrorCode::UnknownEnum, integrity_offset,
+          "integrity[" + std::to_string(i) + "].kind",
+          "unknown integrity kind"));
     }
-    if (auto st = checked_add(rec.region.offset, rec.region.length, offset,
+    if (auto st = checked_add(rec.region.offset, rec.region.length,
+                              integrity_offset,
                               "integrity.region");
         !st) {
-      return std::unexpected(st.error());
+      auto error = st.error();
+      error.field = "integrity[" + std::to_string(i) + "]." + error.field;
+      return std::unexpected(std::move(error));
     }
     if (rec.kind == IntegrityKind::Sha256PayloadSpan ||
         rec.kind == IntegrityKind::Sha256ScaleSpan) {
       if (find_tensor(schema, rec.tensor_id) == nullptr) {
         return std::unexpected(make_error(
-            FormatErrorCode::InvalidSpan, offset, "integrity.tensor",
+            FormatErrorCode::InvalidSpan, integrity_offset,
+            "integrity[" + std::to_string(i) + "].tensor",
             "payload integrity record needs a tensor id"));
       }
     }

@@ -354,6 +354,58 @@ void test_manifest_absolute_error_context() {
          "layout error preserves absolute offset, field, and raw value");
 }
 
+void test_semantic_errors_preserve_record_context() {
+  auto put_u64 = [](std::vector<std::byte>& out, std::size_t offset,
+                    std::uint64_t value) {
+    for (std::size_t i = 0; i < 8; ++i) {
+      out[offset + i] =
+          static_cast<std::byte>((value >> (8 * i)) & 0xFFu);
+    }
+  };
+
+  auto schema = base_schema();
+  schema.tensors.push_back(bf16_vector(17, "named_tensor", 4, 256));
+  auto bytes = must_encode(schema, "semantic tensor record context");
+  if (bytes.empty()) {
+    return;
+  }
+  std::size_t const tensor_record_offset =
+      2 + (2 + schema.compiler.ident.size() + 16) + 3 * 32 +
+      (4 + 4 * schema.precision.bindings.size()) + 2 + 4;
+  std::size_t const payload_length_offset =
+      tensor_record_offset + 4 + 2 + schema.tensors[0].logical_name.size() +
+      8 + 16 * schema.tensors[0].shape.rank + 8 + 20 + 8;
+  put_u64(bytes, payload_length_offset, 16);
+
+  constexpr std::uint64_t kManifestFileOffset = 4096;
+  auto decoded = decode_schema(bytes, kManifestFileOffset);
+  expect(!decoded && decoded.error().code == FormatErrorCode::InvalidSpan &&
+             decoded.error().offset ==
+                 kManifestFileOffset + tensor_record_offset &&
+             decoded.error().field ==
+                 "named_tensor.tensor.payload.length",
+         "tensor semantic error retains record offset and logical name");
+
+  schema = base_schema();
+  bytes = must_encode(schema, "semantic state record context");
+  if (bytes.empty()) {
+    return;
+  }
+  std::size_t const tensor_count_offset =
+      2 + (2 + schema.compiler.ident.size() + 16) + 3 * 32 +
+      (4 + 4 * schema.precision.bindings.size()) + 2;
+  std::size_t const first_state_record_offset =
+      tensor_count_offset + 4 + 4 + 4 + 4;
+  bytes[first_state_record_offset + 6] = std::byte{0x02};
+  decoded = decode_schema(bytes, kManifestFileOffset);
+  expect(!decoded &&
+             decoded.error().code == FormatErrorCode::LiveStateForbidden &&
+             decoded.error().offset ==
+                 kManifestFileOffset + first_state_record_offset &&
+             decoded.error().field == "state[0].state.live_payload",
+         "state semantic error retains record offset and state index");
+}
+
 void test_overflow_and_alignment() {
   auto mul = checked_mul(1ull << 32, 1ull << 32, 12, "dims");
   expect(!mul && mul.error().code == FormatErrorCode::Overflow &&
@@ -953,6 +1005,7 @@ int main() {
   test_endian_mismatch_is_rejected_as_version();
   test_enum_and_version_rejection();
   test_manifest_absolute_error_context();
+  test_semantic_errors_preserve_record_context();
   test_overflow_and_alignment();
   test_invalid_shape_and_span();
   test_shape_entry_points_reject_malformed_ranks_and_sizes();
