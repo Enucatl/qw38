@@ -496,7 +496,13 @@ std::expected<MlpPlan, Error> bind_mlp_plan(Model const& model,
   }
 
   auto h_mid = session.residual_h_mid();
+  h_mid.rank = 1;
+  h_mid.extent = {};
+  h_mid.extent[0] = kHidden;
   auto next_h = session.residual_h();
+  next_h.rank = 1;
+  next_h.extent = {};
+  next_h.extent[0] = kHidden;
   auto normalized = session.scratch(qw38::format::ScratchKind::NormalizedHidden);
   auto swiglu = session.scratch(qw38::format::ScratchKind::MlpSwiglu);
   if (!normalized) {
@@ -517,7 +523,13 @@ std::expected<MlpPlan, Error> bind_mlp_plan(Model const& model,
   views.h_mid = h_mid;
   views.next_h = next_h;
   views.normalized = normalized->region[0].tensor;
+  views.normalized.rank = 1;
+  views.normalized.extent = {};
+  views.normalized.extent[0] = kHidden;
   views.swiglu = swiglu->region[0].tensor;
+  views.swiglu.rank = 1;
+  views.swiglu.extent = {};
+  views.swiglu.extent[0] = kFfnWidth;
   return bind_mlp_plan(views, stream, eps);
 }
 

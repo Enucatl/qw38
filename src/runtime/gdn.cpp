@@ -8,6 +8,8 @@
 #include "format/constants.hpp"
 #include "format/layout.hpp"
 
+#include <cuda_runtime.h>
+
 #include <array>
 #include <cmath>
 #include <initializer_list>
@@ -1352,6 +1354,12 @@ std::expected<TensorView, Error> execute_decode_gdn_impl(
       }
       timings->ms[i] = *ms;
     }
+  }
+  cudaStreamCaptureStatus capture_status = cudaStreamCaptureStatusNone;
+  if (cudaStreamIsCapturing(plan.front.stream->native(), &capture_status) ==
+          cudaSuccess &&
+      capture_status == cudaStreamCaptureStatusActive) {
+    return plan.residual_out;
   }
   if (auto st = plan.front.stream->sync(); !st) {
     return std::unexpected(from_cuda(st.error()));

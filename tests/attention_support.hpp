@@ -63,6 +63,7 @@ using qw38::runtime::AttentionPrepBindViews;
 using qw38::runtime::MemorySpace;
 using qw38::runtime::TensorView;
 using qw38::runtime::WorkspaceView;
+using qw38::runtime::attn_workspace_bytes_for_capacity;
 using qw38::runtime::kAttentionWorkspaceBytesPerToken;
 
 inline std::vector<std::uint16_t> pattern_h(std::uint32_t n, float seed) {
@@ -188,7 +189,12 @@ inline bool upload_host_attn(HostAttn const& host, DeviceAttn& dev,
   auto inf = upload_vec(inv, stream);
   auto r = upload_vec(host.residual, stream);
   auto n = DeviceBuffer::allocate(kHidden * 2);
-  auto ws = DeviceBuffer::allocate(kAttentionWorkspaceBytesPerToken);
+  auto ws_bytes = attn_workspace_bytes_for_capacity(capacity);
+  if (!ws_bytes) {
+    fail("attention workspace size");
+    return false;
+  }
+  auto ws = DeviceBuffer::allocate(*ws_bytes);
   auto kv_n = 16u * 2u * kKvHeads * capacity * kHeadDim * 2u;
   auto kv = DeviceBuffer::allocate(kv_n);
   if (!g || !gq || !gk || !inf || !r || !n || !ws || !kv) {
@@ -256,7 +262,7 @@ inline AttentionPrepBindViews bind_views(DeviceAttn& dev,
   v.normalized = vec_view(dev.normalized, ArithmeticDtype::Bf16,
                           PhysicalLayoutId::CudaBf16RowMajorV0, StorageClass::Bf16,
                           true, kHidden);
-  v.workspace = attention_workspace_view(dev.workspace.data());
+  v.workspace = attention_workspace_view(dev.workspace.data(), dev.workspace.bytes());
   v.kv = vec_view(dev.kv, ArithmeticDtype::Bf16,
                   PhysicalLayoutId::CudaBf16KvCacheV0, StorageClass::Bf16, true, 1);
   v.kv.rank = 5;
