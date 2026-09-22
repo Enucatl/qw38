@@ -27,7 +27,9 @@ class Artifact {
   [[nodiscard]] static std::expected<Artifact, FormatError> open(
       std::filesystem::path path);
   [[nodiscard]] static std::expected<Artifact, FormatError> parse(
-      std::vector<std::byte> bytes);
+      std::vector<std::byte> const& bytes);
+  [[nodiscard]] static std::expected<Artifact, FormatError> parse(
+      std::vector<std::byte>&& bytes);
   [[nodiscard]] static std::expected<Artifact, FormatError> parse(
       std::span<std::byte const> bytes);
 

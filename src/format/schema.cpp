@@ -2,6 +2,8 @@
 
 #include <iterator>
 #include <limits>
+#include <new>
+#include <stdexcept>
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
@@ -11,6 +13,25 @@ namespace {
 
 constexpr std::uint16_t kFlagPopulatedDistinct = 0x0001;
 constexpr std::uint16_t kFlagLivePayload = 0x0002;
+
+template <typename Count>
+std::expected<void, FormatError> preflight_count(
+    ByteReader const& r, Count count, std::size_t minimum_record_bytes,
+    Count maximum_count, std::string_view field) {
+  auto const count_offset = r.offset() - sizeof(Count);
+  if (count > maximum_count) {
+    return std::unexpected(make_error(
+        FormatErrorCode::ResourceLimitExceeded, count_offset, field,
+        "record count exceeds the V0 limit"));
+  }
+  if (static_cast<std::size_t>(count) >
+      r.remaining() / minimum_record_bytes) {
+    return std::unexpected(make_error(
+        FormatErrorCode::Truncated, count_offset, field,
+        "remaining manifest bytes cannot contain the declared records"));
+  }
+  return {};
+}
 
 std::expected<std::size_t, FormatError> to_size(std::uint64_t n,
                                                 std::uint64_t offset,
@@ -299,6 +320,11 @@ std::expected<PrecisionPolicyRecord, FormatError> read_precision(ByteReader& r) 
   auto const count = r.u16("precision.count");
   if (!count) {
     return std::unexpected(count.error());
+  }
+  if (auto st = preflight_count(r, *count, 4, kMaxPrecisionBindingsV0,
+                                "precision.count");
+      !st) {
+    return std::unexpected(st.error());
   }
   policy.bindings.reserve(*count);
   for (std::uint16_t i = 0; i < *count; ++i) {
@@ -1537,6 +1563,11 @@ std::expected<void, FormatError> validate_header(ContainerHeader const& header,
                                       "header.manifest_offset",
                                       "manifest must start after the header"));
   }
+  if (header.manifest_length > kMaxManifestBytesV0) {
+    return std::unexpected(make_error(
+        FormatErrorCode::ResourceLimitExceeded, offset,
+        "header.manifest_length", "manifest exceeds the V0 size limit"));
+  }
   if (auto st = checked_add(header.manifest_offset, header.manifest_length,
                             offset, "header.manifest");
       !st) {
@@ -1642,7 +1673,16 @@ std::expected<std::size_t, FormatError> encoded_size(
   if (auto st = acc.add(*integ_n, 0, "integrity"); !st) {
     return std::unexpected(st.error());
   }
-  return acc.finish(0, "schema");
+  auto const total = acc.finish(0, "schema");
+  if (!total) {
+    return std::unexpected(total.error());
+  }
+  if (*total > kMaxManifestBytesV0) {
+    return std::unexpected(make_error(
+        FormatErrorCode::ResourceLimitExceeded, 0, "schema",
+        "encoded manifest exceeds the V0 size limit"));
+  }
+  return total;
 }
 
 std::expected<void, FormatError> encode(ArtifactSchema const& schema,
@@ -1772,7 +1812,12 @@ std::expected<void, FormatError> encode(ArtifactSchema const& schema,
 }
 
 std::expected<ArtifactSchema, FormatError> decode_schema(
-    std::span<std::byte const> in) {
+    std::span<std::byte const> in) try {
+  if (in.size() > kMaxManifestBytesV0) {
+    return std::unexpected(make_error(
+        FormatErrorCode::ResourceLimitExceeded, 0, "manifest",
+        "manifest exceeds the V0 size limit"));
+  }
   ByteReader r{in};
   ArtifactSchema schema{};
   auto const version = r.u16("manifest.version");
@@ -1824,6 +1869,11 @@ std::expected<ArtifactSchema, FormatError> decode_schema(
   if (!n_tensors) {
     return std::unexpected(n_tensors.error());
   }
+  if (auto st = preflight_count(r, *n_tensors, 90, kMaxTensorRecordsV0,
+                                "tensor_count");
+      !st) {
+    return std::unexpected(st.error());
+  }
   schema.tensors.reserve(*n_tensors);
   for (std::uint32_t i = 0; i < *n_tensors; ++i) {
     auto t = read_tensor(r);
@@ -1835,6 +1885,11 @@ std::expected<ArtifactSchema, FormatError> decode_schema(
   auto const n_shared = r.u32("shared_count");
   if (!n_shared) {
     return std::unexpected(n_shared.error());
+  }
+  if (auto st = preflight_count(r, *n_shared, 12, kMaxSharedBindingsV0,
+                                "shared_count");
+      !st) {
+    return std::unexpected(st.error());
   }
   schema.shared_bindings.reserve(*n_shared);
   for (std::uint32_t i = 0; i < *n_shared; ++i) {
@@ -1848,6 +1903,11 @@ std::expected<ArtifactSchema, FormatError> decode_schema(
   if (!n_graph) {
     return std::unexpected(n_graph.error());
   }
+  if (auto st = preflight_count(r, *n_graph, 16, kMaxGraphBindingsV0,
+                                "graph_count");
+      !st) {
+    return std::unexpected(st.error());
+  }
   schema.graph_bindings.reserve(*n_graph);
   for (std::uint32_t i = 0; i < *n_graph; ++i) {
     auto b = read_graph(r);
@@ -1859,6 +1919,11 @@ std::expected<ArtifactSchema, FormatError> decode_schema(
   auto const n_state = r.u32("state_count");
   if (!n_state) {
     return std::unexpected(n_state.error());
+  }
+  if (auto st = preflight_count(r, *n_state, 72, kMaxStateAllocationsV0,
+                                "state_count");
+      !st) {
+    return std::unexpected(st.error());
   }
   schema.state.reserve(*n_state);
   for (std::uint32_t i = 0; i < *n_state; ++i) {
@@ -1872,6 +1937,11 @@ std::expected<ArtifactSchema, FormatError> decode_schema(
   if (!n_scratch) {
     return std::unexpected(n_scratch.error());
   }
+  if (auto st = preflight_count(r, *n_scratch, 16, kMaxScratchAllocationsV0,
+                                "scratch_count");
+      !st) {
+    return std::unexpected(st.error());
+  }
   schema.scratch.reserve(*n_scratch);
   for (std::uint32_t i = 0; i < *n_scratch; ++i) {
     auto s = read_scratch(r);
@@ -1883,6 +1953,11 @@ std::expected<ArtifactSchema, FormatError> decode_schema(
   auto const n_int = r.u32("integrity_count");
   if (!n_int) {
     return std::unexpected(n_int.error());
+  }
+  if (auto st = preflight_count(r, *n_int, kIntegrityRecordBytes,
+                                kMaxIntegrityRecordsV0, "integrity_count");
+      !st) {
+    return std::unexpected(st.error());
   }
   schema.integrity.reserve(*n_int);
   for (std::uint32_t i = 0; i < *n_int; ++i) {
@@ -1899,6 +1974,13 @@ std::expected<ArtifactSchema, FormatError> decode_schema(
     return std::unexpected(st.error());
   }
   return schema;
+} catch (std::bad_alloc const&) {
+  return std::unexpected(
+      FormatError{.code = FormatErrorCode::AllocationFailure});
+} catch (std::length_error const&) {
+  return std::unexpected(make_error(
+      FormatErrorCode::ResourceLimitExceeded, 0, "manifest",
+      "container size is not representable while decoding schema"));
 }
 
 std::expected<void, FormatError> validate_schema(ArtifactSchema const& schema,
@@ -1907,6 +1989,17 @@ std::expected<void, FormatError> validate_schema(ArtifactSchema const& schema,
     return std::unexpected(make_error(
         FormatErrorCode::UnsupportedManifestVersion, offset, "manifest.version",
         "only manifest version 1 is supported"));
+  }
+  if (schema.precision.bindings.size() > kMaxPrecisionBindingsV0 ||
+      schema.tensors.size() > kMaxTensorRecordsV0 ||
+      schema.shared_bindings.size() > kMaxSharedBindingsV0 ||
+      schema.graph_bindings.size() > kMaxGraphBindingsV0 ||
+      schema.state.size() > kMaxStateAllocationsV0 ||
+      schema.scratch.size() > kMaxScratchAllocationsV0 ||
+      schema.integrity.size() > kMaxIntegrityRecordsV0) {
+    return std::unexpected(make_error(
+        FormatErrorCode::ResourceLimitExceeded, offset, "schema",
+        "one or more record counts exceed V0 limits"));
   }
   if (schema.compiler.ident.empty()) {
     return std::unexpected(make_error(FormatErrorCode::InvalidHeader, offset,

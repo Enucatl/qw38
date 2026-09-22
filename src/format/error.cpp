@@ -76,6 +76,10 @@ char const* code_name(FormatErrorCode code) noexcept {
       return "missing_integrity";
     case FormatErrorCode::TensorNotFound:
       return "tensor_not_found";
+    case FormatErrorCode::ResourceLimitExceeded:
+      return "resource_limit_exceeded";
+    case FormatErrorCode::AllocationFailure:
+      return "allocation_failure";
   }
   return "unknown";
 }

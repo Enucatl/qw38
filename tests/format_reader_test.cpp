@@ -374,6 +374,22 @@ void test_bad_hash_and_leftover() {
               "trailing leftover bytes");
 }
 
+void test_manifest_limit_precedes_span_copy() {
+  ScratchDir dir("qw38-reader-limit");
+  auto fx = write_minimal(dir.file("limit.qw38"));
+  auto bytes = read_all(fx.path);
+  auto const hostile_length = qw38::format::kMaxManifestBytesV0 + 1;
+  for (std::size_t i = 0; i < 8; ++i) {
+    bytes[24 + i] =
+        static_cast<std::byte>((hostile_length >> (8 * i)) & 0xFFu);
+  }
+
+  auto const borrowed = std::span<std::byte const>{bytes};
+  expect_code(Artifact::parse(borrowed),
+              FormatErrorCode::ResourceLimitExceeded,
+              "oversized manifest is rejected before span ownership copy");
+}
+
 }  // namespace
 
 int main() {
@@ -384,6 +400,7 @@ int main() {
   test_invalid_pairs_shapes_scales_shared_state();
   test_canonical_owner_range_and_integrity_validation();
   test_bad_hash_and_leftover();
+  test_manifest_limit_precedes_span_copy();
   if (g_failures != 0) {
     std::cerr << g_failures << " reader unit checks failed\n";
     return 1;

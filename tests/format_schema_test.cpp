@@ -591,6 +591,58 @@ void test_truncated_input() {
   }
 }
 
+void test_hostile_record_counts_are_bounded() {
+  auto const schema = base_schema();
+  auto const bytes = must_encode(schema, "hostile counts");
+  if (bytes.empty()) {
+    return;
+  }
+
+  auto put_u16 = [](std::vector<std::byte>& out, std::size_t offset,
+                    std::uint16_t value) {
+    out[offset] = static_cast<std::byte>(value & 0xFFu);
+    out[offset + 1] = static_cast<std::byte>((value >> 8) & 0xFFu);
+  };
+  auto put_u32 = [](std::vector<std::byte>& out, std::size_t offset,
+                    std::uint32_t value) {
+    for (std::size_t i = 0; i < 4; ++i) {
+      out[offset + i] =
+          static_cast<std::byte>((value >> (8 * i)) & 0xFFu);
+    }
+  };
+
+  std::size_t const precision_count_offset =
+      2 + (2 + schema.compiler.ident.size() + 16) + 3 * 32 + 2;
+  auto hostile = bytes;
+  put_u16(hostile, precision_count_offset,
+          std::numeric_limits<std::uint16_t>::max());
+  auto decoded = decode_schema(hostile);
+  expect(!decoded &&
+             decoded.error().code == FormatErrorCode::ResourceLimitExceeded,
+         "UINT16_MAX precision count is bounded before reserve");
+
+  std::size_t const tensor_count_offset =
+      precision_count_offset + 2 + 4 * schema.precision.bindings.size() + 2;
+  std::array<std::size_t, 6> const count_offsets{
+      tensor_count_offset, tensor_count_offset + 4, tensor_count_offset + 8,
+      tensor_count_offset + 12, tensor_count_offset + 16,
+      tensor_count_offset + 20};
+  for (auto const offset : count_offsets) {
+    hostile = bytes;
+    put_u32(hostile, offset, std::numeric_limits<std::uint32_t>::max());
+    decoded = decode_schema(hostile);
+    expect(!decoded &&
+               decoded.error().code == FormatErrorCode::ResourceLimitExceeded,
+           "UINT32_MAX record count is bounded before reserve");
+  }
+
+  hostile = bytes;
+  put_u32(hostile, tensor_count_offset, 1);
+  decoded = decode_schema(hostile);
+  expect(!decoded && decoded.error().code == FormatErrorCode::Truncated,
+         "plausible count is preflighted against remaining manifest bytes");
+}
+
 }  // namespace
 
 int main() {
@@ -603,6 +655,7 @@ int main() {
   test_shared_binding_ownership_graph();
   test_schema_roundtrip_and_object_layout_independence();
   test_truncated_input();
+  test_hostile_record_counts_are_bounded();
   if (g_failures != 0) {
     std::cerr << g_failures << " format schema checks failed\n";
     return 1;

@@ -23,6 +23,19 @@ inline constexpr std::uint32_t kHashBytes = 32;
 inline constexpr std::uint32_t kIntegrityRecordBytes = 56;
 inline constexpr std::uint32_t kNoLayerIndex = 0xFFFFFFFFu;
 
+// V0 describes one fixed Qwen3.8-family model. These limits leave ample room
+// for descriptors and aliases while keeping hostile wire counts and manifests
+// from driving unbounded host allocations.
+inline constexpr std::uint64_t kMaxManifestBytesV0 = 16 * 1024 * 1024;
+inline constexpr std::uint16_t kMaxPrecisionBindingsV0 = 32;
+inline constexpr std::uint32_t kMaxTensorRecordsV0 = 4096;
+inline constexpr std::uint32_t kMaxSharedBindingsV0 = 4096;
+inline constexpr std::uint32_t kMaxGraphBindingsV0 = 16384;
+inline constexpr std::uint32_t kMaxStateAllocationsV0 = 16;
+inline constexpr std::uint32_t kMaxScratchAllocationsV0 = 64;
+inline constexpr std::uint32_t kMaxIntegrityRecordsV0 =
+    2 * kMaxTensorRecordsV0 + 1;
+
 inline constexpr std::uint64_t kBf16Size = 2;
 inline constexpr std::uint64_t kFp16Size = 2;
 inline constexpr std::uint64_t kFp32Size = 4;

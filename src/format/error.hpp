@@ -42,6 +42,8 @@ enum class FormatErrorCode : std::uint16_t {
   IntegrityDigestMismatch = 33,
   MissingIntegrity = 34,
   TensorNotFound = 35,
+  ResourceLimitExceeded = 36,
+  AllocationFailure = 37,
 };
 
 struct FormatError {

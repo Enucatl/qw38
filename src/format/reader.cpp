@@ -9,6 +9,8 @@
 #include <cstring>
 #include <fcntl.h>
 #include <limits>
+#include <new>
+#include <stdexcept>
 #include <string>
 #include <unistd.h>
 #include <unordered_set>
@@ -512,7 +514,8 @@ Artifact::Artifact(Artifact&&) noexcept = default;
 Artifact& Artifact::operator=(Artifact&&) noexcept = default;
 Artifact::~Artifact() = default;
 
-std::expected<Artifact, FormatError> Artifact::open(std::filesystem::path path) {
+std::expected<Artifact, FormatError> Artifact::open(
+    std::filesystem::path path) try {
   auto mapped = MappedFile::open(path);
   if (!mapped) {
     return std::unexpected(mapped.error());
@@ -528,10 +531,22 @@ std::expected<Artifact, FormatError> Artifact::open(std::filesystem::path path) 
   impl->schema = std::move(validated->schema);
   impl->storage = std::move(*mapped);
   return Artifact{std::move(impl)};
+} catch (std::bad_alloc const&) {
+  return std::unexpected(
+      FormatError{.code = FormatErrorCode::AllocationFailure});
+} catch (std::length_error const&) {
+  return std::unexpected(make_error(
+      FormatErrorCode::ResourceLimitExceeded, 0, "artifact",
+      "container size is not representable while opening artifact"));
 }
 
 std::expected<Artifact, FormatError> Artifact::parse(
-    std::vector<std::byte> bytes) {
+    std::vector<std::byte> const& bytes) {
+  return parse(std::span<std::byte const>{bytes});
+}
+
+std::expected<Artifact, FormatError> Artifact::parse(
+    std::vector<std::byte>&& bytes) try {
   auto validated = validate_bytes(bytes);
   if (!validated) {
     return std::unexpected(validated.error());
@@ -542,11 +557,37 @@ std::expected<Artifact, FormatError> Artifact::parse(
   impl->schema = std::move(validated->schema);
   impl->storage = std::move(bytes);
   return Artifact{std::move(impl)};
+} catch (std::bad_alloc const&) {
+  return std::unexpected(
+      FormatError{.code = FormatErrorCode::AllocationFailure});
+} catch (std::length_error const&) {
+  return std::unexpected(make_error(
+      FormatErrorCode::ResourceLimitExceeded, 0, "artifact",
+      "container size is not representable while parsing artifact"));
 }
 
 std::expected<Artifact, FormatError> Artifact::parse(
-    std::span<std::byte const> bytes) {
-  return parse(std::vector<std::byte>(bytes.begin(), bytes.end()));
+    std::span<std::byte const> bytes) try {
+  // Validate the borrowed bytes, including bounded header and manifest sizes,
+  // before allocating an owned copy of a potentially large artifact.
+  auto validated = validate_bytes(bytes);
+  if (!validated) {
+    return std::unexpected(validated.error());
+  }
+  std::vector<std::byte> owned(bytes.begin(), bytes.end());
+  auto impl = std::make_unique<Impl>();
+  impl->identity = make_identity({}, *validated, owned.size());
+  impl->header = validated->header;
+  impl->schema = std::move(validated->schema);
+  impl->storage = std::move(owned);
+  return Artifact{std::move(impl)};
+} catch (std::bad_alloc const&) {
+  return std::unexpected(
+      FormatError{.code = FormatErrorCode::AllocationFailure});
+} catch (std::length_error const&) {
+  return std::unexpected(make_error(
+      FormatErrorCode::ResourceLimitExceeded, 0, "artifact",
+      "container size is not representable while parsing artifact"));
 }
 
 ArtifactIdentity const& Artifact::identity() const noexcept {
