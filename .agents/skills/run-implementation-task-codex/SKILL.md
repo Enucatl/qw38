@@ -136,18 +136,20 @@ Code findings (severity, file/line, contract, impact, correction):
 Targeted evidence requested:
 ```
 
-Handle `CHANGES_REQUIRED` first. Spawn one fresh Luna repair subagent with all
-findings; it may repair only those findings, may not change architecture, and
-must not commit or push. It refreshes affected evidence, then a fresh Sol
-reviewer examines the complete revised candidate.
+Handle `CHANGES_REQUIRED` first by sending the findings to the same Sol reviewer
+and asking it to make only the requested code or documentation corrections
+directly. It may not change architecture, expand scope, commit, or push. Luna
+continues to run builds, tests, benchmarks, and targeted evidence commands;
+after affected evidence is refreshed, the same Sol reviewer examines the
+complete revised candidate and reports whether the findings are resolved.
 
 When Sol requests evidence without a code change, batch its requests into one
-fresh Luna evidence subagent. It collects output without changing code; a fresh
-Sol reviewer then examines the same candidate and new evidence. A failed check
-enters the repair path if unused. Allow one repair and one supplemental evidence
-round. If code findings remain after repair, or evidence remains incomplete
-after the supplemental round, mark the task `BLOCKED`. Unavailable required
-hardware also marks it `BLOCKED`.
+fresh Luna evidence subagent. It collects output without changing code; the same
+Sol reviewer then examines the unchanged candidate and new evidence. A failed
+check enters the repair path if unused. Allow one Sol repair round and one
+supplemental evidence round. If code findings remain after repair, or evidence
+remains incomplete after the supplemental round, mark the task `BLOCKED`.
+Unavailable required hardware also marks it `BLOCKED`.
 
 An architectural failure, missing required dependency, or material contract
 ambiguity also marks the task `BLOCKED`. For every `BLOCKED` outcome, record the
