@@ -19,17 +19,16 @@ Use these sources, in descending task relevance:
   container requirements;
 - `docs/implementation/code-standards.md` for C++ and CUDA rules.
 
-Start every implementation, repair, verification, diagnostic, and delivery
-stage as a new Codex subagent with `fork_context: false`. Never resume an
-agent or reuse one in another role. Give each subagent only the task ID, task
-path, relevant normative paths, role, any findings needed for that role, and
-the required output contract. Because subagents share the working tree, run
-these stages sequentially.
+The coordinator handles admission and delivery. Use fresh subagents with
+`fork_turns: "none"` for implementation, code review, repair, and any requested
+evidence collection. Pass only the task ID and path, relevant normative paths,
+role, findings when applicable, and required output. Run agents sequentially
+because they share the working tree.
 
-Use exactly `gpt-6-luna` at high reasoning for implementation and repair,
-and independent verification. Use exactly `gpt-6-sol` at high reasoning only
-for difficult diagnosis that exceeds the implementation agent's capacity.
-Use exactly `gpt-6-luna` at medium reasoning for final documentation and delivery.
+Use `gpt-6-luna` at high reasoning for implementation and repair, and at
+medium reasoning for separately requested command collection. Use
+`gpt-6-sol` at high reasoning for independent code review and difficult
+diagnosis.
 
 ## Admission
 
@@ -77,11 +76,12 @@ Spawn a fresh Luna implementation subagent. Require it to:
    documents;
 2. implement only the task, obeying `LOCKED` decisions and preserving the
    distinction between tuning defaults and required semantics;
-3. run every focused test and required benchmark/diagnostic, keeping
-   correctness tests separate from benchmark measurements;
-4. record exact commands and outcomes, artifact/binary identities, and
+3. run focused commands on the final candidate that establish every acceptance
+   criterion and each required test, benchmark, or diagnostic, keeping
+   correctness tests separate from benchmarks;
+4. record exact commands, results, logs, artifact/binary identities, and
    hardware context in the task's Completion Report; and
-5. leave commits and pushes to the delivery stage.
+5. leave commits and pushes to the coordinator.
 
 Unrelated discoveries belong in the Completion Report as
 `FOLLOW_UP_REQUIRED`; do not expand scope, create roadmap tasks, or edit
@@ -103,55 +103,79 @@ Smallest plausible alternative:
 Affected downstream tasks:
 ```
 
-## Independent verification and one repair
+## Evidence and independent review
 
-After implementation, spawn a fresh Luna verification subagent. It must
-independently read the contract and normative documents, inspect the complete
-diff and Completion Report, and run every acceptance command. It must verify
-the evidence rather than trust reported results, make no semantic fixes, and
-return:
+The implementation agent leaves complete command evidence for Sol. Missing
+hardware or a skipped required check is incomplete evidence, not a pass. Apply
+the verification scope in `code-standards.md`; do not run unrelated suites or
+repeat unchanged commands merely for a second witness.
+
+A fresh Sol reviewer reads the task contract, relevant architecture and
+code standards, the complete diff, changed code and its production callers,
+tests, and the evidence. Review independently for:
+
+- correct behavior at numerical, state, lifetime, error, and CUDA boundaries
+  relevant to the change, including failure and continuation paths;
+- compliance with Architecture V0's locked decisions, the technology baseline,
+  and `code-standards.md`'s design philosophy and concrete rules;
+- the smallest implementation that fully meets the task, without speculative
+  abstractions, extra dependencies, or unrelated changes;
+- discriminating tests and complete, current evidence for every acceptance
+  criterion, including resource or schedule effects where relevant.
+
+Sol inspects code and evidence; Luna runs builds, tests, benchmarks, and any
+targeted commands Sol requests. Sol must not accept a passing test log as proof
+of code correctness. Return all material findings in one pass with file/line,
+the violated contract or failure scenario, and a concrete correction:
 
 ```text
-VERIFICATION: PASS|FAIL
-Commands run:
-Results:
-Unmet acceptance criteria:
-File/line findings:
+REVIEW: PASS|CHANGES_REQUIRED|BLOCKED
+Reviewed candidate:
+Acceptance and evidence gaps:
+Code findings (severity, file/line, contract, impact, correction):
+Targeted evidence requested:
 ```
 
-On the first ordinary verification failure, spawn one fresh Luna repair
-subagent with the verifier findings. It may repair only those findings, may
-not change architecture, and must not commit or push. Then spawn a fresh Luna
-verifier and repeat the full independent gate.
+Handle `CHANGES_REQUIRED` first. Spawn one fresh Luna repair subagent with all
+findings; it may repair only those findings, may not change architecture, and
+must not commit or push. It refreshes affected evidence, then a fresh Sol
+reviewer examines the complete revised candidate.
 
-If verification fails again, or if any stage encounters an architectural
-failure, missing required dependency, or material contract ambiguity, mark the
-task `BLOCKED`, record the reason in both the task file and ledger, and stop.
-Do not use repair to invent a design. Missing hardware is incomplete evidence,
-not a passing result.
+When Sol requests evidence without a code change, batch its requests into one
+fresh Luna evidence subagent. It collects output without changing code; a fresh
+Sol reviewer then examines the same candidate and new evidence. A failed check
+enters the repair path if unused. Allow one repair and one supplemental evidence
+round. If code findings remain after repair, or evidence remains incomplete
+after the supplemental round, mark the task `BLOCKED`. Unavailable required
+hardware also marks it `BLOCKED`.
+
+An architectural failure, missing required dependency, or material contract
+ambiguity also marks the task `BLOCKED`. For every `BLOCKED` outcome, record the
+reason in both the task file and ledger, then stop. Do not use repair to invent
+a design.
 
 ## Delivery
 
-Only after verification passes, spawn a fresh delivery subagent. It may
-only:
+Only after Sol review passes, the coordinator:
 
-1. confirm that the verified diff is unchanged;
-2. record the final verification result in the Completion Report;
+1. confirm that the reviewed implementation and evidence are unchanged;
+2. record the review result in the Completion Report;
 3. change the task and ledger from `IN_PROGRESS` to `DONE`;
 4. create exactly one commit for the task; and
 5. push the current branch to its configured upstream.
 
-Delivery must not make semantic implementation changes. If substantive
-content changed after verification, invalidate the result and run a fresh
-verification before delivery.
+If code or evidence changes after review, refresh affected evidence and obtain
+a new Sol review before committing. The coordinator makes only status and
+review-record edits after approval.
 
-Use the git-commit skill to create a proper git commit message.
-Never force-push, rebase, merge, amend, or automatically resolve a non-fast-forward rejection. If push fails, preserve
-the local commit, report the failure, do not claim successful delivery, and do
-not start another task.
+Use the git-commit skill to create a proper git commit message. Never
+force-push, rebase, merge, amend, or automatically resolve a non-fast-forward
+rejection. If push fails, preserve the local commit, report the failure, do not
+claim successful delivery, and do not start another task.
 
 ## Final report
 
-Report the task ID and name, final status, implementation and verification
-models, whether repair was used, exact verification commands, commit hash if
-created, push result, task-file path, and any blocker or follow-up status.
+Report the task ID and name, final status, implementation/review models,
+whether repair or separate evidence collection was used, exact acceptance
+commands and results, commit hash if created, push result, task-file path, and
+any blocker or follow-up.
