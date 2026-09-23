@@ -142,35 +142,47 @@ hashing payload contents. Do not add source-content identities, payload hash
 audits, release-time shard scans, or mutation tests over cached BF16 files.
 This item is closed as a policy decision; it is not a future implementation task.
 
-### AR-02 — P1, confirmed: verify the requested policy and expected semantic schema
+### AR-02 — P1, confirmed: check artifact policy and schema from metadata
 
-**Evidence.** `verify_compiled_artifact` marks its policy argument unused at
-`src/compiler/compile.cpp:886`. Lines 941–952 select quantization/layout/geometry
-from the artifact being verified. `verify_identity_artifact` simply delegates
-with `IdentityBf16` at lines 972–976. Consequently, the BF16 identity verifier can
-accept a correctly reconstructed quantized artifact. Reconstruction also does
-not prove the complete expected binding set, directory, or alias semantics.
-`src/format/schema.cpp:2468` validates individual graph records, which is a
-different responsibility from proving the complete model schema.
+**Evidence.** `verify_compiled_artifact` ignores its policy argument at
+`src/compiler/compile.cpp:886`. Later it selects quantization/layout/geometry
+from each artifact record. `verify_identity_artifact` delegates with
+`IdentityBf16` at lines 971–976, but that policy is ignored, so a quantized
+artifact may pass the function named for identity artifacts if its payloads
+reconstruct as expected. The verifier also compares tensor bytes without first
+establishing that the artifact's complete tensor directory and graph bindings
+match the expected model schema. `src/format/schema.cpp:2468` validates
+individual graph records; it does not prove complete-model membership.
 
-**Implementation.** Build the expected semantic schema from the classified
-checkpoint and requested policy using the existing schema construction path.
-Compare exact tensor membership, logical geometry, family storage/quantizer/
-layout/mapping, semantic scope, graph bindings, and canonical sharing before
-reconstruction. Compare semantic fields rather than writer-assigned offsets,
-directory ordering where explicitly nonsemantic, or integrity-record bytes.
-Report which field and tensor/binding differs. Avoid a second independently
-maintained model-schema table.
+This is a policy/schema validation gap. It is not a request to hash the cached
+BF16 checkpoint. The current `verify_compiled_artifact` also performs the
+separate, expensive payload reconstruction pass; keep that work explicitly
+separate from the schema decision described here.
 
-**Acceptance.** Verify BF16 and production artifacts against both policies;
-only matching combinations pass. Exercise missing and swapped same-shaped
-bindings, unexpected extra tensors, wrong family format, and changed shape with
-the same element count. Generate valid integrity records for the mutated
-artifacts so these tests reach semantic verification instead of stopping at a
-digest mismatch. Use small fixtures for these checks in ordinary CI; do not use
-the authoritative checkpoint. Keep full reconstruction as the explicit
-promotion/candidate check above. Complete before relying on TASK-017's artifact
-verification.
+**Implementation.** Add a metadata-only comparison that derives the expected
+schema from parsed checkpoint/config/index metadata and the requested policy,
+using the existing schema construction path. It must not read, hash, or digest
+BF16 tensor payloads or their shard files. Compare exact tensor membership,
+logical geometry, family storage/quantizer/layout/mapping, semantic scope, graph
+bindings, and canonical sharing. Ignore writer-assigned offsets, ordering where
+nonsemantic, and integrity-record bytes for this semantic comparison. Report
+the differing field and tensor/binding. Avoid a duplicate model-schema table.
+Have the payload reconstruction verifier call this check before it reads source
+payloads, while allowing tests to invoke the metadata check alone. The compile
+option that controls full reconstruction remains separate.
+
+**Acceptance.** Use small synthetic metadata/artifact fixtures in ordinary CI:
+identity artifacts pass only `IdentityBf16`, production artifacts pass only
+`ProductionV0`, and mismatches fail before any source tensor payload is read.
+Cover
+missing/swapped bindings, extra tensors, wrong family format, and changed shape
+with unchanged element count. Regenerate `.qw38` integrity records in mutated
+fixtures where needed so the semantic comparison is reached; these are hashes
+of test artifacts, not cached BF16 source data. Require mismatches to be rejected
+from metadata before any source tensor payload is read. No authoritative checkpoint,
+source payload hash, full quantization, or full reconstruction is required for
+AR-02. Keep the separate full reconstruction cadence above for cases that
+explicitly need payload-level evidence.
 
 ### AR-03 — P1, confirmed: define failed-state recovery and complete-token commit
 
