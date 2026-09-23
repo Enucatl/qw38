@@ -81,6 +81,46 @@ checkpoint scan, extended full-vocabulary run, Debug rebuild, sanitizer sweep,
 or end-to-end model evaluation was performed. The passing fast suite establishes
 existing regression coverage, not absence of the gaps below.
 
+### Verification cadence recommendation
+
+Run the full authoritative-checkpoint reconstruction/quantization pass once
+when promoting a new artifact for release or sharing, and once on a candidate
+when a code change can alter the bytes or the correctness decision. Concrete
+triggers include changes to:
+
+- checkpoint parsing/classification, source tensor selection, or source identity;
+- quantizer equations/rounding, Q4/Q8 packing, BF16 transforms, layouts, or
+  emitted tensor bytes;
+- artifact schema, graph bindings, policy selection, or compiler identity fields;
+- reconstruction, semantic-schema comparison, or the full-verification path.
+
+For a code change, run it on the candidate before merging or promoting that
+change if the change affects an authoritative artifact's result or whether it
+passes verification. When releasing an artifact, run it once for that exact
+checkpoint, compiler revision, format policy, and output artifact. A later
+release of a different checkpoint or output is a new candidate and needs its
+own run. If those identities and bytes are unchanged, retain the prior
+verification record instead of repeating the hour-long pass.
+
+Examples that do **not** trigger it: documentation-only edits; changes limited
+to runtime execution kernels after compilation; benchmark-only changes; and
+tests that use synthetic/small checkpoint fixtures. Run the fast suite and
+focused fixture tests for those changes. Do not add a nightly full-checkpoint
+run by default. This is a promotion or focused engineering checkpoint, not a
+per-commit or per-PR CI job.
+
+Every commit runs the fast suite and small fixture tests. Those tests exercise
+identity, policy, and corruption behavior without scanning or quantizing the
+50+ GB authority checkpoint. Metadata-only inspection stays cheap. The normal
+artifact compile necessarily reads and transforms its inputs; the separate
+reconstruction verifier must be opt-in so it does not add a second full source
+read and quantization pass by default. At the reviewed commit,
+`CompileOptions::verify_reconstruction` defaults to `true`
+(`src/compiler/compile.hpp:24`) and the CLI disables it only with `--no-verify`
+(`src/compiler/main.cpp:29`). Change that default/flag semantics as part of the
+follow-up so code matches this cadence. Print whether verification ran and which
+artifact/source/compiler/policy identities it covered.
+
 ## Required repairs
 
 ### AR-01 — P1, confirmed: make source identity match the artifact without a commit-time shard scan
@@ -152,7 +192,10 @@ only matching combinations pass. Exercise missing and swapped same-shaped
 bindings, unexpected extra tensors, wrong family format, and changed shape with
 the same element count. Generate valid integrity records for the mutated
 artifacts so these tests reach semantic verification instead of stopping at a
-digest mismatch. Complete before relying on TASK-017's artifact verification.
+digest mismatch. Use small fixtures for these checks in ordinary CI; do not use
+the authoritative checkpoint. Keep full reconstruction as the explicit
+promotion/candidate check above. Complete before relying on TASK-017's artifact
+verification.
 
 ### AR-03 — P1, confirmed: define failed-state recovery and complete-token commit
 
@@ -286,10 +329,12 @@ requesting materialized output. State whether a memory measurement covers owned
 temporary memory or total RSS including mapped pages.
 
 **Acceptance.** Corrupt a byte in each supported BF16 layout and require a
-failure. Measure row-major and tiled BF16 verification in isolated processes
-over increasing sizes, showing bounded owned scratch. Avoid process-lifetime
-RSS high-water marks hiding additional allocations. Complete before the large
-BF16 control and source-agreement work in TASK-017/018.
+failure using small fixtures in ordinary CI. Measure row-major and tiled BF16
+verification in isolated processes over increasing synthetic sizes, showing
+bounded owned scratch; do not use 2.37 GiB authority tensors for this test. Avoid
+process-lifetime RSS high-water marks hiding additional allocations. The single
+full-model reconstruction run belongs at artifact promotion or after a relevant
+compiler/quantization change, not on every commit.
 
 ### AR-08 — P2, confirmed: define the closed Runtime API contract
 
