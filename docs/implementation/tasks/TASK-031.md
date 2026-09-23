@@ -10,6 +10,7 @@ Test whether a 64-token chunkwise/WY evaluation can replace the selected serial 
 - TASK-030
 ## Normative references
 - `docs/architecture/architecture-v0.md` — EXP-H; prefill GDN recurrence
+- `docs/architecture/evaluation-policy-v0.md` — PERF-01; final parity-gap reassessment
 - `docs/architecture/performance-validation.md`
 - `docs/implementation/technology-baseline.md`
 - `docs/implementation/code-standards.md`
@@ -50,6 +51,7 @@ Yes: local 64-token recurrence, full prefill/TTFT/request, workspace/resources.
 - [ ] All tail/chunk/handoff and long-context quality checks pass for a change recommendation.
 - [ ] Workspace/resource/local/end-to-end deltas are identity-matched and uncertainty-aware.
 - [ ] Recommendation follows EXP-H; no architecture amendment occurs.
+- [ ] PERF-01 parity status is reassessed for the final accepted implementation using the matched llama.cpp baseline; any remaining speed gaps are explicit and do not invalidate a completed experiment.
 ## Architecture blocker rule
 Candidate rejection is result; unrelated locked conflict requires full blocker report.
 ## Completion report

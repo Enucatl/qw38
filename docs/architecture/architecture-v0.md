@@ -358,6 +358,11 @@ Kernel boundaries provide global ordering without cooperative grid barriers. V0 
 
 # Behavior and performance validation
 
+The selected evaluation suites, scoring rules, staged context coverage, and
+required llama.cpp performance comparison are normative in
+[EVAL-01 / PERF-01](evaluation-policy-v0.md). This decision resolves the earlier
+methodology's unselected suite and scoring policy for the V0 implementation.
+
 The first validation target is **useful language-model behavior**, not equality with a quantized baseline or bitwise equality between schedules. Follow the identity and attribution principles in [quantization validation](quantization-validation.md) and [performance validation](performance-validation.md), with the explicitly narrower primary-language scope above.
 
 First establish the BF16 identity compiler path against the source model's language forward behavior. Use focused semantic checks for norm roles, per-head q/g split, RoPE coordinates, convolution tap order, GDN update/readout, causal masks, and state continuation. Compare full prefill, chunked prefill, and repeated decode on the same token IDs; these checks detect semantic and chunk-boundary errors before evaluating compression. Tensor reconstruction and intermediate differences diagnose failures but are not the final quality gate.
@@ -366,13 +371,13 @@ Then evaluate the V0 artifact using teacher-forced target-token NLL relative to 
 
 ## Initial validation policy
 
-The following are validation-policy defaults, not architecture contracts: **HYPOTHESIS** limits of +0.03 nats/token mean NLL and +0.06 on each declared domain/context slice relative to the BF16 control, with no capability-score regression greater than two percentage points beyond paired uncertainty. Deterministic outputs are inspected for failures and repetition, not required to match token-for-token. These are engineering acceptance budgets, not thresholds established by the dossier. Freeze the actual held-out suite and scoring rules before comparing quantizers; failure blocks a quality claim and drives targeted wider precision, rather than silently relaxing the gate.
+The selected validation policy retains **HYPOTHESIS** limits of +0.03 nats/token mean NLL and +0.06 on each declared domain/context slice relative to the BF16 control. EVAL-01 defines the frozen DS4-derived inputs, generated-answer graders, two-percentage-point capability regression screen and paired uncertainty, qualitative review, and mandatory versus deferred context coverage. Deterministic outputs are inspected for failures and repetition, not required to match token-for-token across models or schedules. These are engineering acceptance budgets, not thresholds established by the dossier. Freeze source continuations and input/scorer identities before comparing quantizers. Failure blocks quality acceptance and follows TASK-018's diagnosis and amendment procedure; neither wider precision nor threshold relaxation is implicitly authorized.
 
 Measure batch-one decode at populated lengths 512, 4096, and 32768; prefill at 256, 4096, and 32768 tokens; and a request that prefills then generates 128 tokens. Exercise the maximum supported context separately when memory permits, and report any untested long-context coverage. Record artifact/binary hashes, GPU and resource limits, capacity versus populated length, clocks, graph mode, warmups, repetitions, and token/output policy. Warm up five runs, collect at least twenty timed repetitions with restored identical incoming state, and report median, p99, and uncertainty. Setup, upload, warmup, and state restore are outside steady-state timing and reported separately; the first generated token belongs to TTFT, not subsequent decode throughput.
 
 Use node/kernel profiles, actual memory traffic, spills, and occupancy to explain end-to-end measurements. Do not add parent graph durations to their child kernel times. A local speedup is insufficient if the matching end-to-end request regresses. The initial validation policy requests a reproducible benefit beyond noise, using 5% end-to-end improvement in the affected mode as an engineering threshold alongside the quality gate and explicit memory accounting. This threshold is not an architecture decision.
 
-`models/Qwen3.8-27B-Q4_K_M.gguf` through llama.cpp is a **future black-box Pareto point** for quality, size, and performance under matching identities. It supplies neither compiler input nor numerical targets. Compiling directly from BF16 may produce better quality than Q4_K_M; V0 must neither inherit its errors nor reproduce its logits. No quality or throughput result is claimed by this document.
+`models/Qwen3.8-27B-Q4_K_M.gguf` through llama.cpp is the **required black-box performance comparator** in PERF-01, with matching workloads, timing boundaries and a declared parity target. TASK-023 records the baseline and gaps; speed parity is not a prerequisite for the subsequent authorized optimization experiments. Quality, size and performance evidence together may support a Pareto comparison. GGUF supplies neither compiler input nor numerical targets. Compiling directly from BF16 may produce better quality than Q4_K_M; V0 must neither inherit its errors nor reproduce its logits. No quality or throughput result is claimed by this document.
 
 # Deliberate V0 non-goals
 

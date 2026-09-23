@@ -1,5 +1,11 @@
 # Qwen3.8-27B performance methodology (TASK-19)
 
+> **V0 implementation authority:** [EVAL-01 / PERF-01](evaluation-policy-v0.md)
+> selects matching QW38/llama.cpp workloads, measurement boundaries and the
+> performance parity target. Together with Architecture V0, it supersedes the
+> historical unselected protocol and optional comparator below. The generated
+> Phase 1 JSON remains historical methodology, not the current task contract.
+
 Complete-map MTP behavior cited here is conditional on TASK-02's unverified analysis model.
 
 > **Draft status:** conclusions in this document are **unverified** until the verification stage completes.

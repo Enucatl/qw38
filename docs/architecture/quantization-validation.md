@@ -1,5 +1,12 @@
 # Qwen3.8-27B quantization evaluation methodology (TASK-18)
 
+> **V0 implementation authority:** [EVAL-01 / PERF-01](evaluation-policy-v0.md)
+> now selects the language evaluation inputs, scoring rules and acceptance policy.
+> Its selection supersedes this historical document's prohibitions on naming
+> suites/thresholds and its unselected evaluation flags for V0. The prose and
+> generated JSON below retain the Phase 1 methodology's historical scope;
+> language+MTP, calibration and Pareto research questions are not closed by it.
+
 > **Draft status:** conclusions in this document are **unverified** until the verification stage completes.
 
 Phase 1 **quantization evaluation methodology** for Qwen3.8-27B language+MTP.

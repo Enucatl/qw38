@@ -7,6 +7,7 @@ Implement Architecture V0 as a sequence of small, testable increments that reach
 ## Normative authority
 
 - `docs/architecture/architecture-v0.md`
+- `docs/architecture/evaluation-policy-v0.md` — EVAL-01 / PERF-01
 - `docs/implementation/technology-baseline.md`
 - `docs/implementation/code-standards.md`
 
@@ -99,6 +100,7 @@ TASK-001 → 002 → 003 → 004 → 005 → 006
 
 | Amendment | Date | Decisions affected | Summary |
 | --------- | ---- | ------------------ | ------- |
+| EVAL-01 / PERF-01 | 2026-09-23 | V0 validation policy; TASK-018, TASK-022, TASK-023 and downstream experiments | User-requested decision selects DS4-derived language fixtures/scoring, staged context coverage, and a required matched llama.cpp performance baseline with an explicit parity target. Supersedes historical unselected-suite restrictions; task execution statuses remain unchanged. See [evaluation policy](../architecture/evaluation-policy-v0.md). |
 
 ## Repair index
 
