@@ -83,7 +83,7 @@ existing regression coverage, not absence of the gaps below.
 
 ## Required repairs
 
-### AR-01 — P1, confirmed: connect canonical source identity to production compilation
+### AR-01 — P1, confirmed: make source identity match the artifact without a commit-time shard scan
 
 **Evidence.** `src/compiler/checkpoint.cpp:302`
 (`compute_checkpoint_identities`) hashes the index and all referenced shard
@@ -100,20 +100,32 @@ quantization bin can preserve emitted bytes, and excluded vision payloads are
 not reconstructed at all. This is a residual of the original source-identity
 finding, despite the helper-level repair.
 
-**Implementation.** Preserve cheap metadata inspection. Explicitly compute and
-pass canonical identities at production compilation and verification boundaries.
-Reuse identities within one operation only when the source bytes are immutable
-for that operation. Make the distinction between metadata identity and complete
-source identity explicit in types/names so the index hash cannot masquerade as
-the latter. Previously emitted index-only artifacts need recompile or an
+**Cost boundary and implementation.** This finding does **not** propose putting
+50+ GB SHA-256 scans or full-checkpoint quantization into every commit's tests.
+Normal build and test jobs must stay metadata-only or use small fixtures; they
+must not call `compute_checkpoint_identities` on the authoritative checkpoint.
+The artifact still needs a content identity for the source weights it actually
+contains. Prefer composing that identity from the index/config metadata and
+digests of included tensor bytes as the compiler already reads them for
+conversion. That avoids a separate full-file pre-scan and does not hash excluded
+vision tensors that are not part of this artifact. Reuse the resulting identity
+inside the same compile/verification operation. If exact identity of every byte
+in the original checkpoint, including excluded tensors, is required, expose it
+as an explicit provenance audit with a clearly stated full-scan cost; do not
+silently make that audit part of routine CI or metadata inspection. Name these
+two identity scopes distinctly. Decide whether the existing wire field means
+compiled-source identity or complete-checkpoint identity before changing its
+semantics. Previously emitted index-only artifacts need recompile or an
 explicitly versioned compatibility decision; do not silently accept either hash.
 
-**Acceptance.** Prove the actual production orchestration writes the canonical
-index-plus-shards identity. Mutate shard bytes without changing index/config,
-including a mutation preserving quantized output, and require a typed source
-identity mismatch. A bounded fixture or shared production seam is appropriate,
-but a test of only `compute_checkpoint_identities` is insufficient. Keep normal
-metadata tests independent of multi-gigabyte authority scans.
+**Acceptance.** A small fixture proves the production orchestration includes
+content from each compiled source tensor in its identity and rejects a changed
+source tensor even when the index is unchanged and quantized output happens to
+remain the same. Test that the compile/verification path reuses bytes already
+read rather than invoking a full-shard pre-scan. Keep ordinary metadata tests
+independent of checkpoint payloads. Any full-checkpoint identity audit is
+separate, opt-in, and never required on every commit. This verifies identity
+wiring without restoring the removed 50+ GB SHA/quantization tests.
 
 ### AR-02 — P1, confirmed: verify the requested policy and expected semantic schema
 
