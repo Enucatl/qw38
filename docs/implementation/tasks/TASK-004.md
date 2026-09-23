@@ -1,5 +1,9 @@
 # TASK-004 — `.qw38` reader, metadata, and corruption validation
 
+> Current integrity policy supersedes the original acceptance criteria below:
+> verify only the small manifest SHA-256. Never hash or require digests for
+> tensor payload or scale spans. See [code standards](../code-standards.md#checkpoint-and-qw38-payload-digest-policy).
+
 ## Status
 DONE
 ## Milestone
@@ -18,9 +22,9 @@ Make `.qw38` independently readable and safe before any CUDA consumer trusts its
 | A-01, A-02, I-06 | Artifact/backend and logical/physical boundaries | LOCKED |
 | Q-01–Q-03, P-01–P-02, S-01–S-02, G-01–G-02, L-01, M-01 | V0 tensor, graph, precision, state, and layout metadata | LOCKED |
 ## Starting point
-TASK-003 emits deterministic integrity-protected fixtures.
+TASK-003 emits deterministic fixtures with a manifest-only digest under current policy.
 ## Scope
-- Parse/map header and manifest safely; validate versions, sizes, arithmetic, alignment, ordering/overlap, hashes, enum values, layouts, shapes, storage/scale relationships, shared bindings, source/config/tokenizer identities, compiler revision, precision policy, semantic scope, graph bindings, and state/scratch schema before device allocation.
+- Parse/map header and manifest safely; validate versions, sizes, arithmetic, alignment, ordering/overlap, the manifest digest, enum values, layouts, shapes, storage/scale relationships, shared bindings, source/config/tokenizer identities, compiler revision, precision policy, semantic scope, graph bindings, and state/scratch schema before device allocation.
 - Expose immutable typed views whose ownership/lifetime is explicit.
 - Add corruption mutation tests covering every validation family and a writer→reader round trip.
 ## Out of scope
@@ -28,9 +32,9 @@ CUDA allocation/upload, checkpoint compilation, quantization, executing graph no
 ## Required interfaces
 `std::expected<Artifact, Error>` open/parse API; immutable tensor/span lookup by stable logical identity; typed architecture/state metadata access.
 ## Required semantics
-No payload view is exposed before complete structural and integrity validation. Unsupported container, quantizer, or layout versions reject distinctly. External-data failures never rely on assertions.
+No payload view is exposed before complete structural validation and manifest-digest verification. Unsupported container, quantizer, or layout versions reject distinctly. External-data failures never rely on assertions. Payload and scale spans are never hashed or checked against content digests.
 ## Data representation
-Borrowed views use `std::span<const std::byte>` tied to RAII mapping/file ownership. Hashes cover exactly the schema-declared regions.
+Borrowed views use `std::span<const std::byte>` tied to RAII mapping/file ownership. The only content digest covers the small manifest metadata.
 ## Implementation constraints
 Overflow-safe validation precedes pointer formation/allocation. Errors include version, tensor/field, and offset where applicable.
 ## Tuning defaults
@@ -41,7 +45,7 @@ Host `format/` reader/validator and corruption/round-trip fixtures.
 ### Unit tests
 - Truncation at every record boundary; bad magic/version/enum/hash; misalignment; overflow; overlap; invalid layout/quantizer pair; bad shapes/scales/shared bindings/state schema.
 ### Reference/numerical tests
-- Independent digest verification.
+- Independent manifest-digest verification only; never hash tensor payload or scale spans.
 ### Integration tests
 - TASK-003 multi-tensor fixture round-trips with identical metadata and span bytes.
 ## Benchmark required
@@ -59,10 +63,10 @@ On a locked conflict, stop with all required `ARCHITECTURE_BLOCKER` fields; do n
 DONE. Independent verification PASS (Debug/Release ctest 11/11).
 ### Changes made
 - Host-only `Artifact` under `src/format/reader.hpp` / `reader.cpp`: `open(path)` memory-maps with RAII `mmap`/`munmap` + fd; `parse(vector|span)` owns a byte buffer. Payload/scale views are `std::span<std::byte const>` whose lifetime is the `Artifact`.
-- `std::expected<Artifact, FormatError>` is returned only after header decode, overflow-safe range checks, exact file-size match, schema validation (versions, enums, layouts, shapes, storage/scale pairs, shared/graph bindings, compiler revision, precision policy, semantic scope, state/scratch schema including live-state rejection), unique-span ordering/overlap vs header+manifest, required integrity coverage, and SHA-256 of every schema-declared region.
+- `std::expected<Artifact, FormatError>` is returned only after header decode, overflow-safe range checks, exact file-size match, schema validation (versions, enums, layouts, shapes, storage/scale pairs, shared/graph bindings, compiler revision, precision policy, semantic scope, state/scratch schema including live-state rejection), unique-span ordering/overlap vs header+manifest, and SHA-256 verification of the small manifest only.
 - Manifest digest covers the encoded prefix `manifest_length - 56` (excludes the trailing digest record), matching the TASK-003 writer.
-- Lookup by stable logical name or tensor id; typed accessors for compiler, precision, scope, graph bindings, and state/scratch schema. Unknown names return `TensorNotFound`; digest mismatch is `IntegrityDigestMismatch`; missing records are `MissingIntegrity`.
-- Tests: truncation at every header/span/manifest record boundary; bad magic/version/enum/hash; misalignment, overflow, overlap; invalid layout/quantizer and storage/quantizer pairs; bad shapes/scales/shared bindings/state; independent digest verification; TASK-003 multi-tensor writer→reader round trip with identical metadata and span bytes; corruption mutations for every validation family.
+- Lookup by stable logical name or tensor id; typed accessors for compiler, precision, scope, graph bindings, and state/scratch schema. Unknown names return `TensorNotFound`; manifest digest mismatch is `IntegrityDigestMismatch`; a missing manifest record is `MissingIntegrity`.
+- Tests: truncation at every header/span/manifest record boundary; bad magic/version/enum/hash; misalignment, overflow, overlap; invalid layout/quantizer and storage/quantizer pairs; bad shapes/scales/shared bindings/state; independent manifest-digest verification; TASK-003 multi-tensor writer→reader round trip with identical metadata and span bytes; corruption mutations for every validation family. Never add payload/scale hashing tests.
 ### Tests run
 Debug:
 
@@ -89,4 +93,3 @@ Not required.
 None.
 ### Follow-up observations
 - POSIX fd RAII is duplicated in `writer.cpp` and `reader.cpp`; they are intentionally separate host I/O units. A shared helper would be a later cleanup, not a TASK-004 contract.
-

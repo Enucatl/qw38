@@ -87,7 +87,7 @@ void test_known_vectors() {
          "SHA-256 of one million a characters");
 }
 
-void test_emitted_span_digest() {
+void test_writer_emits_no_payload_digest() {
   auto base = std::filesystem::temp_directory_path() / "qw38-sha256-XXXXXX";
   std::string tmpl = base.string();
   std::vector<char> buf(tmpl.begin(), tmpl.end());
@@ -161,24 +161,17 @@ void test_emitted_span_digest() {
     std::filesystem::remove_all(dir);
     return;
   }
-  Hash256 const independent = parse_hex(
-      "a51f32551aae346ed4948a0dba69cf406bdcfd3db57f30c2c9bf0f5d2945f2c4");
-  bool found = false;
   for (auto const& rec : manifest->integrity) {
-    if (rec.kind == IntegrityKind::Sha256PayloadSpan && rec.tensor_id == 1) {
-      found = true;
-      expect(rec.digest == independent,
-             "emitted payload digest matches independent SHA-256");
-      expect(rec.region.offset == 256 && rec.region.length == 8,
-             "payload integrity region");
-    }
+    expect(rec.kind == IntegrityKind::Sha256Manifest,
+           "writer emits only a manifest digest");
   }
-  expect(found, "payload integrity record present");
+  expect(manifest->integrity.size() == 1,
+         "writer emits exactly one manifest digest");
   std::error_code ec;
   std::filesystem::remove_all(dir, ec);
 }
 
-void test_emitted_multichunk_digest() {
+void test_multichunk_writer_emits_no_payload_digest() {
   auto base = std::filesystem::temp_directory_path() / "qw38-sha256-chunks-XXXXXX";
   std::string tmpl = base.string();
   std::vector<char> name(tmpl.begin(), tmpl.end());
@@ -251,17 +244,12 @@ void test_emitted_multichunk_digest() {
     fail("decode chunks schema");
     return;
   }
-  Hash256 const frozen = parse_hex(
-      "90f04006647c0f19dbba34cfe1787474ea25e8a44dbfee4def4393ec5e6a4125");
-  bool found = false;
   for (auto const& record : manifest->integrity) {
-    if (record.kind == IntegrityKind::Sha256PayloadSpan && record.tensor_id == 1) {
-      found = true;
-      expect(record.digest == frozen,
-             "emitted multi-chunk digest matches externally frozen SHA-256");
-    }
+    expect(record.kind == IntegrityKind::Sha256Manifest,
+           "multi-chunk writer emits only a manifest digest");
   }
-  expect(found, "multi-chunk payload integrity record present");
+  expect(manifest->integrity.size() == 1,
+         "multi-chunk writer emits exactly one manifest digest");
   std::error_code ec;
   std::filesystem::remove_all(dir, ec);
 }
@@ -270,8 +258,8 @@ void test_emitted_multichunk_digest() {
 
 int main() {
   test_known_vectors();
-  test_emitted_span_digest();
-  test_emitted_multichunk_digest();
+  test_writer_emits_no_payload_digest();
+  test_multichunk_writer_emits_no_payload_digest();
   if (g_failures != 0) {
     std::cerr << g_failures << " SHA-256 checks failed\n";
     return 1;

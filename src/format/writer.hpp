@@ -41,8 +41,8 @@ struct WriterFilesystem {
   void* context{};
 };
 
-// Streaming host writer. Payload and scale bytes are hashed and stored as they
-// arrive; the immutable input schema is copied and its span/integrity slots are
+// Streaming host writer. Payload and scale bytes are stored as they arrive;
+// the immutable input schema is copied and its span/manifest slot is
 // filled by the writer. Failed finalization never publishes a destination file.
 class ArtifactWriter {
  public:

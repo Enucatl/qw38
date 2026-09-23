@@ -318,10 +318,7 @@ int main() {
   }
 
   bool saw_manifest = false;
-  int payload_hashes = 0;
-  int scale_hashes = 0;
   for (auto const& rec : decoded->integrity) {
-    Hash256 independent{};
     if (rec.kind == IntegrityKind::Sha256Manifest) {
       std::vector<std::byte> canonical(
           file.begin() + static_cast<std::ptrdiff_t>(rec.region.offset),
@@ -329,27 +326,15 @@ int main() {
                                                      rec.region.length));
       std::fill(canonical.end() - qw38::format::kHashBytes, canonical.end(),
                 std::byte{});
-      independent = sha256(canonical);
-    } else {
-      auto region = std::span<std::byte const>{
-          file.data() + rec.region.offset,
-          static_cast<std::size_t>(rec.region.length)};
-      independent = sha256(region);
-    }
-    expect(independent == rec.digest,
-           "integrity digest matches independent SHA-256 of declared region");
-    if (rec.kind == IntegrityKind::Sha256Manifest) {
+      expect(sha256(canonical) == rec.digest,
+             "manifest digest matches independently computed SHA-256");
       saw_manifest = true;
       expect(rec.region.offset == header->manifest_offset, "manifest region");
-    } else if (rec.kind == IntegrityKind::Sha256PayloadSpan) {
-      ++payload_hashes;
-    } else if (rec.kind == IntegrityKind::Sha256ScaleSpan) {
-      ++scale_hashes;
+    } else {
+      fail("writer must not emit payload or scale digest records");
     }
   }
   expect(saw_manifest, "manifest integrity record present");
-  expect(payload_hashes == 4, "payload hashes for embed, q4, q8, and alias");
-  expect(scale_hashes == 2, "scale hashes for q4 and q8");
 
   auto const& embed_span = decoded->tensors[0].payload;
   expect(std::equal(embed_bytes.begin(), embed_bytes.end(),

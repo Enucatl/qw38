@@ -8,9 +8,12 @@ successful download. Never compute, store, or compare a content digest over its
 BF16 tensor contents, directly or by hashing the containing shard files, for any
 reason. This applies to compilation, verification, tests, CI, release checks, and
 audits. See the normative
-[cached BF16 checkpoint payload policy](docs/implementation/code-standards.md#cached-bf16-checkpoint-payload-policy).
-The source hash is metadata-only. `.qw38` artifact integrity hashes are separate
-and remain required.
+[checkpoint and `.qw38` payload digest policy](docs/implementation/code-standards.md#checkpoint-and-qw38-payload-digest-policy).
+The source hash is metadata-only. The code requirements guide also prohibits
+content digests of `.qw38` tensor payload and scale spans, including generated
+quantized data; only the small manifest digest remains allowed. This policy
+supersedes older findings below that recommend payload/scale hashes. Do not
+propose those checks again.
 
 This is the deduplicated review of the completed subagent reviews for TASK-001 through TASK-015. Findings are ordered by priority. Each item is written as an actionable work description for a fixing worker. The four TASK-015 findings supplied for this consolidation are included below.
 
@@ -55,9 +58,9 @@ Fix by creating a unique same-directory temporary file atomically, retaining tha
 
 ### 3. Enforce a canonical, acyclic shared-binding ownership graph (confirmed; TASK-002/TASK-003/TASK-004)
 
-Schema validation only rejects duplicate directed pairs (`src/format/schema.cpp:2011`). It permits multiple owners, alias-as-owner chains, and cycles such as `A→B`, `B→C`, `A→C` or `A→B`, `B→A`. `writer.cpp:131` selects the first matching owner, physical spans are emitted only for non-alias tensors, and integrity records can therefore be omitted. The reader treats every alias endpoint as non-owning (`reader.cpp:155`, `:253`), allowing a cyclic alias to bypass file-range and overlap checks and potentially expose header bytes as payload.
+Schema validation only rejects duplicate directed pairs (`src/format/schema.cpp:2011`). It permits multiple owners, alias-as-owner chains, and cycles such as `A→B`, `B→C`, `A→C` or `A→B`, `B→A`. `writer.cpp:131` selects the first matching owner, physical spans are emitted only for non-alias tensors, and alias ranges can therefore be ambiguous. The reader treats every alias endpoint as non-owning (`reader.cpp:155`, `:253`), allowing a cyclic alias to bypass file-range and overlap checks and potentially expose header bytes as payload.
 
-Fix the schema contract to require one canonical non-alias root per alias, reject multiple owners, aliases that are owners, chains if unsupported, and all cycles. Resolve each alias to its canonical root before assigning spans, emitting integrity records, and validating ranges. Add encode, writer, reader, and round-trip tests for reverse pairs, multiple owners, chains, cycles, missing owner digests, and alias/header overlap.
+Fix the schema contract to require one canonical non-alias root per alias, reject multiple owners, aliases that are owners, chains if unsupported, and all cycles. Resolve each alias to its canonical root before assigning spans and validating ranges. Add encode, writer, reader, and round-trip tests for reverse pairs, multiple owners, chains, cycles, and alias/header overlap. Do not add payload or scale digest records or checks; these are prohibited by the current code requirements guide.
 
 ### 4. Bound all wire-record counts before allocation and translate allocation failures (confirmed; TASK-002/TASK-004)
 
@@ -89,7 +92,8 @@ Do not implement the former recommendation to hash shard contents or test
 mutations of cached BF16 tensor bytes for digest changes. The source checkpoint
 is trusted after download, and the governing requirement prohibits payload or
 containing-shard hashes under all circumstances. Retain metadata-only source
-identity. This policy does not change `.qw38` artifact integrity records or
+identity. `.qw38` payload/scale digests are also prohibited by the current
+policy; only its small manifest digest is checked. This does not change
 independent config, tokenizer, and compiler metadata checks.
 
 ### 9. Make safetensors parsing reject malformed offsets, overlaps, and type errors (confirmed; TASK-005)
@@ -112,9 +116,9 @@ Fix by verifying payload and scale bytes incrementally in eight-row or physical-
 
 ### 12. Validate packed quantizer domains before CUDA execution (confirmed; TASK-006/TASK-009)
 
-The independent unpacker rejects Q4 code `-8` and Q8 code `-128` (`src/format/unpack.cpp:14`), but CUDA decoders interpret all nibble/byte values (`cuda/decode_mmv.cu:103-125`). CUDA also accepts invalid FP16 scale encodings. Artifact opening checks structure and hashes but does not validate these semantic domains before upload.
+The independent unpacker rejects Q4 code `-8` and Q8 code `-128` (`src/format/unpack.cpp:14`), but CUDA decoders interpret all nibble/byte values (`cuda/decode_mmv.cu:103-125`). CUDA also accepts invalid FP16 scale encodings. Artifact opening checks structure and the manifest digest but does not validate these semantic domains before upload.
 
-Fix by adding one-time artifact/weight validation for forbidden codes, zero padding, and scale encodings (zero or positive finite normal values with the required floor), preferably during the existing hash/scan pass. Return typed errors before model creation and add malformed-artifact tests proving reference and CUDA paths cannot disagree.
+Fix by adding semantic validation for forbidden codes, zero padding, and scale encodings (zero or positive finite normal values with the required floor). Return typed errors before model creation and add malformed-artifact tests proving reference and CUDA paths cannot disagree. This validation is distinct from content-digest integrity: never add or recommend payload/scale hashing, and do not couple this item to any hash pass.
 
 ### 13. Restore the required QK precision boundary in TASK-008 (confirmed; TASK-008)
 

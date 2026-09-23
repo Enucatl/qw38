@@ -36,7 +36,7 @@ Norm weights remain stored and runtime applies the correct `1+gamma` or multipli
 ## Data representation
 BF16 dense control uses the corresponding eight-row/256-input tile order; embeddings row-major; vectors contiguous; convolution tap-major; RoPE inverse frequencies FP32.
 ## Implementation constraints
-No PyTorch/TensorFlow runtime dependency in the engine. A narrowly justified offline safetensors/config parser is allowed. Reject nonfinite/unexpected/missing tensors and `.qw38` artifact integrity mismatches. Never compute, store, or compare a content digest over cached BF16 tensor payloads or their shard files; follow the [cached BF16 checkpoint payload policy](../code-standards.md#cached-bf16-checkpoint-payload-policy).
+No PyTorch/TensorFlow runtime dependency in the engine. A narrowly justified offline safetensors/config parser is allowed. Reject nonfinite/unexpected/missing tensors and `.qw38` manifest-digest mismatches. Never compute, store, or compare a content digest over cached BF16 tensor payloads or their shard files, or over `.qw38` tensor payload/scale spans; follow the [checkpoint and `.qw38` payload digest policy](../code-standards.md#checkpoint-and-qw38-payload-digest-policy).
 ## Tuning defaults
 None.
 ## Expected files/modules

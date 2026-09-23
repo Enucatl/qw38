@@ -62,7 +62,7 @@ DONE — independent verification PASSED (2026-09-21): all acceptance criteria m
 ### Changes made
 - Added host-only `qw38_format` static library under `src/format/`: little-endian `ByteWriter`/`ByteReader` over `std::span<std::byte>`, overflow-safe size/alignment/range helpers, and typed `FormatError` with field/offset context.
 - Defined magic `QW38FMT\0`, container/manifest version 1, 64-byte header (manifest offset/length), 256-byte span alignment, and disjoint wire enums for storage class, logical quantizer (`q4g64_v0`/`q8g32_v0`/`none`), physical layout (`cuda_q4g64_v0`, `cuda_q8g32_v0`, BF16 layouts, GDN-S/conv/KV state layouts), semantic nodes, precision policy, and supported scope.
-- Schema records cover tensors/shapes/mappings/payload+scale spans, SHA-256 hash slots, compiler revision, precision-policy bindings, graph bindings, shared bindings (untied embed/`lm_head`; MTP aliases), integrity records, and state/scratch allocation descriptions (no live state).
+- Schema records cover tensors/shapes/mappings/payload+scale spans, legacy-compatible digest record kinds, compiler revision, precision-policy bindings, graph bindings, shared bindings (untied embed/`lm_head`; MTP aliases), integrity records, and state/scratch allocation descriptions (no live state). Current code standards permit only the small manifest digest; never compute payload/scale digests.
 - Encode/decode is explicit byte ops (`std::endian`/`std::byteswap`); validation is deterministic and I/O-free. Logical quantizer and physical layout are separate fields with disjoint IDs; mismatched pairs are rejected.
 - Wired `qw38_format` into `src/CMakeLists.txt` and added `format_schema` plus `format_schema_integration` CTest targets.
 ### Tests run
@@ -96,4 +96,3 @@ None.
 ### Follow-up observations
 - Schema validation encodes sitting Qwen3.8 language state coefficients (48 GDN layers, 16 KV layers, `[48,128,128]` HVK S, `[3,10240]` conv, `65536*T` KV). A different SKU would need an artifact-versioned geometry change; none is specified for V0.
 - Integrity records are slots only (kind, region, 32-byte digest). Digest computation remains TASK-003.
-

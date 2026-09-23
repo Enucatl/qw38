@@ -97,7 +97,7 @@ Implement `.qw38` parsing and writing explicitly. Prefer `std::byte`, `std::span
 
 Validate all offsets, lengths, layout versions, and relationships before use. Do not serialize compiler-dependent C++ struct layout directly as the persistent file ABI unless Architecture V0 explicitly specifies that representation.
 
-# Cached BF16 checkpoint payload policy
+# Checkpoint and `.qw38` payload digest policy
 
 The downloaded BF16 Transformers checkpoint in `.cache/authorities` is trusted
 after its one-time successful download. **Never compute, store, or compare
@@ -116,9 +116,21 @@ as a digest of tensor contents or as proof of their integrity. If a cached
 checkpoint is missing or its metadata is invalid, report that condition; do not
 respond by adding a payload digest scan.
 
-This prohibition applies to the downloaded BF16 source checkpoint. It does not
-remove the `.qw38` artifact's own manifest and payload integrity records, which
-protect a separately produced runtime artifact under its file-format contract.
+This prohibition also applies to every `.qw38` artifact produced by this
+project: **never compute, store, or compare a content digest over a `.qw38`
+tensor payload or scale span, including quantized output, for any reason.** The
+writer must not hash these spans as they are written, and the reader must not
+rehash them. Do not reintroduce payload/scale digests as integrity records, CI
+checks, release checks, tests, audits, or implementation-review suggestions.
+This restriction is normative and supersedes older task notes, review findings,
+format prose, or code comments that call for payload/scale hashes. Do not
+propose this work again.
+
+The only content digest allowed by the current `.qw38` contract is SHA-256 of
+the small manifest, which covers metadata only. Continue structural validation
+of offsets, lengths, alignment, overlap, schema, and quantized layout. Legacy
+`.qw38` files that contain payload/scale digest records may be parsed, but
+those digests are ignored and never recomputed.
 
 # Validation, assertions, and diagnostics
 

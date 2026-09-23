@@ -347,96 +347,26 @@ std::expected<Hash256, FormatError> require_manifest_integrity(
   return manifest_rec->digest;
 }
 
-std::expected<void, FormatError> require_span_integrity(
-    ArtifactSchema const& schema) {
-  std::unordered_set<std::uint32_t> payload_seen;
-  std::unordered_set<std::uint32_t> scale_seen;
-  for (auto const& rec : schema.integrity) {
-    if (rec.kind == IntegrityKind::Sha256Manifest) {
-      continue;
-    }
-    auto const* tensor = tensor_by_id(schema, rec.tensor_id);
-    if (tensor == nullptr) {
-      return std::unexpected(make_error(
-          FormatErrorCode::InvalidSpan, rec.region.offset, "integrity.tensor",
-          "integrity record references a missing tensor"));
-    }
-    auto const owner_id =
-        canonical_owner_tensor_id(schema, tensor->tensor_id);
-    if (!owner_id) {
-      return std::unexpected(owner_id.error());
-    }
-    auto const* owner = tensor_by_id(schema, *owner_id);
-    if (owner == nullptr) {
-      return std::unexpected(make_error(FormatErrorCode::SharedBinding, 0,
-                                        "shared.owner",
-                                        "canonical owner is missing"));
-    }
-    if (rec.kind == IntegrityKind::Sha256PayloadSpan) {
-      if (!payload_seen.insert(rec.tensor_id).second) {
-        return std::unexpected(make_error(
-            FormatErrorCode::DuplicateId, rec.region.offset, "integrity.tensor",
-            "duplicate payload digest for tensor"));
-      }
-      if (rec.region != owner->payload) {
-        return std::unexpected(make_error(
-            FormatErrorCode::InvalidSpan, rec.region.offset, "integrity.region",
-            "payload digest region must match the tensor payload span"));
-      }
-    } else if (rec.kind == IntegrityKind::Sha256ScaleSpan) {
-      if (!scale_seen.insert(rec.tensor_id).second) {
-        return std::unexpected(make_error(
-            FormatErrorCode::DuplicateId, rec.region.offset, "integrity.tensor",
-            "duplicate scale digest for tensor"));
-      }
-      if (rec.region != owner->scales || owner->scales.empty()) {
-        return std::unexpected(make_error(
-            FormatErrorCode::InvalidSpan, rec.region.offset, "integrity.region",
-            "scale digest region must match a nonempty tensor scale span"));
-      }
-    }
-  }
-
-  for (auto const& tensor : schema.tensors) {
-    if (!payload_seen.contains(tensor.tensor_id)) {
-      return std::unexpected(make_error(
-          FormatErrorCode::MissingIntegrity, tensor.payload.offset,
-          tensor.logical_name, "payload SHA-256 record is required"));
-    }
-    if (!tensor.scales.empty() && !scale_seen.contains(tensor.tensor_id)) {
-      return std::unexpected(make_error(
-          FormatErrorCode::MissingIntegrity, tensor.scales.offset,
-          tensor.logical_name, "scale SHA-256 record is required"));
-    }
-    if (tensor.scales.empty() && scale_seen.contains(tensor.tensor_id)) {
-      return std::unexpected(make_error(
-          FormatErrorCode::InvalidSpan, tensor.scales.offset,
-          tensor.logical_name, "unquantized tensor must not have a scale digest"));
-    }
-  }
-  return {};
-}
-
-std::expected<void, FormatError> verify_digests(
+std::expected<void, FormatError> verify_manifest_digest(
     std::span<std::byte const> file, ArtifactSchema const& schema) {
   for (auto const& rec : schema.integrity) {
+    // Older V0 artifacts may carry payload/scale digest records. They are
+    // retained as parse-compatible metadata only and are never recomputed.
+    if (rec.kind != IntegrityKind::Sha256Manifest) {
+      continue;
+    }
     auto region = slice(file, rec.region, "integrity.region");
     if (!region) {
       return std::unexpected(region.error());
     }
     Hash256 actual{};
-    if (rec.kind == IntegrityKind::Sha256Manifest) {
-      std::vector<std::byte> canonical(region->begin(), region->end());
-      std::fill(canonical.end() - kHashBytes, canonical.end(), std::byte{});
-      actual = sha256(canonical);
-    } else {
-      actual = sha256(*region);
-    }
+    std::vector<std::byte> canonical(region->begin(), region->end());
+    std::fill(canonical.end() - kHashBytes, canonical.end(), std::byte{});
+    actual = sha256(canonical);
     if (actual != rec.digest) {
       return std::unexpected(make_error(
           FormatErrorCode::IntegrityDigestMismatch, rec.region.offset,
-          rec.kind == IntegrityKind::Sha256Manifest ? "manifest"
-                                                    : "integrity.digest",
+          "manifest",
           "SHA-256 does not match the schema-declared region"));
     }
   }
@@ -539,10 +469,7 @@ std::expected<Validated, FormatError> validate_bytes(
   if (!manifest_digest) {
     return std::unexpected(manifest_digest.error());
   }
-  if (auto st = require_span_integrity(*schema); !st) {
-    return std::unexpected(st.error());
-  }
-  if (auto st = verify_digests(bytes, *schema); !st) {
+  if (auto st = verify_manifest_digest(bytes, *schema); !st) {
     return std::unexpected(st.error());
   }
   if (auto st = validate_quantized_payloads(bytes, *schema); !st) {

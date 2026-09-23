@@ -130,11 +130,15 @@ include a BF16 source tensor or shard content hash in that record.
 The earlier proposal to hash cached BF16 source tensors or their shard files is
 rejected and must not be implemented, tested against the authority checkpoint,
 or suggested again. The authoritative rule is in the
-[code requirements guide](docs/implementation/code-standards.md#cached-bf16-checkpoint-payload-policy):
+[code requirements guide](docs/implementation/code-standards.md#checkpoint-and-qw38-payload-digest-policy):
 after the one-time successful download, never compute, store, or compare a
 content digest over cached BF16 tensor contents, directly or by hashing
-containing shard files, for any reason. The `.qw38` artifact's own integrity
-records remain separate and required by its format.
+containing shard files, for any reason. The same no-payload-digest rule applies
+to generated `.qw38` tensor and scale spans, including quantized output. Only
+the small manifest digest is allowed. Legacy payload/scale digest records are
+ignored, and no implementation review or follow-up task should recommend
+reintroducing their computation or verification. This explicit policy
+supersedes older review items below.
 
 Keep `source_hash` metadata-only. Configuration, index, names, shapes, dtypes,
 declared sizes, and safetensors headers may be validated without reading or
@@ -176,9 +180,9 @@ identity artifacts pass only `IdentityBf16`, production artifacts pass only
 `ProductionV0`, and mismatches fail before any source tensor payload is read.
 Cover
 missing/swapped bindings, extra tensors, wrong family format, and changed shape
-with unchanged element count. Regenerate `.qw38` integrity records in mutated
-fixtures where needed so the semantic comparison is reached; these are hashes
-of test artifacts, not cached BF16 source data. Require mismatches to be rejected
+with unchanged element count. Regenerate only the small `.qw38` manifest digest
+in mutated fixtures where needed so the semantic comparison is reached; never
+add payload/scale digests. Require mismatches to be rejected
 from metadata before any source tensor payload is read. No authoritative checkpoint,
 source payload hash, full quantization, or full reconstruction is required for
 AR-02. Keep the separate full reconstruction cadence above for cases that

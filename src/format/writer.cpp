@@ -456,7 +456,6 @@ struct ArtifactWriter::Impl {
     SpanKind kind{SpanKind::Payload};
     ByteSpan region{};
     std::string field;
-    Sha256 hasher{};
     std::uint64_t written{};
     bool started{false};
     bool complete{false};
@@ -656,7 +655,6 @@ std::expected<void, FormatError> ArtifactWriter::write_span(
                          span.field); !st) {
     return st;
   }
-  span.hasher.update(chunk);
   span.written += chunk.size();
   span.started = true;
   if (span.written == span.region.length) {
@@ -702,39 +700,9 @@ std::expected<ArtifactIdentity, FormatError> ArtifactWriter::finalize() try {
     }
   }
 
-  std::vector<IntegrityRecord> records;
-  records.reserve(impl_->schema.tensors.size() * 2 + 1);
-  for (auto const& tensor : impl_->schema.tensors) {
-    auto const owner_id = owner_of(impl_->schema, tensor.tensor_id);
-    if (!owner_id) {
-      return fail(owner_id.error());
-    }
-    for (auto const& span : impl_->spans) {
-      if (span.owner_tensor_id != *owner_id) {
-        continue;
-      }
-      if (span.kind == SpanKind::Payload) {
-        IntegrityRecord rec{};
-        rec.kind = IntegrityKind::Sha256PayloadSpan;
-        rec.tensor_id = tensor.tensor_id;
-        rec.region = tensor.payload;
-        rec.digest = span.hasher.digest();
-        records.push_back(rec);
-      } else {
-        IntegrityRecord rec{};
-        rec.kind = IntegrityKind::Sha256ScaleSpan;
-        rec.tensor_id = tensor.tensor_id;
-        rec.region = tensor.scales;
-        rec.digest = span.hasher.digest();
-        records.push_back(rec);
-      }
-    }
-  }
-
   IntegrityRecord manifest_rec{};
   manifest_rec.kind = IntegrityKind::Sha256Manifest;
-  records.push_back(manifest_rec);
-  impl_->schema.integrity = records;
+  impl_->schema.integrity = {manifest_rec};
 
   auto encoded_n = encoded_size(impl_->schema);
   if (!encoded_n) {
@@ -755,7 +723,7 @@ std::expected<ArtifactIdentity, FormatError> ArtifactWriter::finalize() try {
   }
   // The final integrity digest is self-referential.  Encode its zero-initialized
   // bytes while hashing so the record's kind, tensor id, and region remain
-  // integrity-protected without changing the fixed-width wire record.
+  // covered by the manifest digest without changing the fixed-width wire record.
   Hash256 const digest =
       sha256(std::span<std::byte const>{manifest.data(), manifest.size()});
   impl_->schema.integrity.back().digest = digest;

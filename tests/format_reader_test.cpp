@@ -437,39 +437,14 @@ void test_required_state_scratch_and_precision_schema() {
   }
 }
 
-void test_canonical_owner_range_and_integrity_validation() {
+void test_canonical_owner_range_validation() {
   ScratchDir dir("qw38-reader-owner");
   auto fx = write_task003(dir.file("owner.qw38"));
   auto file = read_all(fx.path);
 
-  auto missing_owner_digest = mutate_schema(file, [](auto& schema) {
-    std::erase_if(schema.integrity, [](auto const& rec) {
-      return rec.kind == IntegrityKind::Sha256PayloadSpan &&
-             rec.tensor_id == 1;
-    });
-    for (auto& rec : schema.integrity) {
-      if (rec.kind == IntegrityKind::Sha256Manifest) {
-        rec.region.length -= qw38::format::kIntegrityRecordBytes;
-      }
-    }
-  });
-  if (!missing_owner_digest) {
-    fail(error_message(missing_owner_digest.error()));
-    return;
-  }
-  expect_code(Artifact::parse(*missing_owner_digest),
-              FormatErrorCode::MissingIntegrity,
-              "canonical owner payload digest is required");
-
   auto header_overlap = mutate_schema(file, [](auto& schema) {
     schema.tensors[0].payload.offset = 0;
     schema.tensors[3].payload.offset = 0;
-    for (auto& rec : schema.integrity) {
-      if (rec.kind == IntegrityKind::Sha256PayloadSpan &&
-          (rec.tensor_id == 1 || rec.tensor_id == 4)) {
-        rec.region.offset = 0;
-      }
-    }
   });
   if (!header_overlap) {
     fail(error_message(header_overlap.error()));
@@ -485,8 +460,8 @@ void test_bad_hash_and_leftover() {
   auto fx = write_minimal(dir.file("h.qw38"));
   auto bytes = read_all(fx.path);
   bytes[256] = static_cast<std::byte>(static_cast<std::uint8_t>(bytes[256]) ^ 0xFF);
-  expect_code(Artifact::parse(bytes), FormatErrorCode::IntegrityDigestMismatch,
-              "payload byte flip");
+  expect(static_cast<bool>(Artifact::parse(bytes)),
+         "payload byte flip does not trigger a payload digest scan");
 
   bytes = read_all(fx.path);
   auto opened = Artifact::open(fx.path);
@@ -638,7 +613,7 @@ int main() {
   test_noncanonical_directory_and_span_order();
   test_invalid_pairs_shapes_scales_shared_state();
   test_required_state_scratch_and_precision_schema();
-  test_canonical_owner_range_and_integrity_validation();
+  test_canonical_owner_range_validation();
   test_bad_hash_and_leftover();
   test_manifest_record_field_corruption();
   test_manifest_limit_precedes_span_copy();

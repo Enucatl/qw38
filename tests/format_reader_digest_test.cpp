@@ -51,18 +51,14 @@ int main() {
     fail(error_message(payload.error()));
     return 1;
   }
-  Hash256 const independent_payload = sha256(*payload);
-  Hash256 const from_source = sha256(min.payload);
-  expect(independent_payload == from_source,
-         "reader span hash matches source bytes");
-
-  bool saw_payload = false;
+  bool saw_payload_digest = false;
   bool saw_manifest = false;
   for (auto const& rec : art->schema().integrity) {
-    std::span<std::byte const> region;
     if (rec.kind == IntegrityKind::Sha256PayloadSpan) {
-      region = *payload;
-      saw_payload = true;
+      saw_payload_digest = true;
+      fail("new artifacts must not carry payload digests");
+    } else if (rec.kind == IntegrityKind::Sha256ScaleSpan) {
+      fail("new artifacts must not carry scale digests");
     } else if (rec.kind == IntegrityKind::Sha256Manifest) {
       auto const bytes = read_all(min.path);
       expect(rec.region.length ==
@@ -78,14 +74,10 @@ int main() {
              "independent SHA-256 zeroes only self-digest bytes");
       saw_manifest = true;
       continue;
-    } else {
-      fail("unexpected integrity kind on minimal artifact");
-      continue;
     }
-    expect(sha256(region) == rec.digest,
-           "independent SHA-256 matches stored digest");
   }
-  expect(saw_payload && saw_manifest, "payload and manifest digests present");
+  expect(!saw_payload_digest && saw_manifest,
+         "manifest-only digest is present");
 
   auto fx = write_task003(dir.file("multi.qw38"));
   auto multi = Artifact::open(fx.path);
@@ -106,11 +98,7 @@ int main() {
              "multi manifest digest zeroes only self-digest bytes");
       continue;
     }
-    auto region = std::span<std::byte const>{
-        file.data() + static_cast<std::size_t>(rec.region.offset),
-        static_cast<std::size_t>(rec.region.length)};
-    expect(sha256(region) == rec.digest,
-           "independent digest of declared region");
+    expect(false, "new artifacts must not carry payload or scale digests");
   }
   auto embed = multi->payload("model.embed_tokens.weight");
   auto alias = multi->payload("mtp.embed_tokens.weight");
@@ -118,18 +106,20 @@ int main() {
     fail("embed/alias payload lookup");
     return 1;
   }
-  expect(sha256(*embed) == sha256(*alias), "alias digest matches owner");
-  expect(sha256(*embed) == sha256(fx.embed), "embed digest matches source");
+  expect(std::equal(embed->begin(), embed->end(), alias->begin()),
+         "alias payload equals owner payload");
+  expect(std::equal(embed->begin(), embed->end(), fx.embed.begin()),
+         "embed payload equals source bytes");
   auto q4p = multi->payload("model.layers.0.mlp.down_proj.weight");
   auto q4s = multi->scales("model.layers.0.mlp.down_proj.weight");
   if (!q4p || !q4s) {
     fail("q4 span lookup");
     return 1;
   }
-  expect(sha256(*q4p) == sha256(fx.q4_payload),
-         "q4 payload digest matches source");
-  expect(sha256(*q4s) == sha256(fx.q4_scales),
-         "q4 scale digest matches source");
+  expect(std::equal(q4p->begin(), q4p->end(), fx.q4_payload.begin()),
+         "q4 payload equals source bytes");
+  expect(std::equal(q4s->begin(), q4s->end(), fx.q4_scales.begin()),
+         "q4 scales equal source bytes");
 
   if (g_failures != 0) {
     std::cerr << g_failures << " reader digest checks failed\n";

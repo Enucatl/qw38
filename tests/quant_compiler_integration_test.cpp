@@ -261,21 +261,16 @@ int main() {
                std::equal(ep->begin(), ep->end(), embed.bytes.begin()),
            "embed identity bytes");
 
-    bool saw_payload_hash = false;
-    bool saw_scale_hash = false;
     for (auto const& rec : art->schema().integrity) {
       if (rec.kind == qw38::format::IntegrityKind::Sha256PayloadSpan &&
-          rec.tensor_id == q4->tensor_id && q4p) {
-        expect(rec.digest == sha256(*q4p), "Q4 payload hash");
-        saw_payload_hash = true;
+          rec.tensor_id == q4->tensor_id) {
+        expect(false, "quantized payload digest must not be emitted");
       }
       if (rec.kind == qw38::format::IntegrityKind::Sha256ScaleSpan &&
-          rec.tensor_id == q4->tensor_id && q4sc) {
-        expect(rec.digest == sha256(*q4sc), "Q4 scale hash");
-        saw_scale_hash = true;
+          rec.tensor_id == q4->tensor_id) {
+        expect(false, "quantized scale digest must not be emitted");
       }
     }
-    expect(saw_payload_hash && saw_scale_hash, "integrity records present");
 
     if (q4p && q4sc) {
       auto want = quantize_bf16(LogicalQuantizerId::Q4G64V0, 8, 256, dense.bytes);
