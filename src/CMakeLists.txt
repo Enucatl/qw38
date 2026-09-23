@@ -52,6 +52,7 @@ target_compile_options(qw38_reference PRIVATE
 )
 
 add_library(qw38_runtime STATIC
+  runtime/language_layer.cpp
   runtime/error.cpp
   runtime/sizes.cpp
   runtime/arena.cpp

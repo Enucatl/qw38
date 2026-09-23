@@ -212,6 +212,19 @@ target_compile_options(qw38_runtime_session_integration_test PRIVATE
   $<$<COMPILE_LANGUAGE:CXX>:-Wall -Wextra -Wpedantic>
 )
 
+add_executable(qw38_language_layer_integration_test
+  language_layer_integration_test.cpp)
+target_link_libraries(qw38_language_layer_integration_test PRIVATE
+  qw38_runtime qw38_compiler qw38_reference)
+target_compile_features(qw38_language_layer_integration_test PRIVATE cxx_std_23)
+target_compile_options(qw38_language_layer_integration_test PRIVATE
+  $<$<COMPILE_LANGUAGE:CXX>:-Wall -Wextra -Wpedantic>
+)
+add_test(NAME language_layer_integration COMMAND qw38_language_layer_integration_test)
+set_tests_properties(language_layer_integration PROPERTIES
+  LABELS "cuda;gpu;runtime;gdn;attention;mlp"
+)
+
 add_executable(qw38_runtime_allocation_failure_test
   runtime_allocation_failure_test.cpp)
 target_link_libraries(qw38_runtime_allocation_failure_test PRIVATE qw38_runtime)

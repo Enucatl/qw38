@@ -1,8 +1,8 @@
 # TASK-016 prerequisite repair evidence
 
 This records the review repairs made before the one-layer checkpoint. TASK-016
-remains `TODO`; its own composition and continuation criteria have not been
-accepted by these component checks.
+is now `DONE`; its own composition and continuation criteria are covered by
+the integration evidence in [`tasks/TASK-016.md`](tasks/TASK-016.md).
 
 | Review ID | Production boundary | Discriminating check |
 | --- | --- | --- |
