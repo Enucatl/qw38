@@ -1,5 +1,17 @@
 # Implementation review
 
+## Superseding source-checkpoint policy
+
+The recommendation in former item 8 to digest safetensors shards is rejected.
+The downloaded BF16 authority checkpoint is trusted after its one-time
+successful download. Never compute, store, or compare a content digest over its
+BF16 tensor contents, directly or by hashing the containing shard files, for any
+reason. This applies to compilation, verification, tests, CI, release checks, and
+audits. See the normative
+[cached BF16 checkpoint payload policy](docs/implementation/code-standards.md#cached-bf16-checkpoint-payload-policy).
+The source hash is metadata-only. `.qw38` artifact integrity hashes are separate
+and remain required.
+
 This is the deduplicated review of the completed subagent reviews for TASK-001 through TASK-015. Findings are ordered by priority. Each item is written as an actionable work description for a fixing worker. The four TASK-015 findings supplied for this consolidation are included below.
 
 There were no P0 findings. “Confirmed” means the reviewer found the issue directly in the current implementation. “Concern” means the issue needs a contract decision or additional reproduction before changing code.
@@ -71,11 +83,14 @@ Fix by enforcing the exact language-only state kinds, fixed dimensions, no paddi
 
 Fix by representing and validating every behavior-defining language/MTP configuration field, including cross-field invariants and exact allowed values. Reject unsupported Qwen variants and config/dtype combinations with typed errors. Add mutation tests that change one field at a time and prove compilation is rejected.
 
-### 8. Bind source and reconstruction verification to all artifact identities (confirmed; TASK-005)
+### 8. Superseded: shard-content source identity proposal (rejected)
 
-`open_checkpoint` sets `source_hash` from only `model.safetensors.index.json` (`src/compiler/checkpoint.cpp:475`), excluding shard contents. `verify_compiled_artifact` (`src/compiler/compile.cpp:676`) compares payloads but does not compare source, config, tokenizer, or compiler identities.
-
-Fix by defining a canonical source identity covering the index and every shard’s identity/digest, storing config/tokenizer/compiler identities, and requiring verification to compare all of them before reconstruction. Add tests that mutate shard bytes, config, tokenizer, and compiler revision while keeping filenames/indexes unchanged; each mismatch must fail with a typed diagnostic.
+Do not implement the former recommendation to hash shard contents or test
+mutations of cached BF16 tensor bytes for digest changes. The source checkpoint
+is trusted after download, and the governing requirement prohibits payload or
+containing-shard hashes under all circumstances. Retain metadata-only source
+identity. This policy does not change `.qw38` artifact integrity records or
+independent config, tokenizer, and compiler metadata checks.
 
 ### 9. Make safetensors parsing reject malformed offsets, overlaps, and type errors (confirmed; TASK-005)
 

@@ -16,10 +16,10 @@ suite passes all 36 tests. TASK-016 is the right next integration checkpoint.
 
 However, “the review items were fixed” should not yet mean “the foundation is
 ready for unrestricted composition.” There are residual correctness issues in
-production source identity, verification policy, and session lifetime/failure
-handling. Several repairs were tested as isolated helpers or successful local
-operations without proving the contract of their production callers. Excluded
-benchmark targets have also drifted from the repaired interfaces.
+verification policy and session lifetime/failure handling. Several repairs were
+tested as isolated helpers or successful local operations without proving the
+contract of their production callers. Excluded benchmark targets have also
+drifted from the repaired interfaces.
 
 The strongest conclusion from this batch is to strengthen integration contracts
 and completion evidence, not replace the architecture. There is no current
@@ -88,7 +88,8 @@ when promoting a new artifact for release or sharing, and once on a candidate
 when a code change can alter the bytes or the correctness decision. Concrete
 triggers include changes to:
 
-- checkpoint parsing/classification, source tensor selection, or source identity;
+- checkpoint parsing/classification, source tensor selection, or source identity
+  metadata (never source tensor content hashes; see the binding rule below);
 - quantizer equations/rounding, Q4/Q8 packing, BF16 transforms, layouts, or
   emitted tensor bytes;
 - artifact schema, graph bindings, policy selection, or compiler identity fields;
@@ -119,53 +120,27 @@ read and quantization pass by default. At the reviewed commit,
 (`src/compiler/compile.hpp:24`) and the CLI disables it only with `--no-verify`
 (`src/compiler/main.cpp:29`). Change that default/flag semantics as part of the
 follow-up so code matches this cadence. Print whether verification ran and which
-artifact/source/compiler/policy identities it covered.
+artifact, source-metadata, compiler, and policy identities it covered. Never
+include a BF16 source tensor or shard content hash in that record.
 
 ## Required repairs
 
-### AR-01 — P1, confirmed: make source identity match the artifact without a commit-time shard scan
+### AR-01 — Withdrawn by explicit source-checkpoint policy
 
-**Evidence.** `src/compiler/checkpoint.cpp:302`
-(`compute_checkpoint_identities`) hashes the index and all referenced shard
-digests. Production `open_checkpoint`, however, assigns only the index hash to
-`source_hash` at line 770. `compile_checkpoint` consumes that value at
-`src/compiler/compile.cpp:696`; verification uses it at line 897. The canonical
-identity helper has no production caller. Metadata-only opening was an
-intentional optimization, but canonical hashing was not moved to the production
-compile/verify boundary.
+The earlier proposal to hash cached BF16 source tensors or their shard files is
+rejected and must not be implemented, tested against the authority checkpoint,
+or suggested again. The authoritative rule is in the
+[code requirements guide](docs/implementation/code-standards.md#cached-bf16-checkpoint-payload-policy):
+after the one-time successful download, never compute, store, or compare a
+content digest over cached BF16 tensor contents, directly or by hashing
+containing shard files, for any reason. The `.qw38` artifact's own integrity
+records remain separate and required by its format.
 
-**Consequence.** An artifact's source identity does not identify its source
-weight bytes. Reconstruction cannot compensate: a shard change within the same
-quantization bin can preserve emitted bytes, and excluded vision payloads are
-not reconstructed at all. This is a residual of the original source-identity
-finding, despite the helper-level repair.
-
-**Cost boundary and implementation.** This finding does **not** propose putting
-50+ GB SHA-256 scans or full-checkpoint quantization into every commit's tests.
-Normal build and test jobs must stay metadata-only or use small fixtures; they
-must not call `compute_checkpoint_identities` on the authoritative checkpoint.
-The artifact still needs a content identity for the source weights it actually
-contains. Prefer composing that identity from the index/config metadata and
-digests of included tensor bytes as the compiler already reads them for
-conversion. That avoids a separate full-file pre-scan and does not hash excluded
-vision tensors that are not part of this artifact. Reuse the resulting identity
-inside the same compile/verification operation. If exact identity of every byte
-in the original checkpoint, including excluded tensors, is required, expose it
-as an explicit provenance audit with a clearly stated full-scan cost; do not
-silently make that audit part of routine CI or metadata inspection. Name these
-two identity scopes distinctly. Decide whether the existing wire field means
-compiled-source identity or complete-checkpoint identity before changing its
-semantics. Previously emitted index-only artifacts need recompile or an
-explicitly versioned compatibility decision; do not silently accept either hash.
-
-**Acceptance.** A small fixture proves the production orchestration includes
-content from each compiled source tensor in its identity and rejects a changed
-source tensor even when the index is unchanged and quantized output happens to
-remain the same. Test that the compile/verification path reuses bytes already
-read rather than invoking a full-shard pre-scan. Keep ordinary metadata tests
-independent of checkpoint payloads. Any full-checkpoint identity audit is
-separate, opt-in, and never required on every commit. This verifies identity
-wiring without restoring the removed 50+ GB SHA/quantization tests.
+Keep `source_hash` metadata-only. Configuration, index, names, shapes, dtypes,
+declared sizes, and safetensors headers may be validated without reading or
+hashing payload contents. Do not add source-content identities, payload hash
+audits, release-time shard scans, or mutation tests over cached BF16 files.
+This item is closed as a policy decision; it is not a future implementation task.
 
 ### AR-02 — P1, confirmed: verify the requested policy and expected semantic schema
 
@@ -596,7 +571,7 @@ it; unresolved residuals remain visible.
 1. Correct authoritative pointers and add the targeted guideline requirements
    (AR-15/16), then resolve the session execution/lifetime design in AR-03/04/05/11.
    Implement these coupled state changes in coherent, reviewable increments.
-2. Repair production identity and policy verification (AR-01/02); repair the
+2. Repair policy verification (AR-02); repair the
    checked descriptor/transform boundaries and closed Runtime behavior (AR-06/08).
    Compiler and runtime repairs can be reviewed independently.
 3. Complete bounded BF16 verification, attention direct residual output, and

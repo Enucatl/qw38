@@ -36,7 +36,7 @@ Norm weights remain stored and runtime applies the correct `1+gamma` or multipli
 ## Data representation
 BF16 dense control uses the corresponding eight-row/256-input tile order; embeddings row-major; vectors contiguous; convolution tap-major; RoPE inverse frequencies FP32.
 ## Implementation constraints
-No PyTorch/TensorFlow runtime dependency in the engine. A narrowly justified offline safetensors/config parser is allowed. Reject nonfinite/unexpected/missing tensors and hash mismatches.
+No PyTorch/TensorFlow runtime dependency in the engine. A narrowly justified offline safetensors/config parser is allowed. Reject nonfinite/unexpected/missing tensors and `.qw38` artifact integrity mismatches. Never compute, store, or compare a content digest over cached BF16 tensor payloads or their shard files; follow the [cached BF16 checkpoint payload policy](../code-standards.md#cached-bf16-checkpoint-payload-policy).
 ## Tuning defaults
 None.
 ## Expected files/modules
@@ -99,4 +99,3 @@ None.
 - TASK-002 graph validation allows `LM_HEAD` bindings only with role `LmHeadWeight`, so `model.language_model.norm.weight` and `mtp.norm.weight` are stored in the tensor directory but not graph-bound as head norms.
 - Generated RoPE required an FP32 vector storage/layout that TASK-002 did not define; `StorageClass::Fp32` / `cuda_fp32_vector_v0` is the additive ABI used here.
 - Full-checkpoint `.qw38` emission is implemented and reconstruction-checked in the CLI (`--no-verify` to skip the second pass) but is omitted from default ctest because the identity payload is ~54 GiB.
-
