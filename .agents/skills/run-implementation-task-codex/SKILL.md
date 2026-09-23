@@ -26,10 +26,10 @@ path, relevant normative paths, role, any findings needed for that role, and
 the required output contract. Because subagents share the working tree, run
 these stages sequentially.
 
-Use exactly `gpt-5.6-luna` at high reasoning for implementation and repair,
-and exactly `gpt-5.6-sol` for independent verification, difficult diagnosis,
-and delivery. If a required model is unavailable, stop and report it; do not
-silently substitute another model.
+Use exactly `gpt-6-luna` at high reasoning for implementation and repair,
+and independent verification. Use exactly `gpt-6-sol` at high reasoning only
+for difficult diagnosis that exceeds the implementation agent's capacity.
+Use exactly `gpt-6-luna` at medium reasoning for final documentation and delivery.
 
 ## Admission
 
@@ -132,7 +132,7 @@ not a passing result.
 
 ## Delivery
 
-Only after verification passes, spawn a fresh Sol delivery subagent. It may
+Only after verification passes, spawn a fresh delivery subagent. It may
 only:
 
 1. confirm that the verified diff is unchanged;
@@ -145,9 +145,8 @@ Delivery must not make semantic implementation changes. If substantive
 content changed after verification, invalidate the result and run a fresh
 verification before delivery.
 
-Use a concise Google-style commit subject, at most 50 characters where
-practical, and an intent-focused body. Never force-push, rebase, merge, amend,
-or automatically resolve a non-fast-forward rejection. If push fails, preserve
+Use the git-commit skill to create a proper git commit message.
+Never force-push, rebase, merge, amend, or automatically resolve a non-fast-forward rejection. If push fails, preserve
 the local commit, report the failure, do not claim successful delivery, and do
 not start another task.
 
