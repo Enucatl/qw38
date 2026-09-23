@@ -30,7 +30,7 @@ Implement Architecture V0 as a sequence of small, testable increments that reach
 - **M4 — GDN execution:** convolution/preparation, recurrence, and the complete GDN mixer execute with continuation-correct persistent state.
 - **M5 — Attention execution:** preparation/cache and segmented online decode attention execute with deterministic merging.
 - **M6 — Integrated language decode:** both layer kinds integrate through common state/scratch machinery and the complete 64-layer primary-language model produces FP32 logits.
-- **M7 — Behavioral correctness baseline:** frozen language-only NLL, distribution, generation, continuation, capability, and feasible long-context checks distinguish BF16 control from V0 quantization effects.
+- **M7 — Behavioral correctness baseline:** frozen Q4_K_M llama.cpp/V0 NLL, top-k availability, generation, continuation, capability, and feasible long-context checks; BF16 is limited to optional elementary sanity.
 - **M8 — Production V0 prefill:** tensor-core projections, chunked GDN, tiled causal attention, and exact prefill-to-decode handoff work end to end.
 - **M9 — End-to-end performance baseline:** declared decode, prefill, request, memory, and kernel measurements are reproducible and identity-bound.
 - **M10 — Architecture-V0 experiments:** EXP-A through EXP-H produce keep/change recommendations without opportunistic redesign.
@@ -56,7 +56,7 @@ Implement Architecture V0 as a sequence of small, testable increments that reach
 | TASK-015 | Segmented online decode attention | M5 | TASK-014 | Causal GQA segment scan, fixed-order merge, gating, output residual | DONE |
 | TASK-016 | One-layer integration checkpoint | M6 | TASK-013, TASK-015 | One GDN-style and one attention-style layer through common runtime | DONE |
 | TASK-017 | Complete primary-language decode | M6 | TASK-016 | Embedding, 64 layers, persistent state, final norm, Q8 head, logits | DONE |
-| TASK-018 | Behavioral correctness baseline | M7 | TASK-017 | Frozen language-only BF16/V0 behavioral and continuation validation | TODO |
+| TASK-018 | Behavioral correctness baseline | M7 | TASK-017 | Frozen language-only Q4_K_M llama.cpp/V0 behavioral and continuation validation; optional BF16 sanity | IN_PROGRESS |
 | TASK-019 | Tensor-core prefill projections and chunk planning | M8 | TASK-018 | Bounded token-major scratch and common-view packed GEMM consumers | TODO |
 | TASK-020 | Chunked prefill GDN | M8 | TASK-019 | Parallel FIR/history commit and ordered 64-token recurrence schedule | TODO |
 | TASK-021 | Tiled causal prefill attention | M8 | TASK-019 | 32-query × 64-key online attention with correct cache/state semantics | TODO |
@@ -98,9 +98,27 @@ TASK-001 → 002 → 003 → 004 → 005 → 006
 
 ## Architecture amendment log
 
+## TASK-018 evidence record
+
+TASK-018 remains `IN_PROGRESS`; its 216-case paired quality gate has no result.
+The original cache-default llama attempt generated 216/216 outputs but exited 1
+during fresh-request replay. Its failed attempt and logs remain in
+`.cache/evaluation/qw38-language-v1/runs/llama-20260923T160709Z-1476101/`.
+A later four-probe replay matched those preserved outputs, but the source
+attempt lacks authenticated per-case provenance, so reuse is diagnostic only.
+The full V0 attempt was interrupted at 124/216 completed cases (exit 137); its
+partial result and outputs remain in
+`.cache/evaluation/qw38-language-v1/runs/v0-20260923T170423Z-1492403/`.
+Independent V0 reset/snapshot replay passed all nine declared boundaries and
+interleave. P10 timing covers ten selected P100 cases as a speed diagnostic only.
+The paired report and 100 P100 human adjudications remain absent. Current
+report-contract repairs emit durable `INVALID` results, bind the report driver,
+and gate required fixed-key answers. See
+[`TASK-018`](tasks/TASK-018.md#coordinator-directed-resumed-work--2026-09-23).
+
 | Amendment | Date | Decisions affected | Summary |
 | --------- | ---- | ------------------ | ------- |
-| EVAL-01 / PERF-01 | 2026-09-23 | V0 validation policy; TASK-018, TASK-022, TASK-023 and downstream experiments | User-requested decision selects DS4-derived language fixtures/scoring, staged context coverage, and a required matched llama.cpp performance baseline with an explicit parity target. Supersedes historical unselected-suite restrictions; task execution statuses remain unchanged. See [evaluation policy](../architecture/evaluation-policy-v0.md). |
+| EVAL-01 / PERF-01 | 2026-09-23 | V0 validation policy; TASK-018, TASK-022, TASK-023 and downstream experiments | User-requested decision selects DS4-derived language fixtures/scoring, staged context coverage, and llama.cpp Q4_K_M versus V0 as the TASK-018 behavior pair. PERF-01 separately defines its matched llama.cpp performance baseline for later performance tasks. Supersedes historical unselected-suite restrictions; task execution statuses remain unchanged. See [evaluation policy](../architecture/evaluation-policy-v0.md). |
 
 ## Repair index
 

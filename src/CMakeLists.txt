@@ -75,6 +75,22 @@ target_link_libraries(qw38_bf16_diagnostic PRIVATE qw38_runtime)
 target_compile_features(qw38_bf16_diagnostic PRIVATE cxx_std_23)
 set_target_properties(qw38_bf16_diagnostic PROPERTIES
   OUTPUT_NAME qw38-bf16-diagnostic)
+
+add_executable(qw38_evaluate runtime/evaluate.cpp)
+target_link_libraries(qw38_evaluate PRIVATE qw38_runtime)
+target_compile_features(qw38_evaluate PRIVATE cxx_std_23)
+target_compile_options(qw38_evaluate PRIVATE
+  $<$<COMPILE_LANGUAGE:CXX>:-Wall -Wextra -Wpedantic>
+)
+set_target_properties(qw38_evaluate PROPERTIES OUTPUT_NAME qw38-evaluate)
+
+add_executable(qw38_state_replay runtime/state_replay.cpp)
+target_link_libraries(qw38_state_replay PRIVATE qw38_runtime)
+target_compile_features(qw38_state_replay PRIVATE cxx_std_23)
+target_compile_options(qw38_state_replay PRIVATE
+  $<$<COMPILE_LANGUAGE:CXX>:-Wall -Wextra -Wpedantic>
+)
+set_target_properties(qw38_state_replay PROPERTIES OUTPUT_NAME qw38-state-replay)
 target_include_directories(qw38_runtime PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 target_link_libraries(qw38_runtime PUBLIC qw38_format qw38_cuda)
 target_compile_features(qw38_runtime PUBLIC cxx_std_23)
