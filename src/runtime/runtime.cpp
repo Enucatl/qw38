@@ -77,6 +77,13 @@ std::expected<Model, Error> Runtime::upload(
   return Model::upload(artifact, *stream_);
 }
 
+std::expected<Model, Error> Runtime::upload_diagnostic(
+    qw38::format::Artifact const& artifact, DiagnosticWeights selection,
+    std::uint32_t layer) {
+  if (!stream_) return std::unexpected(closed_error("runtime.upload_diagnostic"));
+  return Model::upload(artifact, *stream_, selection, layer);
+}
+
 std::expected<Session, Error> Runtime::create_session(Model const& model,
                                                       std::uint64_t kv_capacity) {
   if (!stream_) {

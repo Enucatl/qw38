@@ -387,6 +387,7 @@ std::expected<void, Error> Session::reset() {
   execution_state_->conv_cursor.fill(0);
   execution_state_->gdn_position.fill(0);
   execution_state_->kv_populated.fill(0);
+  execution_state_->token_position_ = 0;
   execution_state_->recover();
   return {};
 }
@@ -434,6 +435,7 @@ std::expected<SessionSnapshot, Error> Session::save() const {
   snap.conv_cursor = execution_state_->conv_cursor;
   snap.gdn_position = execution_state_->gdn_position;
   snap.kv_populated = execution_state_->kv_populated;
+  snap.token_position = execution_state_->token_position_;
   if (auto st = qw38::cuda::copy_d2h(snap.gdn_s, gdn_s_.data(), *stream_); !st) {
     execution_state_->poison();
     return std::unexpected(from_cuda(st.error()));
@@ -475,6 +477,11 @@ std::expected<void, Error> Session::restore(SessionSnapshot const& snap) {
     return std::unexpected(make_error(ErrorCode::InvalidArgument, "snapshot",
                                       "snapshot size does not match session"));
   }
+  if (snap.token_position > kv_capacity_) {
+    return std::unexpected(make_error(ErrorCode::InvalidPopulatedLength,
+                                      "snapshot.token_position",
+                                      "token position exceeds session capacity"));
+  }
   for (auto populated : snap.kv_populated) {
     if (populated > kv_capacity_) {
       return std::unexpected(make_error(ErrorCode::InvalidPopulatedLength,
@@ -512,6 +519,7 @@ std::expected<void, Error> Session::restore(SessionSnapshot const& snap) {
   execution_state_->conv_cursor = snap.conv_cursor;
   execution_state_->gdn_position = snap.gdn_position;
   execution_state_->kv_populated = snap.kv_populated;
+  execution_state_->token_position_ = snap.token_position;
   execution_state_->recover();
   return {};
 }

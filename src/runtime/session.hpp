@@ -80,6 +80,7 @@ struct SessionSnapshot {
   std::array<std::uint32_t, kConvLayers> conv_cursor{};
   std::array<std::uint64_t, kGdnLayers> gdn_position{};
   std::array<std::uint64_t, kAttnLayers> kv_populated{};
+  std::uint64_t token_position{};
 };
 
 // Host metadata borrowed by bound plans. Shared only so its address and array
@@ -90,12 +91,26 @@ class SessionExecutionState {
   [[nodiscard]] bool is_poisoned() const noexcept { return poisoned_; }
   void poison() noexcept { poisoned_ = true; }
   void recover() noexcept { poisoned_ = false; }
+  [[nodiscard]] std::uint64_t token_position() const noexcept {
+    return token_position_;
+  }
+  void commit_token() noexcept { ++token_position_; }
+  [[nodiscard]] bool layers_at(std::uint64_t position) const noexcept {
+    for (auto value : gdn_position) {
+      if (value != position) return false;
+    }
+    for (auto value : kv_populated) {
+      if (value != position) return false;
+    }
+    return true;
+  }
 
  private:
   friend class Session;
   std::array<std::uint32_t, kConvLayers> conv_cursor{};
   std::array<std::uint64_t, kGdnLayers> gdn_position{};
   std::array<std::uint64_t, kAttnLayers> kv_populated{};
+  std::uint64_t token_position_{};
   bool poisoned_{};
 };
 

@@ -216,7 +216,9 @@ std::expected<ConstTensorView, Error> Model::scales(
 }
 
 std::expected<Model, Error> Model::upload(qw38::format::Artifact const& artifact,
-                                          qw38::cuda::Stream const& stream) {
+                                          qw38::cuda::Stream const& stream,
+                                          std::optional<DiagnosticWeights> selection,
+                                          std::uint32_t layer) {
   try {
   Model model;
   model.schema_ = artifact.schema();
@@ -233,10 +235,30 @@ std::expected<Model, Error> Model::upload(qw38::format::Artifact const& artifact
   if (auto st = require_language_scratch(model.scratch()); !st) {
     return std::unexpected(st.error());
   }
+  if (selection == DiagnosticWeights::Layer && layer >= kLanguageLayers) {
+    return std::unexpected(make_error(ErrorCode::InvalidArgument, "layer",
+                                      "diagnostic layer must be < 64"));
+  }
+  std::string const layer_prefix = selection == DiagnosticWeights::Layer
+      ? "model.language_model.layers." + std::to_string(layer) + "." : "";
+  auto selected = [&](qw38::format::TensorRecord const& rec) {
+    if (!selection) return true;
+    switch (*selection) {
+      case DiagnosticWeights::Input:
+        return rec.logical_name == "model.language_model.embed_tokens.weight";
+      case DiagnosticWeights::Layer:
+        return rec.logical_name.starts_with(layer_prefix) ||
+               rec.logical_name == "rope.inv_freq";
+      case DiagnosticWeights::Output:
+        return rec.logical_name == "model.language_model.norm.weight" ||
+               rec.logical_name == "lm_head.weight";
+    }
+    return false;
+  };
 
   // Host-side span checks happen before any device allocation.
   for (auto const& rec : model.schema_.tensors) {
-    if (is_alias(model.schema_, rec.tensor_id)) {
+    if (!selected(rec) || is_alias(model.schema_, rec.tensor_id)) {
       continue;
     }
     if (!rec.payload.empty()) {
@@ -292,7 +314,7 @@ std::expected<Model, Error> Model::upload(qw38::format::Artifact const& artifact
   };
 
   for (auto const& rec : model.schema_.tensors) {
-    if (is_alias(model.schema_, rec.tensor_id)) {
+    if (!selected(rec) || is_alias(model.schema_, rec.tensor_id)) {
       continue;
     }
     if (auto st = upload_named(rec.logical_name, qw38::format::SpanKind::Payload,
@@ -309,6 +331,7 @@ std::expected<Model, Error> Model::upload(qw38::format::Artifact const& artifact
 
   model.uploaded_.reserve(model.schema_.tensors.size());
   for (auto const& rec : model.schema_.tensors) {
+    if (!selected(rec)) continue;
     auto const oid = owner_id(model.schema_, rec.tensor_id);
     auto const* owner = find_id(model.schema_, oid);
     if (owner == nullptr) {

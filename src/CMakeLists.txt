@@ -53,6 +53,7 @@ target_compile_options(qw38_reference PRIVATE
 
 add_library(qw38_runtime STATIC
   runtime/language_layer.cpp
+  runtime/language_model.cpp
   runtime/error.cpp
   runtime/sizes.cpp
   runtime/arena.cpp
@@ -63,6 +64,17 @@ add_library(qw38_runtime STATIC
   runtime/gdn.cpp
   runtime/attention.cpp
 )
+
+add_executable(qw38_decode runtime/main.cpp)
+target_link_libraries(qw38_decode PRIVATE qw38_runtime)
+target_compile_features(qw38_decode PRIVATE cxx_std_23)
+set_target_properties(qw38_decode PROPERTIES OUTPUT_NAME qw38-decode)
+
+add_executable(qw38_bf16_diagnostic runtime/bf16_diagnostic.cpp)
+target_link_libraries(qw38_bf16_diagnostic PRIVATE qw38_runtime)
+target_compile_features(qw38_bf16_diagnostic PRIVATE cxx_std_23)
+set_target_properties(qw38_bf16_diagnostic PROPERTIES
+  OUTPUT_NAME qw38-bf16-diagnostic)
 target_include_directories(qw38_runtime PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 target_link_libraries(qw38_runtime PUBLIC qw38_format qw38_cuda)
 target_compile_features(qw38_runtime PUBLIC cxx_std_23)

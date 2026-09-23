@@ -38,6 +38,9 @@ class Runtime {
   [[nodiscard]] std::expected<Model, Error> load(std::filesystem::path const& path);
   [[nodiscard]] std::expected<Model, Error> upload(
       qw38::format::Artifact const& artifact);
+  [[nodiscard]] std::expected<Model, Error> upload_diagnostic(
+      qw38::format::Artifact const& artifact, DiagnosticWeights selection,
+      std::uint32_t layer = 0);
   [[nodiscard]] std::expected<Session, Error> create_session(
       Model const& model, std::uint64_t kv_capacity);
 

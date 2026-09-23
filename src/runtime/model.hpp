@@ -8,6 +8,7 @@
 
 #include <cstdint>
 #include <expected>
+#include <optional>
 #include <span>
 #include <string_view>
 #include <vector>
@@ -17,6 +18,8 @@ class Stream;
 }
 
 namespace qw38::runtime {
+
+enum class DiagnosticWeights : std::uint8_t { Input, Layer, Output };
 
 class Model {
  public:
@@ -72,7 +75,9 @@ class Model {
   Model() = default;
 
   static std::expected<Model, Error> upload(qw38::format::Artifact const& artifact,
-                                            qw38::cuda::Stream const& stream);
+                                            qw38::cuda::Stream const& stream,
+                                            std::optional<DiagnosticWeights> selection = {},
+                                            std::uint32_t layer = 0);
 
   struct UploadedTensor {
     std::uint32_t tensor_id{};

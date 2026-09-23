@@ -58,6 +58,17 @@ target_compile_options(qw38_format_reader_integration_test PRIVATE
 )
 
 add_test(NAME host_expected_smoke COMMAND qw38_host_expected_smoke)
+add_executable(qw38_language_model_plan_test language_model_plan_test.cpp)
+target_link_libraries(qw38_language_model_plan_test PRIVATE qw38_runtime)
+target_compile_features(qw38_language_model_plan_test PRIVATE cxx_std_23)
+add_test(NAME language_model_plan COMMAND qw38_language_model_plan_test)
+add_executable(qw38_language_model_integration_test
+  language_model_integration_test.cpp)
+target_link_libraries(qw38_language_model_integration_test PRIVATE qw38_runtime)
+target_compile_features(qw38_language_model_integration_test PRIVATE cxx_std_23)
+add_test(NAME language_model_integration COMMAND qw38_language_model_integration_test)
+set_tests_properties(language_model_integration PROPERTIES
+  LABELS "runtime;gpu;extended;checkpoint;authority")
 add_test(NAME format_schema COMMAND qw38_format_schema_test)
 add_test(NAME format_schema_integration COMMAND qw38_format_schema_integration_test)
 add_test(NAME format_writer COMMAND qw38_format_writer_test)

@@ -404,6 +404,13 @@ int main() {
     expect(!bad_populated_restore && bad_populated_restore.error().code ==
                                          ErrorCode::InvalidPopulatedLength,
            "restore rejects populated length beyond capacity");
+    auto invalid_token_position = *snap2;
+    invalid_token_position.token_position = kCap + 1;
+    auto bad_token_position_restore = s1->restore(invalid_token_position);
+    expect(!bad_token_position_restore &&
+               bad_token_position_restore.error().code ==
+                   ErrorCode::InvalidPopulatedLength,
+           "restore rejects token position beyond capacity");
     auto invalid_cursor = *snap2;
     invalid_cursor.conv_cursor[0] = qw38::runtime::kConvTaps;
     auto bad_cursor_restore = s1->restore(invalid_cursor);

@@ -54,7 +54,7 @@ Implement Architecture V0 as a sequence of small, testable increments that reach
 | TASK-014 | Attention preparation and KV cache | M5 | TASK-009 | Per-head q/g, QK norm, partial RoPE, and BF16 cache append | DONE |
 | TASK-015 | Segmented online decode attention | M5 | TASK-014 | Causal GQA segment scan, fixed-order merge, gating, output residual | DONE |
 | TASK-016 | One-layer integration checkpoint | M6 | TASK-013, TASK-015 | One GDN-style and one attention-style layer through common runtime | DONE |
-| TASK-017 | Complete primary-language decode | M6 | TASK-016 | Embedding, 64 layers, persistent state, final norm, Q8 head, logits | TODO |
+| TASK-017 | Complete primary-language decode | M6 | TASK-016 | Embedding, 64 layers, persistent state, final norm, Q8 head, logits | DONE |
 | TASK-018 | Behavioral correctness baseline | M7 | TASK-017 | Frozen language-only BF16/V0 behavioral and continuation validation | TODO |
 | TASK-019 | Tensor-core prefill projections and chunk planning | M8 | TASK-018 | Bounded token-major scratch and common-view packed GEMM consumers | TODO |
 | TASK-020 | Chunked prefill GDN | M8 | TASK-019 | Parallel FIR/history commit and ordered 64-token recurrence schedule | TODO |
@@ -89,6 +89,12 @@ TASK-001 → 002 → 003 → 004 → 005 → 006
 | Task | Decision | Summary | Resolution |
 | ---- | -------- | ------- | ---------- |
 
+## Task execution blockers
+
+| Task | Blocker | Evidence | Required follow-up |
+| ---- | ------- | -------- | ------------------ |
+| TASK-017 | Resolved: stale compiler executable reported a graph-binding failure. | Current compiler source already assigns retained MTP layer bindings index 0; rebuilding produced both production and BF16 identity artifacts. | Completed primary-language decode and independent BF16/source validation; see [`TASK-017`](tasks/TASK-017.md). |
+
 ## Architecture amendment log
 
 | Amendment | Date | Decisions affected | Summary |
@@ -106,7 +112,7 @@ regression, and limits are recorded here.
 | -- | ------- | ------ | ------------------------------------------------------- |
 | AR-01 | No source or generated payload digests | Closed by policy | [`code-standards.md`](code-standards.md#checkpoint-and-qw38-payload-digest-policy); checkpoint source identity is index metadata only; manifest digest remains the sole content digest. |
 | AR-02 | Verify artifact policy and schema from metadata | Focused checks pass | [`verify_artifact_metadata`](../../src/compiler/compile.cpp) precedes reconstruction; synthetic schema comparison covers policy, bindings, format, shape and ordering. Full checkpoint caller evidence follows the promotion cadence. |
-| AR-03 | Failed-state recovery and complete-token commit | Component checks pass; TASK-017 remains | [`Session`](../../src/runtime/session.cpp) poisons failed stateful operations; reset/restore and GDN/attention failure/recovery checks compare device bytes and metadata. Global token commit awaits TASK-017. |
+| AR-03 | Failed-state recovery and complete-token commit | Full-model checkpoint passes | [`LanguageModelPlan`](../../src/runtime/language_model.cpp) commits once after final logits; late injected output failure poisons execution and snapshots. Restore/reset continuation replays identical logits, persistent bytes, and metadata. |
 | AR-04 | Move-stable plan metadata | Focused checks pass | [`SessionExecutionState`](../../src/runtime/session.hpp) keeps borrowed counters stable; bound GDN/attention plans execute after move construction and assignment. |
 | AR-05 | One session stream at session-backed binders | Focused checks pass | MLP, attention, and GDN binders reject an alternate same-device stream before execution. |
 | AR-06 | Checked geometry and descriptors | Focused checks pass | Checked runtime views, state indices, and compiler transforms reject rank/count/index/overflow and payload-size errors. |
@@ -114,9 +120,9 @@ regression, and limits are recorded here.
 | AR-08 | Closed Runtime API | Focused checks pass | [`Runtime`](../../src/runtime/runtime.cpp) rejects post-shutdown upload/session creation; repeated shutdown is safe. |
 | AR-09 | Attention direct residual output | Focused checks and trace pass | [`execute_attention_core`](../../src/runtime/attention.cpp) preserves Q4/BF16 input residuals; isolated BF16 trace records six kernels and no D2D copy. |
 | AR-10 | Benchmark consumers and launch accounting | Focused checks and trace pass | Excluded MLP/GDN benchmarks build and smoke; GDN trace records eight kernels per execution and no D2D copy. |
-| AR-11 | Completion semantics before 64-layer composition | Partial | GDN capture is rejected before mutation; GDN/attention completion remains component-owned and TASK-017 must establish one token commit/sync boundary with measured eager behavior. |
+| AR-11 | Completion semantics before 64-layer composition | Full-model checkpoint passes | The eager 64-layer plan synchronizes output before the global token commit; `TASK-017` records the measured Debug integration smoke and slow prompt setup. |
 | AR-12 | Semantic operand resolution boundary | Focused checks pass | [`resolve_semantic_tensor`](../../src/runtime/model.cpp) resolves canonical V0 names to IDs and validates graph node/role/layer at plan binding; binders validate shape/layout before returning plans. TASK-016's uploaded-model composition verifies both layer families and rejects wrong-family bindings. |
-| AR-13 | Integration checkpoint and independent source evidence | Planning carried forward | [`TASK-016`](tasks/TASK-016.md) and [`TASK-017`](tasks/TASK-017.md) include session-backed integration and pinned source-oracle evidence; no oracle run exists yet. |
+| AR-13 | Integration checkpoint and independent source evidence | TASK-017 checkpoint passes | [`TASK-017`](tasks/TASK-017.md) records authoritative full-model decode, pinned source identity, BF16 logits/residual/state numerical gates, and V0 differences for two tokens. |
 | AR-14 | Quality-gate recovery procedure | Documented | [`TASK-018`](tasks/TASK-018.md) requires preserving baseline, diagnosis, accepted amendment, and unchanged gate retest; no quality failure has been observed. |
 | AR-15 | Concrete code-boundary and evidence standards | Implemented | [`code-standards.md`](code-standards.md#boundary-lifetime-and-evidence-contracts) covers boundary, lifetime, production-path, numerical, resource, schedule, and closure requirements. |
 | AR-16 | Historical authority reconciliation | Partial | Ledger ranges/links and stale TASK-008/010/012/013 claims were corrected or marked historical; no standalone `review.md` exists, and broader historical reports remain unreconciled. |
