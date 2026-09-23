@@ -105,7 +105,7 @@ Affected downstream tasks:
 
 ## Independent verification and one repair
 
-After implementation, spawn a fresh Sol verification subagent. It must
+After implementation, spawn a fresh Luna verification subagent. It must
 independently read the contract and normative documents, inspect the complete
 diff and Completion Report, and run every acceptance command. It must verify
 the evidence rather than trust reported results, make no semantic fixes, and
@@ -121,7 +121,7 @@ File/line findings:
 
 On the first ordinary verification failure, spawn one fresh Luna repair
 subagent with the verifier findings. It may repair only those findings, may
-not change architecture, and must not commit or push. Then spawn a fresh Sol
+not change architecture, and must not commit or push. Then spawn a fresh Luna
 verifier and repeat the full independent gate.
 
 If verification fails again, or if any stage encounters an architectural
