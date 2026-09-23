@@ -285,6 +285,16 @@ Addressed the remaining report-contract findings in the current candidate:
   `.cache/task018-p10-generation-only/run-summary.json`, `run.log`,
   `cases.jsonl`, and `input-identity.json`. This remains a diagnostic, not a
   performance-parity or quality result.
+- Extended the diagnostic with one long C92 example, `aime2025-16`, at its
+  frozen 2048-token cap. Both arms reached the cap. The V0 observed completion
+  interval was 71.64 seconds; the Q4_K_M completion request took 32.22 seconds.
+  The V0 interval includes session/prompt work and log observation, while the
+  llama request timing includes tokenization verification and generation; this
+  is indicative, not a calibrated speed-parity measurement. The 11-case
+  totals were 2803 V0 tokens in 107.25 seconds launch-to-exit and 2723 Q4_K_M
+  tokens in 44.26 seconds of requests (16.02 seconds startup). Report and raw
+  evidence are under `.cache/task018-p11-long/`; no `.qw38` payload digest was
+  recorded. This remains diagnostic-only evidence.
 
 The subsequent review found that the replay-completion path could not prove
 per-case provenance for the failed source attempt. That reuse path was removed;
