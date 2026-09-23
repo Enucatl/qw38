@@ -108,7 +108,7 @@ int main() {
   auto workspace = DeviceBuffer::allocate(kGdnWorkspaceBytesPerToken);
   auto history = DeviceBuffer::allocate(static_cast<std::uint64_t>(kConvTaps) *
                                         kConvChannels * 2u);
-  auto s = DeviceBuffer::allocate(kGdnSElemsPerLayer * 4);
+  auto s = DeviceBuffer::allocate(qw38::runtime::kGdnSBytes);
   if (!qkv_c || !qkv_s || !z_c || !z_s || !out_c || !out_s || !a || !b || !gamma ||
       !gated || !taps || !alog || !dt || !residual || !residual_out ||
       !normalized || !workspace || !history || !s) {
@@ -180,16 +180,24 @@ int main() {
   views.normalized = make_view(normalized->data(), ArithmeticDtype::Bf16,
                                PhysicalLayoutId::CudaBf16RowMajorV0,
                                StorageClass::Bf16, true, 1, kHidden);
-  views.workspace = make_view(workspace->data(), ArithmeticDtype::Fp32,
-                              PhysicalLayoutId::CudaFp32VectorV0, StorageClass::Fp32,
-                              true, 1, kGdnWorkspaceBytesPerToken / 4);
+  auto workspace_view = qw38::runtime::WorkspaceView::from_tensor(make_view(
+      workspace->data(), ArithmeticDtype::Fp32,
+      PhysicalLayoutId::CudaFp32VectorV0, StorageClass::Fp32, true, 1,
+      kGdnWorkspaceBytesPerToken / 4));
+  if (!workspace_view) {
+    std::cerr << qw38::runtime::error_message(workspace_view.error()) << '\n';
+    return 1;
+  }
+  views.workspace = *workspace_view;
   views.history = make_view(history->data(), ArithmeticDtype::Bf16,
                             PhysicalLayoutId::CudaBf16ConvHistoryV0,
                             StorageClass::Bf16, true, 2, kConvTaps,
                             kConvChannels);
   views.s = make_view(s->data(), ArithmeticDtype::Fp32,
                       PhysicalLayoutId::CudaFp32GdnSHvKV0, StorageClass::Fp32, true,
-                      1, kGdnSElemsPerLayer);
+                      4, qw38::runtime::kGdnLayers, kGdnValueHeads);
+  views.s.extent[2] = kGdnValueDim;
+  views.s.extent[3] = qw38::runtime::kGdnKeyDim;
   auto cursor_slot = qw38::runtime::ConvCursorSlot::bind(&cursor);
   if (!cursor_slot) {
     std::cerr << qw38::runtime::error_message(cursor_slot.error()) << '\n';
@@ -212,8 +220,8 @@ int main() {
 
   int const warmup = 2;
   int const iterations = 8;
-  int const kernel_launches_per_iteration = 9;
-  int const device_copies_per_iteration = 1;
+  int const kernel_launches_per_iteration = 8;
+  int const device_copies_per_iteration = 0;
   for (int i = 0; i < warmup; ++i) {
     cursor = 0;
     auto st = execute_decode_gdn(*plan, position);

@@ -41,6 +41,9 @@ class Runtime {
   [[nodiscard]] std::expected<Session, Error> create_session(
       Model const& model, std::uint64_t kv_capacity);
 
+  // Requires an open Runtime. Fallible public operations return
+  // RuntimeClosed after shutdown; this reference accessor is an internal
+  // preconditioned API and must not be called after shutdown.
   [[nodiscard]] qw38::cuda::Stream const& stream() const noexcept {
     return *stream_;
   }

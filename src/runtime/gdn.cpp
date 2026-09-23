@@ -332,8 +332,12 @@ DecodeMmvDesc mmv_from_weight(GdnWeightBinding const& w) {
 }
 
 std::expected<ConstTensorView, Error> require_payload(
-    Model const& model, std::string const& name) {
-  auto v = model.payload(name);
+    Model const& model, std::string const& name,
+    qw38::format::TensorRole role, std::uint32_t layer) {
+  auto id = model.resolve_tensor(name, qw38::format::SemanticNodeKind::GatedDeltaNet,
+                                 role, layer);
+  if (!id) return std::unexpected(id.error());
+  auto v = model.payload(*id);
   if (!v) {
     return std::unexpected(v.error());
   }
@@ -341,11 +345,15 @@ std::expected<ConstTensorView, Error> require_payload(
 }
 
 std::expected<ConstTensorView, Error> optional_scales(
-    Model const& model, std::string const& name, PhysicalLayoutId layout) {
+    Model const& model, std::string const& name, PhysicalLayoutId layout,
+    std::uint32_t layer) {
   if (layout == PhysicalLayoutId::CudaBf16DenseTileV0) {
     return ConstTensorView{};
   }
-  auto v = model.scales(name);
+  auto id = model.resolve_tensor(name, qw38::format::SemanticNodeKind::GatedDeltaNet,
+                                 qw38::format::TensorRole::DenseWeight, layer);
+  if (!id) return std::unexpected(id.error());
+  auto v = model.scales(*id);
   if (!v) {
     return std::unexpected(v.error());
   }
@@ -743,6 +751,17 @@ std::expected<GdnFrontPlan, Error> bind_gdn_front_plan(
 std::expected<GdnFrontPlan, Error> bind_gdn_front_plan(
     Model const& model, Session& session, std::uint32_t layer,
     qw38::cuda::Stream const& stream, float eps) {
+  auto const* session_stream = detail::SessionPlanAccess::stream(session);
+  if (session_stream == nullptr || session_stream->empty() || stream.empty() ||
+      model.device() != stream.device() ||
+      session_stream->native() != stream.native()) {
+    return std::unexpected(arg_error(
+        "stream", "model and GDN front plan must use the session device and stream"));
+  }
+  auto* session_state = detail::SessionPlanAccess::execution_state(session);
+  if (session_state == nullptr || session_state->is_poisoned()) {
+    return std::unexpected(arg_error("session", "session is poisoned or closed"));
+  }
   auto gdn_i = gdn_state_index(layer);
   if (!gdn_i) {
     return std::unexpected(gdn_i.error());
@@ -756,14 +775,14 @@ std::expected<GdnFrontPlan, Error> bind_gdn_front_plan(
   auto const dt_n = gdn_dt_name(layer);
   auto const norm_n = gdn_norm_name(layer);
 
-  auto qkv = require_payload(model, qkv_n);
-  auto z = require_payload(model, z_n);
-  auto a = require_payload(model, a_n);
-  auto b = require_payload(model, b_n);
-  auto taps = require_payload(model, conv_n);
-  auto alog = require_payload(model, alog_n);
-  auto dt = require_payload(model, dt_n);
-  auto gamma = require_payload(model, norm_n);
+  auto qkv = require_payload(model, qkv_n, qw38::format::TensorRole::DenseWeight, layer);
+  auto z = require_payload(model, z_n, qw38::format::TensorRole::DenseWeight, layer);
+  auto a = require_payload(model, a_n, qw38::format::TensorRole::DenseWeight, layer);
+  auto b = require_payload(model, b_n, qw38::format::TensorRole::DenseWeight, layer);
+  auto taps = require_payload(model, conv_n, qw38::format::TensorRole::ConvWeight, layer);
+  auto alog = require_payload(model, alog_n, qw38::format::TensorRole::TimeParameter, layer);
+  auto dt = require_payload(model, dt_n, qw38::format::TensorRole::TimeParameter, layer);
+  auto gamma = require_payload(model, norm_n, qw38::format::TensorRole::AdditiveNorm, layer);
   if (!qkv) {
     return std::unexpected(qkv.error());
   }
@@ -788,8 +807,8 @@ std::expected<GdnFrontPlan, Error> bind_gdn_front_plan(
   if (!gamma) {
     return std::unexpected(gamma.error());
   }
-  auto qkv_s = optional_scales(model, qkv_n, qkv->layout);
-  auto z_s = optional_scales(model, z_n, z->layout);
+  auto qkv_s = optional_scales(model, qkv_n, qkv->layout, layer);
+  auto z_s = optional_scales(model, z_n, z->layout, layer);
   if (!qkv_s) {
     return std::unexpected(qkv_s.error());
   }
@@ -849,33 +868,36 @@ std::expected<GdnFrontPlan, Error> bind_gdn_front_plan(
   views.history = history;
   views.cursor = *cursor;
   views.language_layer = layer;
-  return bind_gdn_front_plan(views, stream, eps);
+  auto plan = bind_gdn_front_plan(views, stream, eps);
+  if (!plan) return std::unexpected(plan.error());
+  plan->session_state = detail::SessionPlanAccess::execution_state(session);
+  return plan;
 }
 
 std::expected<void, Error> execute_gdn_front(GdnFrontPlan const& plan) {
+  if (plan.session_state != nullptr && plan.session_state->is_poisoned()) {
+    return std::unexpected(arg_error("session", "session is poisoned"));
+  }
   if (plan.stream == nullptr || plan.stream->empty()) {
     return std::unexpected(arg_error("stream", "empty stream"));
   }
-  if (auto st = region_rms(plan); !st) {
-    return st;
+  auto run = [&]() -> std::expected<void, Error> {
+    if (auto st = region_rms(plan); !st) return st;
+    if (auto st = region_qkvz(plan); !st) return st;
+    if (auto st = region_ab(plan); !st) return st;
+    auto cursor = region_conv(plan);
+    if (!cursor) return std::unexpected(cursor.error());
+    if (auto st = region_prep(plan); !st) return st;
+    if (auto st = plan.stream->sync(); !st) {
+      return std::unexpected(from_cuda(st.error()));
+    }
+    return plan.cursor.commit_advance(*cursor);
+  };
+  auto result = run();
+  if (!result && plan.session_state != nullptr) {
+    plan.session_state->poison();
   }
-  if (auto st = region_qkvz(plan); !st) {
-    return st;
-  }
-  if (auto st = region_ab(plan); !st) {
-    return st;
-  }
-  auto cursor = region_conv(plan);
-  if (!cursor) {
-    return std::unexpected(cursor.error());
-  }
-  if (auto st = region_prep(plan); !st) {
-    return st;
-  }
-  if (auto st = plan.stream->sync(); !st) {
-    return std::unexpected(from_cuda(st.error()));
-  }
-  return plan.cursor.commit_advance(*cursor);
+  return result;
 }
 
 std::expected<GdnRecurrencePlan, Error> bind_gdn_recurrence_plan(
@@ -966,6 +988,16 @@ std::expected<GdnRecurrencePlan, Error> bind_gdn_recurrence_plan(
 
 std::expected<GdnRecurrencePlan, Error> bind_gdn_recurrence_plan(
     Session& session, std::uint32_t layer, qw38::cuda::Stream const& stream) {
+  auto const* session_stream = detail::SessionPlanAccess::stream(session);
+  if (session_stream == nullptr || session_stream->empty() || stream.empty() ||
+      session_stream->native() != stream.native()) {
+    return std::unexpected(arg_error(
+        "stream", "GDN recurrence must use the session stream"));
+  }
+  auto* session_state = detail::SessionPlanAccess::execution_state(session);
+  if (session_state == nullptr || session_state->is_poisoned()) {
+    return std::unexpected(arg_error("session", "session is poisoned or closed"));
+  }
   auto gdn_i = gdn_state_index(layer);
   if (!gdn_i) {
     return std::unexpected(gdn_i.error());
@@ -989,10 +1021,16 @@ std::expected<GdnRecurrencePlan, Error> bind_gdn_recurrence_plan(
   views.o = slices->o;
   views.s_layer = *gdn_i;
   views.language_layer = layer;
-  return bind_gdn_recurrence_plan(views, stream);
+  auto plan = bind_gdn_recurrence_plan(views, stream);
+  if (!plan) return std::unexpected(plan.error());
+  plan->session_state = detail::SessionPlanAccess::execution_state(session);
+  return plan;
 }
 
 std::expected<void, Error> execute_gdn_recurrence(GdnRecurrencePlan const& plan) {
+  if (plan.session_state != nullptr && plan.session_state->is_poisoned()) {
+    return std::unexpected(arg_error("session", "session is poisoned"));
+  }
   if (plan.stream == nullptr || plan.stream->empty()) {
     return std::unexpected(arg_error("stream", "empty stream"));
   }
@@ -1010,6 +1048,7 @@ std::expected<void, Error> execute_gdn_recurrence(GdnRecurrencePlan const& plan)
   if (auto st = qw38::cuda::launch_gdn_recurrence(q_hat, k_hat, alpha, beta, v, s,
                                                   plan.s_layer, o, *plan.stream);
       !st) {
+    if (plan.session_state != nullptr) plan.session_state->poison();
     return std::unexpected(from_cuda(st.error()));
   }
   return {};
@@ -1133,6 +1172,9 @@ std::expected<GdnPlan, Error> bind_gdn_plan(Model const& model, Session& session
     return std::unexpected(
         arg_error("stream", "must match the session stream"));
   }
+  if (model.device() != stream.device()) {
+    return std::unexpected(arg_error("device", "model and session devices differ"));
+  }
 
   auto gdn_i = gdn_state_index(layer);
   if (!gdn_i) {
@@ -1140,15 +1182,15 @@ std::expected<GdnPlan, Error> bind_gdn_plan(Model const& model, Session& session
   }
   auto const out_n = gdn_out_name(layer);
   auto const gated_n = gdn_gated_norm_name(layer);
-  auto out = require_payload(model, out_n);
-  auto gated = require_payload(model, gated_n);
+  auto out = require_payload(model, out_n, qw38::format::TensorRole::DenseWeight, layer);
+  auto gated = require_payload(model, gated_n, qw38::format::TensorRole::GdnGatedNorm, layer);
   if (!out) {
     return std::unexpected(out.error());
   }
   if (!gated) {
     return std::unexpected(gated.error());
   }
-  auto out_s = optional_scales(model, out_n, out->layout);
+  auto out_s = optional_scales(model, out_n, out->layout, layer);
   if (!out_s) {
     return std::unexpected(out_s.error());
   }
@@ -1193,7 +1235,11 @@ std::expected<GdnPlan, Error> bind_gdn_plan(Model const& model, Session& session
   views.cursor = front->cursor;
   views.position = *position;
   views.language_layer = layer;
-  return bind_gdn_plan(views, stream, eps);
+  auto plan = bind_gdn_plan(views, stream, eps);
+  if (!plan) return std::unexpected(plan.error());
+  plan->session_state = front->session_state;
+  plan->front.session_state = front->session_state;
+  return plan;
 }
 
 std::expected<void, Error> region_recur(GdnPlan const& plan) {
@@ -1260,11 +1306,25 @@ std::expected<void, Error> region_out_residual(GdnPlan const& plan) {
 
 std::expected<TensorView, Error> execute_decode_gdn_impl(
     GdnPlan const& plan, std::uint64_t position, GdnRegionTimings* timings) {
+  if (plan.session_state != nullptr && plan.session_state->is_poisoned()) {
+    return std::unexpected(arg_error("session", "session is poisoned"));
+  }
   if (plan.front.stream == nullptr || plan.front.stream->empty()) {
     return std::unexpected(arg_error("stream", "empty stream"));
   }
   if (auto st = plan.position.validate(position); !st) {
     return std::unexpected(st.error());
+  }
+  cudaStreamCaptureStatus capture_status = cudaStreamCaptureStatusNone;
+  if (auto st = qw38::cuda::check(
+          cudaStreamIsCapturing(plan.front.stream->native(), &capture_status),
+          "cudaStreamIsCapturing");
+      !st) {
+    return std::unexpected(from_cuda(st.error()));
+  }
+  if (capture_status == cudaStreamCaptureStatusActive) {
+    return std::unexpected(arg_error(
+        "stream.capture", "GDN decode does not support stream capture"));
   }
 
   using qw38::cuda::Event;
@@ -1355,12 +1415,6 @@ std::expected<TensorView, Error> execute_decode_gdn_impl(
       timings->ms[i] = *ms;
     }
   }
-  cudaStreamCaptureStatus capture_status = cudaStreamCaptureStatusNone;
-  if (cudaStreamIsCapturing(plan.front.stream->native(), &capture_status) ==
-          cudaSuccess &&
-      capture_status == cudaStreamCaptureStatusActive) {
-    return plan.residual_out;
-  }
   if (auto st = plan.front.stream->sync(); !st) {
     return std::unexpected(from_cuda(st.error()));
   }
@@ -1375,12 +1429,62 @@ std::expected<TensorView, Error> execute_decode_gdn_impl(
 
 std::expected<TensorView, Error> execute_decode_gdn(GdnPlan const& plan,
                                                    std::uint64_t position) {
-  return execute_decode_gdn_impl(plan, position, nullptr);
+  if (plan.session_state != nullptr && plan.session_state->is_poisoned()) {
+    return std::unexpected(arg_error("session", "session is poisoned"));
+  }
+  if (auto st = plan.position.validate(position); !st) {
+    return std::unexpected(st.error());
+  }
+  if (plan.front.stream == nullptr || plan.front.stream->empty()) {
+    return std::unexpected(arg_error("stream", "empty stream"));
+  }
+  cudaStreamCaptureStatus capture_status = cudaStreamCaptureStatusNone;
+  if (auto st = qw38::cuda::check(
+          cudaStreamIsCapturing(plan.front.stream->native(), &capture_status),
+          "cudaStreamIsCapturing");
+      !st) {
+    return std::unexpected(from_cuda(st.error()));
+  }
+  if (capture_status == cudaStreamCaptureStatusActive) {
+    return std::unexpected(arg_error(
+        "stream.capture", "GDN decode does not support stream capture"));
+  }
+  auto result = execute_decode_gdn_impl(plan, position, nullptr);
+  if (!result && plan.session_state != nullptr &&
+      result.error().field != "stream.capture") {
+    plan.session_state->poison();
+  }
+  return result;
 }
 
 std::expected<TensorView, Error> execute_decode_gdn_timed(
     GdnPlan const& plan, std::uint64_t position, GdnRegionTimings& timings) {
-  return execute_decode_gdn_impl(plan, position, &timings);
+  if (plan.session_state != nullptr && plan.session_state->is_poisoned()) {
+    return std::unexpected(arg_error("session", "session is poisoned"));
+  }
+  if (auto st = plan.position.validate(position); !st) {
+    return std::unexpected(st.error());
+  }
+  if (plan.front.stream == nullptr || plan.front.stream->empty()) {
+    return std::unexpected(arg_error("stream", "empty stream"));
+  }
+  cudaStreamCaptureStatus capture_status = cudaStreamCaptureStatusNone;
+  if (auto st = qw38::cuda::check(
+          cudaStreamIsCapturing(plan.front.stream->native(), &capture_status),
+          "cudaStreamIsCapturing");
+      !st) {
+    return std::unexpected(from_cuda(st.error()));
+  }
+  if (capture_status == cudaStreamCaptureStatusActive) {
+    return std::unexpected(arg_error(
+        "stream.capture", "GDN decode does not support stream capture"));
+  }
+  auto result = execute_decode_gdn_impl(plan, position, &timings);
+  if (!result && plan.session_state != nullptr &&
+      result.error().field != "stream.capture") {
+    plan.session_state->poison();
+  }
+  return result;
 }
 
 }  // namespace qw38::runtime

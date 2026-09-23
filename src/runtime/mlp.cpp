@@ -327,8 +327,12 @@ DecodeMmvDesc mmv_from_weight(MlpWeightBinding const& w) {
 }
 
 std::expected<ConstTensorView, Error> require_payload(Model const& model,
-                                                      std::string const& name) {
-  auto v = model.payload(name);
+    std::string const& name, qw38::format::TensorRole role,
+    std::uint32_t layer) {
+  auto id = model.resolve_tensor(name, qw38::format::SemanticNodeKind::Mlp,
+                                 role, layer);
+  if (!id) return std::unexpected(id.error());
+  auto v = model.payload(*id);
   if (!v) {
     return std::unexpected(v.error());
   }
@@ -336,11 +340,15 @@ std::expected<ConstTensorView, Error> require_payload(Model const& model,
 }
 
 std::expected<ConstTensorView, Error> optional_scales(
-    Model const& model, std::string const& name, PhysicalLayoutId layout) {
+    Model const& model, std::string const& name, PhysicalLayoutId layout,
+    std::uint32_t layer) {
   if (layout == PhysicalLayoutId::CudaBf16DenseTileV0) {
     return ConstTensorView{};
   }
-  auto v = model.scales(name);
+  auto id = model.resolve_tensor(name, qw38::format::SemanticNodeKind::Mlp,
+                                 qw38::format::TensorRole::DenseWeight, layer);
+  if (!id) return std::unexpected(id.error());
+  auto v = model.scales(*id);
   if (!v) {
     return std::unexpected(v.error());
   }
@@ -458,6 +466,19 @@ std::expected<MlpPlan, Error> bind_mlp_plan(Model const& model,
                                             std::uint32_t layer,
                                             qw38::cuda::Stream const& stream,
                                             float eps) {
+  auto const* session_stream = detail::SessionPlanAccess::stream(session);
+  if (session_stream == nullptr || session_stream->empty() || stream.empty()) {
+    return std::unexpected(arg_error("stream", "session and plan streams must be open"));
+  }
+  if (model.device() != stream.device() ||
+      session_stream->native() != stream.native()) {
+    return std::unexpected(arg_error(
+        "stream", "model and plan must use the session device and stream"));
+  }
+  auto const* session_state = detail::SessionPlanAccess::execution_state(session);
+  if (session_state == nullptr || session_state->is_poisoned()) {
+    return std::unexpected(arg_error("session", "session is poisoned or closed"));
+  }
   if (layer >= kMlpLayers) {
     return std::unexpected(arg_error("layer", "layer index must be < 64"));
   }
@@ -466,10 +487,10 @@ std::expected<MlpPlan, Error> bind_mlp_plan(Model const& model,
   auto const down_n = mlp_down_name(layer);
   auto const norm_n = mlp_norm_name(layer);
 
-  auto gate = require_payload(model, gate_n);
-  auto up = require_payload(model, up_n);
-  auto down = require_payload(model, down_n);
-  auto gamma = require_payload(model, norm_n);
+  auto gate = require_payload(model, gate_n, qw38::format::TensorRole::DenseWeight, layer);
+  auto up = require_payload(model, up_n, qw38::format::TensorRole::DenseWeight, layer);
+  auto down = require_payload(model, down_n, qw38::format::TensorRole::DenseWeight, layer);
+  auto gamma = require_payload(model, norm_n, qw38::format::TensorRole::AdditiveNorm, layer);
   if (!gate) {
     return std::unexpected(gate.error());
   }
@@ -482,9 +503,9 @@ std::expected<MlpPlan, Error> bind_mlp_plan(Model const& model,
   if (!gamma) {
     return std::unexpected(gamma.error());
   }
-  auto gate_s = optional_scales(model, gate_n, gate->layout);
-  auto up_s = optional_scales(model, up_n, up->layout);
-  auto down_s = optional_scales(model, down_n, down->layout);
+  auto gate_s = optional_scales(model, gate_n, gate->layout, layer);
+  auto up_s = optional_scales(model, up_n, up->layout, layer);
+  auto down_s = optional_scales(model, down_n, down->layout, layer);
   if (!gate_s) {
     return std::unexpected(gate_s.error());
   }
@@ -530,10 +551,16 @@ std::expected<MlpPlan, Error> bind_mlp_plan(Model const& model,
   views.swiglu.rank = 1;
   views.swiglu.extent = {};
   views.swiglu.extent[0] = kFfnWidth;
-  return bind_mlp_plan(views, stream, eps);
+  auto plan = bind_mlp_plan(views, stream, eps);
+  if (!plan) return std::unexpected(plan.error());
+  plan->session_state = session_state;
+  return plan;
 }
 
 std::expected<void, Error> execute_decode_mlp(MlpPlan const& plan) {
+  if (plan.session_state != nullptr && plan.session_state->is_poisoned()) {
+    return std::unexpected(arg_error("session", "session is poisoned"));
+  }
   if (plan.stream == nullptr || plan.stream->empty()) {
     return std::unexpected(arg_error("stream", "empty stream"));
   }

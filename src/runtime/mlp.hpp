@@ -43,6 +43,7 @@ struct MlpPlan {
   TensorView normalized{};   // BF16 [5120]
   TensorView swiglu{};       // BF16 [17408]; only globally materialized gate/up value
   qw38::cuda::Stream const* stream{nullptr};
+  SessionExecutionState const* session_state{};
   float eps{kMlpRmsEps};
 };
 

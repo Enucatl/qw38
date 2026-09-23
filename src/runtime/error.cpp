@@ -26,6 +26,8 @@ char const* code_name(ErrorCode code) noexcept {
       return "invalid_argument";
     case ErrorCode::Internal:
       return "internal";
+    case ErrorCode::RuntimeClosed:
+      return "runtime_closed";
   }
   return "unknown";
 }

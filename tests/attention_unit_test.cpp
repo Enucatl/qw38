@@ -680,19 +680,94 @@ void test_reset_session() {
   }
 }
 
+void test_bf16_mixer_preserves_residual(Stream const& stream) {
+  HostAttn host;
+  if (!qw38::attn::test::make_host_bf16(host, 0.2f)) {
+    return;
+  }
+  host.w_o = qw38::attn::test::bf16_vec(
+      static_cast<std::size_t>(kHidden) * qw38::attn::test::kAttnOutWidth,
+      0.12f);
+  if (!qw38::attn::test::pack_bf16_tile(
+          host.w_o, kHidden, qw38::attn::test::kAttnOutWidth, host.o, "out")) {
+    return;
+  }
+  DeviceAttn dev;
+  constexpr std::uint64_t capacity = 2;
+  if (!qw38::attn::test::upload_host_attn(host, dev, stream, capacity)) {
+    return;
+  }
+  DeviceBuffer out_codes;
+  DeviceBuffer out_scales;
+  if (!qw38::attn::test::upload_packed_named(
+          out_codes, out_scales, host.o, stream, "out")) {
+    return;
+  }
+  auto residual_out = DeviceBuffer::allocate(kHidden * sizeof(float));
+  expect(static_cast<bool>(residual_out), "allocate BF16 attention output");
+  if (!residual_out) {
+    return;
+  }
+  AttentionMixerBindViews views;
+  views.prep = bind_views(dev);
+  views.out = qw38::attn::test::weight_view(
+      out_codes, PhysicalLayoutId::CudaBf16DenseTileV0,
+      StorageClass::Bf16, kHidden, qw38::attn::test::kAttnOutWidth);
+  views.residual_out = qw38::attn::test::vec_view(
+      *residual_out, ArithmeticDtype::Fp32,
+      PhysicalLayoutId::CudaFp32VectorV0, StorageClass::Fp32, true, kHidden);
+  views.residual_out.rank = 2;
+  views.residual_out.extent = {1, kHidden};
+  auto plan = bind_attention_mixer_plan(views, stream);
+  expect(static_cast<bool>(plan), "bind BF16-control attention mixer");
+  if (!plan) {
+    return;
+  }
+  std::vector<std::uint16_t> kv(
+      static_cast<std::size_t>(16) * 2u * qw38::attn::test::kKvHeads *
+          capacity * kHeadDim,
+      0);
+  auto reference = qw38::reference::attn_mixer_reference(
+      host.residual, host.gamma, kDefaultRmsEps, host.w_qg, host.w_k,
+      host.w_v, host.w_o, host.gamma_q, host.gamma_k, host.inv_freq, kv, 0,
+      capacity, 0, true);
+  expect(static_cast<bool>(reference), "BF16-control attention reference");
+  if (!reference) {
+    return;
+  }
+  expect(static_cast<bool>(qw38::runtime::execute_decode_attention(*plan, 0)),
+         "execute BF16-control attention mixer");
+  auto original = download_vec<float>(dev.residual, kHidden, stream);
+  auto output = download_vec<float>(*residual_out, kHidden, stream);
+  expect(original && *original == host.residual,
+         "BF16-control mixer preserves input residual exactly");
+  expect(static_cast<bool>(output), "download BF16-control attention output");
+  if (output) {
+    qw38::attn::test::expect_fp32_close(
+        *output, reference->residual, "BF16-control attention output",
+        qw38::reference::tol::kAttnMixerResidualAbs,
+        qw38::reference::tol::kAttnMixerResidualRel);
+  }
+}
+
 }  // namespace
 
-int main() {
+int main(int argc, char** argv) {
   auto stream = Stream::create();
   if (!stream) {
     fail("stream");
     return 1;
+  }
+  if (argc == 2 && std::string_view(argv[1]) == "--bf16-mixer-only") {
+    test_bf16_mixer_preserves_residual(*stream);
+    return g_failures == 0 ? 0 : 1;
   }
   test_bind_errors(*stream);
   test_cuda_prepare_alias_errors(*stream);
   test_qg_ordering_and_suffix(*stream);
   test_capacity_and_mismatch(*stream);
   test_reset_session();
+  test_bf16_mixer_preserves_residual(*stream);
   if (g_failures != 0) {
     std::cerr << g_failures << " attention unit failures\n";
     return 1;

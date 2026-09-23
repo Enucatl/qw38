@@ -69,6 +69,7 @@ struct AttentionPrepPlan {
   float eps{kAttnRmsEps};
   std::uint32_t language_layer{};
   std::uint32_t attn_layer{};
+  SessionExecutionState* session_state{};
 };
 
 struct AttentionPrepBindViews {
@@ -122,6 +123,7 @@ struct AttentionCorePlan {
   std::uint64_t kv_capacity{};
   std::uint32_t attn_layer{};
   qw38::cuda::Stream const* stream{nullptr};
+  SessionExecutionState* session_state{};
 };
 
 struct AttentionMixerBindViews {

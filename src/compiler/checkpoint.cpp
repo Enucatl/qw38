@@ -314,48 +314,20 @@ compute_checkpoint_identities(std::filesystem::path const& root) {
     return std::unexpected(make_error(CompilerErrorCode::InvalidConfig,
                                       "weight_map", "index has no weight_map"));
   }
-
-  std::map<std::string, int> shard_names;
   for (auto const& [name, shard] : weight_map->as_object()) {
     if (!shard.is_string()) {
       return std::unexpected(make_error(CompilerErrorCode::InvalidConfig, name,
                                         "weight_map value is not a string"));
     }
-    shard_names.emplace(shard.as_string(), 0);
   }
-
-  Sha256 source;
-  auto update_bytes = [&source](void const* data, std::size_t size) {
-    source.update({static_cast<std::byte const*>(data), size});
-  };
-  auto update_u64 = [&update_bytes](std::uint64_t value) {
-    std::array<std::byte, 8> encoded{};
-    for (std::size_t i = 0; i < encoded.size(); ++i) {
-      encoded[i] = static_cast<std::byte>((value >> (8 * i)) & 0xffU);
-    }
-    update_bytes(encoded.data(), encoded.size());
-  };
-  auto update_string = [&update_bytes, &update_u64](std::string_view value) {
-    update_u64(value.size());
-    update_bytes(value.data(), value.size());
-  };
-  constexpr std::string_view domain = "qw38-source-identity-v1";
-  update_string(domain);
-  update_string("model.safetensors.index.json");
-  update_u64(index_text->size());
-  update_bytes(index_text->data(), index_text->size());
-  update_u64(shard_names.size());
-  for (auto const& [shard_name, _] : shard_names) {
-    auto digest = hash_file(root / shard_name, shard_name);
-    if (!digest) {
-      return std::unexpected(digest.error());
-    }
-    update_string(shard_name);
-    update_bytes(digest->bytes.data(), digest->bytes.size());
-  }
-
   CheckpointIdentities identities{};
-  identities.source_hash = source.finish();
+  // Source identity is metadata-only. The index declares tensor names and
+  // shard membership; never hash the containing shard files or tensor payloads.
+  auto source = hash_file(index_path, "model.safetensors.index.json");
+  if (!source) {
+    return std::unexpected(source.error());
+  }
+  identities.source_hash = *source;
   auto config = hash_file(root / "config.json", "config.json");
   if (!config) {
     return std::unexpected(config.error());

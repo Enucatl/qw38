@@ -289,9 +289,10 @@ inline qw38::runtime::GdnBindViews mixer_views(DeviceGdnMixer& dev) {
       vec_view(dev.normalized, ArithmeticDtype::Bf16,
                PhysicalLayoutId::CudaBf16RowMajorV0, StorageClass::Bf16, true,
                kHidden);
-  v.workspace = make_view(dev.workspace.data(), ArithmeticDtype::Fp32,
-                          PhysicalLayoutId::CudaFp32VectorV0, StorageClass::Fp32, true,
-                          1, qw38::runtime::kGdnWorkspaceBytesPerToken / 4);
+  v.workspace = *qw38::runtime::WorkspaceView::from_tensor(make_view(
+      dev.workspace.data(), ArithmeticDtype::Fp32,
+      PhysicalLayoutId::CudaFp32VectorV0, StorageClass::Fp32, true, 1,
+      qw38::runtime::kGdnWorkspaceBytesPerToken / 4));
   v.history = make_view(dev.history.data(), ArithmeticDtype::Bf16,
                         PhysicalLayoutId::CudaBf16ConvHistoryV0, StorageClass::Bf16,
                         true, 2, kConvHistoryTaps, kQkvWidth);

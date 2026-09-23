@@ -3,6 +3,7 @@
 #include "format/constants.hpp"
 
 #include <cstring>
+#include <limits>
 
 namespace qw38::compiler {
 namespace {
@@ -18,11 +19,37 @@ CompilerError size_error(std::string_view field, std::string_view detail) {
 std::expected<void, CompilerError> require_size(std::span<std::byte const> bytes,
                                                 std::uint64_t elems,
                                                 std::string_view field) {
+  if (elems > std::numeric_limits<std::uint64_t>::max() / kBf16Size ||
+      elems > std::numeric_limits<std::size_t>::max() / kBf16Size) {
+    return std::unexpected(make_error(CompilerErrorCode::Unrepresentable, field,
+                                      "BF16 byte size overflows"));
+  }
   auto const need = elems * kBf16Size;
   if (bytes.size() != need) {
     return std::unexpected(size_error(field, "byte length does not match geometry"));
   }
   return {};
+}
+
+std::expected<std::uint64_t, CompilerError> element_count(
+    std::uint64_t a, std::uint64_t b, std::string_view field) {
+  if (b != 0 && a > std::numeric_limits<std::uint64_t>::max() / b) {
+    return std::unexpected(make_error(CompilerErrorCode::Unrepresentable, field,
+                                      "element count overflows"));
+  }
+  return a * b;
+}
+
+std::uint64_t tiled_index_unchecked(std::uint64_t k, std::uint64_t row,
+                                    std::uint64_t col) noexcept {
+  auto const tiles_k = k / kDenseTileK;
+  auto const tile_n = row / kDenseTileRows;
+  auto const row_in_tile = row % kDenseTileRows;
+  auto const tile_k = col / kDenseTileK;
+  auto const col_in_tile = col % kDenseTileK;
+  return ((tile_n * tiles_k + tile_k) * kDenseTileRows + row_in_tile) *
+             kDenseTileK +
+         col_in_tile;
 }
 
 }  // namespace
@@ -55,22 +82,27 @@ std::expected<TileExtents, CompilerError> dense_tile_extents(std::uint64_t n,
     return std::unexpected(size_error("dense.tile",
                                       "N must divide 8 and K must divide 256"));
   }
+  auto elements = element_count(n, k, "dense.geometry");
+  if (!elements) return std::unexpected(elements.error());
+  if (*elements > std::numeric_limits<std::size_t>::max() / kBf16Size) {
+    return std::unexpected(make_error(CompilerErrorCode::Unrepresentable,
+                                      "dense.geometry", "byte size overflows"));
+  }
   return TileExtents{.n = n,
                      .k = k,
                      .tiles_n = n / kDenseTileRows,
                      .tiles_k = k / kDenseTileK};
 }
 
-std::uint64_t tiled_element_index([[maybe_unused]] std::uint64_t n, std::uint64_t k,
-                                  std::uint64_t row, std::uint64_t col) noexcept {
-  auto const tiles_k = k / kDenseTileK;
-  auto const tile_n = row / kDenseTileRows;
-  auto const row_in_tile = row % kDenseTileRows;
-  auto const tile_k = col / kDenseTileK;
-  auto const col_in_tile = col % kDenseTileK;
-  return ((tile_n * tiles_k + tile_k) * kDenseTileRows + row_in_tile) *
-             kDenseTileK +
-         col_in_tile;
+std::expected<std::uint64_t, CompilerError> tiled_element_index(
+    std::uint64_t n, std::uint64_t k, std::uint64_t row, std::uint64_t col) {
+  if (auto extents = dense_tile_extents(n, k); !extents) {
+    return std::unexpected(extents.error());
+  }
+  if (row >= n || col >= k) {
+    return std::unexpected(size_error("dense.index", "coordinate is out of range"));
+  }
+  return tiled_index_unchecked(k, row, col);
 }
 
 std::expected<std::vector<std::byte>, CompilerError> tile_nk_from_row_major(
@@ -79,7 +111,9 @@ std::expected<std::vector<std::byte>, CompilerError> tile_nk_from_row_major(
   if (!extents) {
     return std::unexpected(extents.error());
   }
-  if (auto st = require_size(src, n * k, "dense.src"); !st) {
+  auto elements = element_count(n, k, "dense.src");
+  if (!elements) return std::unexpected(elements.error());
+  if (auto st = require_size(src, *elements, "dense.src"); !st) {
     return std::unexpected(st.error());
   }
   std::vector<std::byte> out(src.size());
@@ -87,7 +121,7 @@ std::expected<std::vector<std::byte>, CompilerError> tile_nk_from_row_major(
     for (std::uint64_t col = 0; col < k; ++col) {
       std::uint16_t bits = 0;
       std::memcpy(&bits, src.data() + (row * k + col) * kBf16Size, kBf16Size);
-      std::memcpy(out.data() + tiled_element_index(n, k, row, col) * kBf16Size,
+      std::memcpy(out.data() + tiled_index_unchecked(k, row, col) * kBf16Size,
                   &bits, kBf16Size);
     }
   }
@@ -100,7 +134,9 @@ std::expected<std::vector<std::byte>, CompilerError> row_major_from_tile_nk(
   if (!extents) {
     return std::unexpected(extents.error());
   }
-  if (auto st = require_size(tiled, n * k, "dense.tiled"); !st) {
+  auto elements = element_count(n, k, "dense.tiled");
+  if (!elements) return std::unexpected(elements.error());
+  if (auto st = require_size(tiled, *elements, "dense.tiled"); !st) {
     return std::unexpected(st.error());
   }
   std::vector<std::byte> out(tiled.size());
@@ -108,7 +144,7 @@ std::expected<std::vector<std::byte>, CompilerError> row_major_from_tile_nk(
     for (std::uint64_t col = 0; col < k; ++col) {
       std::uint16_t bits = 0;
       std::memcpy(&bits,
-                  tiled.data() + tiled_element_index(n, k, row, col) * kBf16Size,
+                  tiled.data() + tiled_index_unchecked(k, row, col) * kBf16Size,
                   kBf16Size);
       std::memcpy(out.data() + (row * k + col) * kBf16Size, &bits, kBf16Size);
     }
@@ -122,7 +158,9 @@ std::expected<std::vector<std::byte>, CompilerError> conv_to_tap_major(
   if (channels == 0 || taps == 0) {
     return std::unexpected(size_error("conv", "channels and taps must be > 0"));
   }
-  if (auto st = require_size(src, channels * taps, "conv.src"); !st) {
+  auto elements = element_count(channels, taps, "conv.src");
+  if (!elements) return std::unexpected(elements.error());
+  if (auto st = require_size(src, *elements, "conv.src"); !st) {
     return std::unexpected(st.error());
   }
   std::vector<std::byte> out(src.size());
@@ -142,7 +180,9 @@ std::expected<std::vector<std::byte>, CompilerError> conv_from_tap_major(
   if (channels == 0 || taps == 0) {
     return std::unexpected(size_error("conv", "channels and taps must be > 0"));
   }
-  if (auto st = require_size(tap_major, channels * taps, "conv.tap_major"); !st) {
+  auto elements = element_count(channels, taps, "conv.tap_major");
+  if (!elements) return std::unexpected(elements.error());
+  if (auto st = require_size(tap_major, *elements, "conv.tap_major"); !st) {
     return std::unexpected(st.error());
   }
   std::vector<std::byte> out(tap_major.size());

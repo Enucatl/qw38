@@ -2,7 +2,10 @@
 #include "compiler/error.hpp"
 
 #include <filesystem>
+#include <array>
+#include <iomanip>
 #include <iostream>
+#include <sstream>
 #include <string>
 #include <string_view>
 
@@ -10,7 +13,16 @@ namespace {
 
 void usage() {
   std::cerr << "Usage: qw38-compile --checkpoint DIR --output FILE "
-               "[--format identity|production] [--no-verify]\n";
+               "[--format identity|production] [--verify-reconstruction]\n";
+}
+
+std::string hex(qw38::format::Hash256 const& hash) {
+  std::ostringstream out;
+  for (auto byte : hash.bytes) {
+    out << std::hex << std::setw(2) << std::setfill('0')
+        << static_cast<unsigned int>(byte);
+  }
+  return out.str();
 }
 
 }  // namespace
@@ -25,8 +37,8 @@ int main(int argc, char** argv) {
       checkpoint = argv[++i];
     } else if (arg == "--output" && i + 1 < argc) {
       output = argv[++i];
-    } else if (arg == "--no-verify") {
-      options.verify_reconstruction = false;
+    } else if (arg == "--verify-reconstruction") {
+      options.verify_reconstruction = true;
     } else if (arg == "--format" && i + 1 < argc) {
       std::string_view mode{argv[++i]};
       if (mode == "identity") {
@@ -64,6 +76,22 @@ int main(int argc, char** argv) {
             << " mtp_instances=" << result->mtp_instances
             << " included_tensors=" << result->included_tensors
             << " vision_excluded=" << result->vision_excluded
-            << " peak_rss_bytes=" << result->peak_rss_bytes << '\n';
+            << " peak_rss_bytes=" << result->peak_rss_bytes
+            << " reconstruction_verified="
+            << (result->reconstruction_verified ? "true" : "false")
+            << " artifact_manifest=" << hex(result->identity.manifest_digest)
+            << " source_metadata=" << hex(result->source_metadata_hash)
+            << " config=" << hex(result->config_hash)
+            << " tokenizer=" << hex(result->tokenizer_hash)
+            << " compiler=" << result->identity.compiler.ident << ':'
+            << result->identity.compiler.major << '.'
+            << result->identity.compiler.minor << '.'
+            << result->identity.compiler.patch
+            << " policy="
+            << (result->format_policy ==
+                        qw38::compiler::WeightFormatPolicy::IdentityBf16
+                    ? "identity"
+                    : "production")
+            << '\n';
   return 0;
 }

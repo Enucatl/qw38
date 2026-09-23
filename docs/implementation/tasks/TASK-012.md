@@ -54,6 +54,9 @@ Diagnostic one-step timing/resource report only.
 ## Architecture blocker rule
 If S-01/S-02 prevents correctness, stop with the complete required blocker report; never transpose/narrow silently.
 ## Completion report
+Historical note: the reported benchmark tag and binary path were not immutable
+identities. Retain their timing only as a historical diagnostic; they are not
+reproducible evidence under the current identity-bound benchmark procedure.
 ### Result
 DONE
 ### Changes made
@@ -114,5 +117,4 @@ Unmet acceptance criteria: none.
 - Declared tolerances: one-step S/o 2e-5 abs / 1e-5 rel; multi-step (17/128) 5e-4 abs / 1e-4 rel (warp-tree vs sequential 128-key reduction feeding S).
 - Session reset and recurrence launches must share the session's ordered stream; a second test stream can race the persistent S zero.
 - 128-step fixtures use L2-normalized q/k, matching prepared decode arrays. Unnormalized keys overflow in FP32 within a long continuation; that is a fixture concern, not an S-01/S-02 issue.
-
 

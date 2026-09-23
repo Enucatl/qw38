@@ -17,6 +17,8 @@
 using qw38::compiler::build_identity_schema;
 using qw38::compiler::ClassifiedCheckpoint;
 using qw38::compiler::compile_identity;
+using qw38::compiler::compare_artifact_schema;
+using qw38::compiler::build_schema;
 using qw38::compiler::compile_synthetic;
 using qw38::compiler::compute_checkpoint_identities;
 using qw38::compiler::CompilerErrorCode;
@@ -40,6 +42,7 @@ using qw38::compiler::SyntheticTensor;
 using qw38::compiler::TensorFamily;
 using qw38::compiler::verify_artifact_identities;
 using qw38::compiler::verify_identity_artifact;
+using qw38::compiler::WeightFormatPolicy;
 using qw38::format::Artifact;
 using qw38::format::ArtifactSchema;
 using qw38::format::Hash256;
@@ -161,6 +164,70 @@ int main() {
   if (!schema) {
     fail(qw38::compiler::error_message(schema.error()));
   } else {
+    auto production = build_schema(
+        classified, hash_seed(1), hash_seed(2), hash_seed(3),
+        CompilerRevision{.ident = kCompilerIdent, .major = 0, .minor = 1},
+        WeightFormatPolicy::ProductionV0);
+    expect(static_cast<bool>(production), "production schema builds from metadata");
+    expect(static_cast<bool>(compare_artifact_schema(*schema, *schema)),
+           "identity metadata schema matches identity policy");
+    auto reordered = *schema;
+    for (auto& tensor : reordered.tensors) tensor.tensor_id += 10000;
+    for (auto& binding : reordered.graph_bindings) binding.tensor_id += 10000;
+    for (auto& binding : reordered.shared_bindings) {
+      binding.owner_tensor_id += 10000;
+      binding.alias_tensor_id += 10000;
+    }
+    std::reverse(reordered.tensors.begin(), reordered.tensors.end());
+    std::reverse(reordered.graph_bindings.begin(), reordered.graph_bindings.end());
+    expect(static_cast<bool>(compare_artifact_schema(reordered, *schema)),
+           "directory order and reassigned tensor IDs are nonsemantic");
+    if (production) {
+      expect(static_cast<bool>(compare_artifact_schema(*production, *production)),
+             "production metadata schema matches production policy");
+      expect(!compare_artifact_schema(*schema, *production) &&
+                 !compare_artifact_schema(*production, *schema),
+             "identity and production policies reject each other");
+    }
+    auto expect_schema_mismatch = [&](ArtifactSchema changed,
+                                      std::string_view field,
+                                      std::string_view what) {
+      auto st = compare_artifact_schema(changed, *schema);
+      expect(!st && st.error().field == field, what);
+    };
+    auto changed = *schema;
+    changed.graph_bindings.pop_back();
+    expect_schema_mismatch(changed, "graph_bindings", "missing binding rejects");
+    changed = *schema;
+    std::swap(changed.graph_bindings[0].tensor_id,
+              changed.graph_bindings[1].tensor_id);
+    expect_schema_mismatch(changed, "graph_bindings", "swapped bindings reject");
+    changed = *schema;
+    changed.tensors.push_back(changed.tensors.front());
+    changed.tensors.back().logical_name = "extra.tensor";
+    changed.tensors.back().tensor_id = 10000;
+    expect_schema_mismatch(changed, "tensor_directory", "extra tensor rejects");
+    changed = *schema;
+    changed.tensors.front().layout =
+        changed.tensors.front().layout == PhysicalLayoutId::CudaBf16RowMajorV0
+            ? PhysicalLayoutId::CudaBf16DenseTileV0
+            : PhysicalLayoutId::CudaBf16RowMajorV0;
+    expect_schema_mismatch(changed,
+                           "tensor." + schema->tensors.front().logical_name,
+                           "wrong family layout rejects");
+    changed = *schema;
+    for (auto& tensor : changed.tensors) {
+      if (tensor.shape.rank == 2) {
+        auto& shape = tensor.shape;
+        if (shape.logical[0] % 2 == 0) {
+          shape.logical[0] /= 2;
+          shape.logical[1] *= 2;
+          break;
+        }
+      }
+    }
+    bool shape_rejected = !compare_artifact_schema(changed, *schema);
+    expect(shape_rejected, "changed shape with same element count rejects");
     expect(schema->scope == SemanticScope::LanguagePlusMtpDescriptors,
            "MTP descriptors retained");
     expect(count_instances(schema->graph_bindings, SourceClass::Language) ==
@@ -229,12 +296,10 @@ int main() {
     auto const identity_dir = dir.path() / "identity";
     std::filesystem::create_directories(identity_dir);
     auto const index = identity_dir / "model.safetensors.index.json";
-    auto const shard = identity_dir / "model-00001-of-00001.safetensors";
     auto const config = identity_dir / "config.json";
     auto const tokenizer = identity_dir / "tokenizer.json";
     write_text(index,
                R"({"weight_map":{"tensor":"model-00001-of-00001.safetensors"}})");
-    write_text(shard, "shard-v1");
     write_text(config, "config-v1");
     write_text(tokenizer, "tokenizer-v1");
 
@@ -270,15 +335,7 @@ int main() {
                        std::string(field));
           };
 
-      write_text(shard, "shard-v2");
       auto changed = compute_checkpoint_identities(identity_dir);
-      if (changed) {
-        expect_identity_mismatch("source_hash", *changed);
-      } else {
-        fail(qw38::compiler::error_message(changed.error()));
-      }
-      write_text(shard, "shard-v1");
-
       write_text(config, "config-v2");
       changed = compute_checkpoint_identities(identity_dir);
       if (changed) {

@@ -1,11 +1,14 @@
 #pragma once
 
 #include "format/constants.hpp"
+#include "runtime/error.hpp"
 
 #include <array>
 #include <concepts>
 #include <cstddef>
 #include <cstdint>
+#include <expected>
+#include <limits>
 #include <span>
 #include <type_traits>
 
@@ -41,7 +44,12 @@ struct BasicTensorView {
         rank(other.rank),
         extent(other.extent) {}
 
-  [[nodiscard]] std::span<std::uint64_t const> extents() const noexcept {
+  [[nodiscard]] std::expected<std::span<std::uint64_t const>, Error> extents() const {
+    if (rank == 0 || rank > extent.size()) {
+      return std::unexpected(make_error(ErrorCode::InvalidArgument,
+                                        "tensor_view.rank",
+                                        "rank is outside descriptor capacity"));
+    }
     return std::span<std::uint64_t const>{extent.data(), rank};
   }
 
@@ -77,24 +85,54 @@ struct WorkspaceView {
   WorkspaceView() = default;
 
   // Keeps synthetic workspace construction convenient for low-level tests.
-  WorkspaceView(TensorView tensor) noexcept
-      : pointer(static_cast<std::byte*>(tensor.pointer)) {
+  [[nodiscard]] static std::expected<WorkspaceView, Error> from_tensor(
+      TensorView tensor) {
+    if (tensor.rank == 0 || tensor.rank > tensor.extent.size()) {
+      return std::unexpected(make_error(ErrorCode::InvalidArgument,
+                                        "workspace.tensor.rank",
+                                        "rank is outside descriptor capacity"));
+    }
     std::uint64_t elements = tensor.rank == 0 ? 0 : 1;
     for (std::uint8_t i = 0; i < tensor.rank; ++i) {
+      if (tensor.extent[i] == 0) {
+        return std::unexpected(make_error(ErrorCode::InvalidArgument,
+                                          "workspace.tensor.extent",
+                                          "extents must be nonzero"));
+      }
+      if (tensor.extent[i] != 0 &&
+          elements > std::numeric_limits<std::uint64_t>::max() /
+                          tensor.extent[i]) {
+        return std::unexpected(make_error(ErrorCode::Overflow,
+                                          "workspace.tensor.elements"));
+      }
       elements *= tensor.extent[i];
     }
-    bytes = elements * qw38::format::element_size(tensor.dtype);
-    space = tensor.space;
-    region_count = 1;
-    region[0] = WorkspaceRegion{.offset = 0,
-                                .bytes = bytes,
-                                .stride_bytes = bytes,
-                                .repetitions = 1,
-                                .tensor = tensor};
+    auto const element_bytes = qw38::format::element_size(tensor.dtype);
+    if (element_bytes == 0 ||
+        elements > std::numeric_limits<std::uint64_t>::max() / element_bytes) {
+      return std::unexpected(make_error(ErrorCode::Overflow,
+                                        "workspace.tensor.bytes"));
+    }
+    WorkspaceView view{};
+    view.pointer = static_cast<std::byte*>(tensor.pointer);
+    view.bytes = elements * element_bytes;
+    view.space = tensor.space;
+    view.region_count = 1;
+    view.region[0] = WorkspaceRegion{.offset = 0,
+                                     .bytes = view.bytes,
+                                     .stride_bytes = view.bytes,
+                                     .repetitions = 1,
+                                     .tensor = tensor};
+    return view;
   }
 
-  [[nodiscard]] std::span<WorkspaceRegion const> regions() const noexcept {
-    return {region.data(), region_count};
+  [[nodiscard]] std::expected<std::span<WorkspaceRegion const>, Error> regions() const {
+    if (region_count > region.size()) {
+      return std::unexpected(make_error(ErrorCode::InvalidArgument,
+                                        "workspace.region_count",
+                                        "region count exceeds descriptor capacity"));
+    }
+    return std::span<WorkspaceRegion const>{region.data(), region_count};
   }
 };
 

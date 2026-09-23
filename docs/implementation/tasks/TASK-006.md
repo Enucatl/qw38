@@ -93,5 +93,5 @@ Not required.
 ### Architecture blocker
 None.
 ### Follow-up observations
-- Default ctest compiles mixed synthetic identity+Q4+Q8 fixtures and 8×256 slices of real `in_proj_qkv` / `lm_head`; it does not emit a full-model production `.qw38`. Use `qw38-compile --format production --checkpoint ... --output ...` for that path (`--no-verify` skips the second-pass requantize).
+- Default ctest compiles mixed synthetic identity+Q4+Q8 fixtures and 8×256 slices of real `in_proj_qkv` / `lm_head`; it does not emit a full-model production `.qw38`. Use `qw38-compile --format production --checkpoint ... --output ...` for that path. Add `--verify-reconstruction` when the separate full second pass is required.
 - CUDA decode contraction remains TASK-009; this task's unpacker/reference GEMV is the correctness authority for packed bytes.

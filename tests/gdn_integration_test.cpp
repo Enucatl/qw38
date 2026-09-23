@@ -11,6 +11,7 @@
 #include <cstring>
 #include <filesystem>
 #include <iostream>
+#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -242,28 +243,24 @@ bool write_gdn_artifact(std::filesystem::path const& path, HostFront const& host
   auto down = q4_weight(14, mlp_down_name(0), kHidden, kFfn);
   schema.tensors = {gamma, qkv, z, a, b, taps, alog, dt, gated, out, post, gate,
                     up, down};
-  schema.graph_bindings = {
-      GraphBinding{.instance_id = 1,
-                   .kind = SemanticNodeKind::GatedDeltaNet,
-                   .role = TensorRole::NormGamma,
-                   .layer_index = 0,
-                   .tensor_id = 1},
-      GraphBinding{.instance_id = 1,
-                   .kind = SemanticNodeKind::GatedDeltaNet,
-                   .role = TensorRole::DenseWeight,
-                   .layer_index = 0,
-                   .tensor_id = 2},
-      GraphBinding{.instance_id = 1,
-                   .kind = SemanticNodeKind::GatedDeltaNet,
-                   .role = TensorRole::ConvWeight,
-                   .layer_index = 0,
-                   .tensor_id = 6},
-      GraphBinding{.instance_id = 1,
-                   .kind = SemanticNodeKind::GatedDeltaNet,
-                   .role = TensorRole::TimeParameter,
-                   .layer_index = 0,
-                   .tensor_id = 7},
+  auto bind = [&](std::uint32_t id, SemanticNodeKind kind, TensorRole role,
+                  std::uint32_t instance) {
+    schema.graph_bindings.push_back(GraphBinding{
+        .instance_id = instance, .kind = kind, .role = role,
+        .layer_index = 0, .tensor_id = id});
   };
+  bind(1, SemanticNodeKind::GatedDeltaNet, TensorRole::AdditiveNorm, 1);
+  for (auto id : {2u, 3u, 4u, 5u, 10u}) {
+    bind(id, SemanticNodeKind::GatedDeltaNet, TensorRole::DenseWeight, 1);
+  }
+  bind(6, SemanticNodeKind::GatedDeltaNet, TensorRole::ConvWeight, 1);
+  bind(7, SemanticNodeKind::GatedDeltaNet, TensorRole::TimeParameter, 1);
+  bind(8, SemanticNodeKind::GatedDeltaNet, TensorRole::TimeParameter, 1);
+  bind(9, SemanticNodeKind::GatedDeltaNet, TensorRole::GdnGatedNorm, 1);
+  bind(11, SemanticNodeKind::Mlp, TensorRole::AdditiveNorm, 2);
+  for (auto id : {12u, 13u, 14u}) {
+    bind(id, SemanticNodeKind::Mlp, TensorRole::DenseWeight, 2);
+  }
   auto state = language_persistent_schema();
   schema.state.assign(state.begin(), state.end());
   schema.scratch = qw38::runtime::test::language_scratch();
@@ -414,8 +411,39 @@ int main() {
   auto mlp_cont = bind_mlp_plan(*model, *s_cont, 0, rt->stream());
   auto mlp_snap = bind_mlp_plan(*model, *s_snap, 0, rt->stream());
   if (!plan_cont || !plan_snap || !mlp_cont || !mlp_snap) {
-    fail("bind mixer/mlp");
+    fail("bind mixer/mlp" +
+         std::string(plan_cont ? "" : " cont=" + qw38::runtime::error_message(plan_cont.error())) +
+         std::string(plan_snap ? "" : " snap=" + qw38::runtime::error_message(plan_snap.error())) +
+         std::string(mlp_cont ? "" : " mlp-cont=" + qw38::runtime::error_message(mlp_cont.error())) +
+         std::string(mlp_snap ? "" : " mlp-snap=" + qw38::runtime::error_message(mlp_snap.error())));
     return 1;
+  }
+  auto alternate_stream = qw38::cuda::Stream::create();
+  expect(static_cast<bool>(alternate_stream), "create alternate same-device stream");
+  if (alternate_stream) {
+    auto wrong_front = bind_gdn_front_plan(*model, *s_cont, 0,
+                                             *alternate_stream);
+    auto wrong_recurrence = bind_gdn_recurrence_plan(*s_cont, 0,
+                                                       *alternate_stream);
+    auto wrong_mixer = bind_gdn_plan(*model, *s_cont, 0,
+                                       *alternate_stream);
+    auto wrong_mlp = bind_mlp_plan(*model, *s_cont, 0,
+                                     *alternate_stream);
+    expect(!wrong_front &&
+               wrong_front.error().code == qw38::runtime::ErrorCode::InvalidArgument,
+           "GDN front rejects non-owning stream");
+    expect(!wrong_recurrence &&
+               wrong_recurrence.error().code == qw38::runtime::ErrorCode::InvalidArgument,
+           "GDN recurrence rejects non-owning stream");
+    expect(!wrong_mixer &&
+               wrong_mixer.error().code == qw38::runtime::ErrorCode::InvalidArgument,
+           "GDN mixer rejects non-owning stream");
+    expect(!wrong_mlp &&
+               wrong_mlp.error().code == qw38::runtime::ErrorCode::InvalidArgument,
+           "MLP rejects non-owning stream");
+    auto unchanged = s_cont->save();
+    expect(unchanged && unchanged->gdn_position[0] == 0,
+           "wrong-stream binds preserve session state and usability");
   }
   expect(plan_cont->front.scratch.q_hat.extent[0] == kGdnKeyHeads, "16 q heads");
   expect(plan_cont->front.scratch.u.extent[0] == kGdnValueHeads, "u [48,128]");
@@ -612,6 +640,81 @@ int main() {
   expect_fp32_close(mid_cont, mid_snap, "cont vs snap post-MLP",
                     qw38::reference::tol::kMlpResidualAbs,
                     qw38::reference::tol::kMlpResidualRel);
+
+  std::optional<qw38::runtime::GdnPlan> bound_gdn;
+  std::optional<qw38::runtime::MlpPlan> bound_mlp;
+  std::optional<qw38::runtime::Session> moved_session;
+  {
+    auto source = rt->create_session(*model, 1);
+    expect(static_cast<bool>(source), "create move-source GDN session");
+    if (source) {
+      auto gdn = bind_gdn_plan(*model, *source, 0, rt->stream());
+      auto mlp = bind_mlp_plan(*model, *source, 0, rt->stream());
+      expect(gdn && mlp, "bind plans before GDN session move");
+      if (gdn && mlp) {
+        bound_gdn.emplace(std::move(*gdn));
+        bound_mlp.emplace(std::move(*mlp));
+        moved_session.emplace(std::move(*source));
+      }
+    }
+  }
+  if (bound_gdn && bound_mlp && moved_session) {
+    expect(static_cast<bool>(execute_decode_gdn(*bound_gdn, 0)) &&
+               static_cast<bool>(execute_decode_mlp(*bound_mlp)),
+           "GDN and MLP plans execute after move-source destruction");
+    auto move_snapshot = moved_session->save();
+    expect(move_snapshot && move_snapshot->gdn_position[0] == 1,
+           "moved GDN session receives bound plan metadata");
+    auto destination = rt->create_session(*model, 1);
+    expect(static_cast<bool>(destination), "create GDN move-assignment destination");
+    if (destination) {
+      *destination = std::move(*moved_session);
+      expect(static_cast<bool>(execute_decode_gdn(*bound_gdn, 1)) &&
+                 static_cast<bool>(execute_decode_mlp(*bound_mlp)),
+             "GDN and MLP plans execute after move assignment");
+      auto assignment_snapshot = destination->save();
+      expect(assignment_snapshot && assignment_snapshot->gdn_position[0] == 2,
+             "move-assigned GDN session receives bound plan metadata");
+    }
+  }
+
+  {
+    auto failed_session = rt->create_session(*model, 1);
+    auto control_session = rt->create_session(*model, 1);
+    expect(failed_session && control_session,
+           "create GDN failure/recovery sessions");
+    if (failed_session && control_session) {
+      auto failed_plan = bind_gdn_plan(*model, *failed_session, 0, rt->stream());
+      auto control_plan = bind_gdn_plan(*model, *control_session, 0, rt->stream());
+      auto initial = failed_session->save();
+      expect(failed_plan && control_plan && initial,
+             "bind and snapshot GDN failure/recovery control");
+      if (failed_plan && control_plan && initial) {
+        expect(static_cast<bool>(execute_decode_gdn(*control_plan, 0)),
+               "clean GDN control token succeeds");
+        auto control = control_session->save();
+        qw38::cuda::testing::fail_next_stream_sync();
+        auto failed = execute_decode_gdn(*failed_plan, 0);
+        expect(!failed && failed.error().code == qw38::runtime::ErrorCode::Cuda,
+               "GDN failure after state mutation is reported");
+        expect(!failed_session->save() && !execute_decode_gdn(*failed_plan, 0),
+               "poisoned GDN session rejects snapshot and retry");
+        expect(static_cast<bool>(failed_session->restore(*initial)),
+               "restore clears failed GDN execution state");
+        expect(static_cast<bool>(execute_decode_gdn(*failed_plan, 0)),
+               "GDN replays after restoring pre-token snapshot");
+        auto recovered = failed_session->save();
+        expect(control && recovered &&
+                   recovered->gdn_s == control->gdn_s &&
+                   recovered->conv_history == control->conv_history &&
+                   recovered->kv == control->kv &&
+                   recovered->conv_cursor == control->conv_cursor &&
+                   recovered->gdn_position == control->gdn_position &&
+                   recovered->kv_populated == control->kv_populated,
+               "GDN recovery exactly matches clean control state and metadata");
+      }
+    }
+  }
 
   if (g_failures != 0) {
     std::cerr << g_failures << " gdn integration failures\n";

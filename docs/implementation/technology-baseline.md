@@ -1,6 +1,6 @@
 # Technology baseline
 
-This document is the normative V0 reference development, build, and runtime environment. [Architecture V0](../architecture/architecture-v0.md) defines what the engine builds and its model/runtime architecture. [Code standards](code-standards.md) define how its C++ and CUDA implementation is written. The future `implementation_ledger.md` will define implementation order; it is intentionally not created here.
+This document is the normative V0 reference development, build, and runtime environment. [Architecture V0](../architecture/architecture-v0.md) defines what the engine builds and its model/runtime architecture. [Code standards](code-standards.md) define how its C++ and CUDA implementation is written. The [task ledger](task_ledger.md) defines implementation order.
 
 # Reference platform
 

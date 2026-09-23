@@ -1,5 +1,7 @@
 #include "runtime/arena.hpp"
+#include "runtime/model.hpp"
 #include "runtime/sizes.hpp"
+#include "runtime/view.hpp"
 
 #include <array>
 #include <cstdint>
@@ -48,6 +50,94 @@ void expect(bool cond, std::string_view what) {
 }  // namespace
 
 int main() {
+  {
+    using qw38::format::GraphBinding;
+    using qw38::format::SemanticNodeKind;
+    using qw38::format::TensorRecord;
+    using qw38::format::TensorRole;
+    qw38::format::ArtifactSchema schema{};
+    schema.tensors = {
+        TensorRecord{.tensor_id = 9, .logical_name = "model.language_model.layers.3.self_attn.q_norm.weight"},
+        TensorRecord{.tensor_id = 2, .logical_name = "model.language_model.layers.3.self_attn.k_norm.weight"},
+        TensorRecord{.tensor_id = 8, .logical_name = "model.language_model.layers.7.self_attn.q_norm.weight"},
+    };
+    schema.graph_bindings = {
+        GraphBinding{.instance_id = 7, .kind = SemanticNodeKind::GatedAttention,
+                     .role = TensorRole::QkNorm, .layer_index = 3, .tensor_id = 9},
+        GraphBinding{.instance_id = 7, .kind = SemanticNodeKind::GatedAttention,
+                     .role = TensorRole::QkNorm, .layer_index = 3, .tensor_id = 2},
+        GraphBinding{.instance_id = 15, .kind = SemanticNodeKind::GatedAttention,
+                     .role = TensorRole::QkNorm, .layer_index = 7, .tensor_id = 8},
+    };
+    auto resolve = [&](std::string_view name, std::uint32_t layer) {
+      return qw38::runtime::resolve_semantic_tensor(
+          schema, name, SemanticNodeKind::GatedAttention, TensorRole::QkNorm,
+          layer);
+    };
+    auto q3 = resolve(schema.tensors[0].logical_name, 3);
+    auto k3 = resolve(schema.tensors[1].logical_name, 3);
+    auto q7 = resolve(schema.tensors[2].logical_name, 7);
+    expect(q3 && k3 && q7 && *q3 == 9 && *k3 == 2 && *q7 == 8,
+           "canonical names select distinct same-shaped and per-layer IDs");
+    std::swap(schema.tensors[0], schema.tensors[2]);
+    std::swap(schema.graph_bindings[0], schema.graph_bindings[2]);
+    expect(resolve("model.language_model.layers.3.self_attn.q_norm.weight", 3) == q3,
+           "nonsemantic directory and graph order is ignored");
+    auto bad = schema;
+    bad.graph_bindings[1].layer_index = 7;
+    expect(!qw38::runtime::resolve_semantic_tensor(
+               bad, "model.language_model.layers.3.self_attn.k_norm.weight",
+               SemanticNodeKind::GatedAttention, TensorRole::QkNorm, 3),
+           "wrong-layer graph association rejected");
+    bad = schema;
+    bad.graph_bindings.push_back(bad.graph_bindings[1]);
+    expect(!qw38::runtime::resolve_semantic_tensor(
+               bad, "model.language_model.layers.3.self_attn.k_norm.weight",
+               SemanticNodeKind::GatedAttention, TensorRole::QkNorm, 3),
+           "duplicate binding rejected");
+    bad = schema;
+    bad.graph_bindings.erase(bad.graph_bindings.begin() + 1);
+    expect(!qw38::runtime::resolve_semantic_tensor(
+               bad, "model.language_model.layers.3.self_attn.k_norm.weight",
+               SemanticNodeKind::GatedAttention, TensorRole::QkNorm, 3),
+           "missing binding rejected");
+  }
+  {
+    qw38::runtime::TensorView tensor{};
+    tensor.pointer = reinterpret_cast<void*>(0x1000);
+    tensor.dtype = qw38::format::ArithmeticDtype::Bf16;
+    tensor.rank = 1;
+    tensor.extent[0] = 4;
+    auto workspace = qw38::runtime::WorkspaceView::from_tensor(tensor);
+    expect(workspace && workspace->bytes == 8 && workspace->region_count == 1,
+           "valid tensor converts to one bounded workspace region");
+    for (std::uint8_t rank : {std::uint8_t{9}, std::uint8_t{255}}) {
+      tensor.rank = rank;
+      expect(!tensor.extents() && !qw38::runtime::WorkspaceView::from_tensor(tensor),
+             "out-of-range tensor rank rejected before extent access");
+    }
+    tensor.rank = 0;
+    expect(!qw38::runtime::WorkspaceView::from_tensor(tensor),
+           "zero-rank workspace tensor rejected");
+    tensor.rank = 2;
+    tensor.extent[0] = std::numeric_limits<std::uint64_t>::max();
+    tensor.extent[1] = 2;
+    auto elements_overflow = qw38::runtime::WorkspaceView::from_tensor(tensor);
+    expect(!elements_overflow && elements_overflow.error().code == ErrorCode::Overflow,
+           "workspace element product overflow rejected");
+    tensor.rank = 1;
+    auto bytes_overflow = qw38::runtime::WorkspaceView::from_tensor(tensor);
+    expect(!bytes_overflow && bytes_overflow.error().code == ErrorCode::Overflow,
+           "workspace byte product overflow rejected");
+    tensor.extent[0] = 0;
+    expect(!qw38::runtime::WorkspaceView::from_tensor(tensor),
+           "zero workspace extent rejected");
+    qw38::runtime::WorkspaceView regions{};
+    for (std::uint8_t count : {std::uint8_t{13}, std::uint8_t{255}}) {
+      regions.region_count = count;
+      expect(!regions.regions(), "out-of-range region count rejected");
+    }
+  }
   expect(intervals_overlap({KernelStage::Mixer, KernelStage::MixerOutput},
                            {KernelStage::Mixer, KernelStage::Mixer}),
          "mixer intervals overlap");

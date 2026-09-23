@@ -306,9 +306,10 @@ void test_front_vs_reference(Stream const& stream) {
   views.normalized = make_view(d_norm->data(), qw38::format::ArithmeticDtype::Bf16,
                                PhysicalLayoutId::CudaBf16RowMajorV0,
                                StorageClass::Bf16, true, 1, kHidden);
-  views.workspace = make_view(d_ws->data(), qw38::format::ArithmeticDtype::Fp32,
-                              PhysicalLayoutId::CudaFp32VectorV0, StorageClass::Fp32,
-                              true, 1, kGdnWorkspaceBytesPerToken / 4);
+  views.workspace = *qw38::runtime::WorkspaceView::from_tensor(make_view(
+      d_ws->data(), qw38::format::ArithmeticDtype::Fp32,
+      PhysicalLayoutId::CudaFp32VectorV0, StorageClass::Fp32, true, 1,
+      kGdnWorkspaceBytesPerToken / 4));
   views.history = make_view(d_hist->data(), qw38::format::ArithmeticDtype::Bf16,
                             PhysicalLayoutId::CudaBf16ConvHistoryV0,
                             StorageClass::Bf16, true, 2, kConvHistoryTaps, kQkvWidth);
@@ -693,78 +694,30 @@ bool make_q4_mixer_host(HostGdnMixer& host) {
   return true;
 }
 
-void expect_eight_launch_schedule(qw38::runtime::GdnPlan const& plan,
-                                  Stream const& stream, std::uint64_t& position,
-                                  std::string_view tag) {
+void expect_capture_rejected(qw38::runtime::GdnPlan const& plan,
+                             Stream const& stream, std::uint64_t position,
+                             std::string_view tag) {
   if (auto st = stream.sync(); !st) {
-    fail(std::string(tag) + " launch-count pre-sync");
+    fail(std::string(tag) + " capture pre-sync");
     return;
   }
-  auto saved_cursor = plan.front.cursor.value();
-  if (!saved_cursor) {
-    fail(std::string(tag) + " read launch-count cursor");
+  auto before = plan.front.cursor.value();
+  if (!before) {
+    fail(std::string(tag) + " capture cursor");
     return;
   }
   cudaGraph_t graph = nullptr;
   auto status = cudaStreamBeginCapture(stream.native(), cudaStreamCaptureModeThreadLocal);
   if (status != cudaSuccess) {
-    fail(std::string(tag) + " begin launch-count capture: " +
-         cudaGetErrorString(status));
+    fail(std::string(tag) + " begin capture");
     return;
   }
-  auto const saved_position = position;
-  auto run = execute_decode_gdn(plan, position);
+  auto result = execute_decode_gdn(plan, position);
   status = cudaStreamEndCapture(stream.native(), &graph);
-  position = saved_position;
-  for (int i = 0; i < 2; ++i) {
-    auto current = plan.front.cursor.value();
-    if (!current || *current == *saved_cursor) {
-      break;
-    }
-    (void)plan.front.cursor.commit_advance(*current);
-  }
-  if (auto restored = plan.front.cursor.value();
-      !restored || *restored != *saved_cursor) {
-    fail(std::string(tag) + " restore launch-count cursor");
-  }
-  if (!run || status != cudaSuccess || graph == nullptr) {
-    if (graph != nullptr) {
-      (void)cudaGraphDestroy(graph);
-    }
-    fail(std::string(tag) + " capture eight-launch schedule");
-    return;
-  }
-
-  std::size_t node_count = 0;
-  status = cudaGraphGetNodes(graph, nullptr, &node_count);
-  if (status != cudaSuccess) {
-    (void)cudaGraphDestroy(graph);
-    fail(std::string(tag) + " count captured nodes");
-    return;
-  }
-  std::vector<cudaGraphNode_t> nodes(node_count);
-  status = cudaGraphGetNodes(graph, nodes.data(), &node_count);
-  std::size_t kernel_count = 0;
-  std::size_t memcpy_count = 0;
-  if (status == cudaSuccess) {
-    for (auto node : nodes) {
-      cudaGraphNodeType type{};
-      if (cudaGraphNodeGetType(node, &type) != cudaSuccess) {
-        status = cudaErrorUnknown;
-        break;
-      }
-      kernel_count += type == cudaGraphNodeTypeKernel ? 1u : 0u;
-      memcpy_count += type == cudaGraphNodeTypeMemcpy ? 1u : 0u;
-    }
-  }
-  (void)cudaGraphDestroy(graph);
-  expect(status == cudaSuccess, std::string(tag) + " inspect captured nodes");
-  expect(node_count == qw38::runtime::kGdnMixerRegions,
-         std::string(tag) + " captures exactly eight schedule nodes");
-  expect(kernel_count == qw38::runtime::kGdnMixerRegions,
-         std::string(tag) + " captures exactly eight kernel launches");
-  expect(memcpy_count == 0,
-         std::string(tag) + " output-residual region has no copy node");
+  if (graph != nullptr) (void)cudaGraphDestroy(graph);
+  auto after = plan.front.cursor.value();
+  expect(!result && status == cudaSuccess && after && *after == *before,
+         std::string(tag) + " capture rejected before state mutation");
 }
 
 bool compare_mixer(HostGdnMixer const& host, DeviceGdnMixer& dev, Stream const& stream,
@@ -775,7 +728,7 @@ bool compare_mixer(HostGdnMixer const& host, DeviceGdnMixer& dev, Stream const& 
     fail(std::string(tag) + " bind: " + qw38::runtime::error_message(plan.error()));
     return false;
   }
-  expect_eight_launch_schedule(*plan, stream, dev.position, tag);
+  expect_capture_rejected(*plan, stream, dev.position, tag);
   std::vector<std::uint16_t> hist(kConvHistoryTaps * kQkvWidth,
                                   qw38::format::fp32_to_bf16_rne(0.0f));
   std::uint32_t cursor = 0;

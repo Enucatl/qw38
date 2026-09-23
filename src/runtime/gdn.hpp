@@ -72,6 +72,7 @@ struct GdnFrontPlan {
   TensorView history{};    // BF16 [3,10240] for this GDN layer
   ConvCursorSlot cursor{};
   qw38::cuda::Stream const* stream{nullptr};
+  SessionExecutionState* session_state{};
   float eps{kGdnRmsEps};
   std::uint32_t language_layer{};
   std::uint32_t gdn_layer{};
@@ -146,6 +147,7 @@ struct GdnRecurrencePlan {
   std::uint32_t language_layer{};
   std::uint32_t gdn_layer{};
   qw38::cuda::Stream const* stream{nullptr};
+  SessionExecutionState* session_state{};
 };
 
 [[nodiscard]] std::expected<GdnRecurrencePlan, Error> bind_gdn_recurrence_plan(
@@ -200,6 +202,7 @@ struct GdnPlan {
   TensorView s{};             // FP32 session S
   GdnPositionSlot position{}; // Absolute next-token sequence for this layer
   std::uint32_t s_layer{};
+  SessionExecutionState* session_state{};
 };
 
 [[nodiscard]] std::expected<GdnPlan, Error> bind_gdn_plan(

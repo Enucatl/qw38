@@ -50,8 +50,8 @@ struct TileExtents {
     std::uint64_t n, std::uint64_t k);
 
 // Physical index of logical (row, col) inside the tiled payload, in BF16 elements.
-[[nodiscard]] std::uint64_t tiled_element_index(std::uint64_t n, std::uint64_t k,
-                                                std::uint64_t row,
-                                                std::uint64_t col) noexcept;
+[[nodiscard]] std::expected<std::uint64_t, CompilerError> tiled_element_index(
+    std::uint64_t n, std::uint64_t k, std::uint64_t row,
+    std::uint64_t col);
 
 }  // namespace qw38::compiler

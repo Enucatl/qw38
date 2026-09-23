@@ -52,6 +52,17 @@ No throughput benchmark.
 - [ ] MTP is excluded and no thresholds are silently changed.
 ## Architecture blocker rule
 If locked V0 cannot produce correct behavior, report full `ARCHITECTURE_BLOCKER`; a quality failure alone does not authorize EXP-A/B/C/E early.
+
+## Quality failure recovery
+Preserve the failing baseline and frozen evaluation suite. First distinguish
+source/semantic implementation bugs from a failure of the selected quantization
+or activation-transport hypothesis. Fix implementation bugs under the existing
+contract. For a hypothesis failure, propose a narrow architecture amendment that
+names the decision, failing evidence, diagnostic comparison, affected weight
+families, artifact identity, and memory impact. Record the decision authority
+and explicit acceptance in the ledger before changing a locked policy or task
+order. Re-run the unchanged quality gate before accepting a replacement baseline
+and resuming the ledger. Do not relax thresholds or run an experiment early.
 ## Completion report
 ### Result
 DONE | BLOCKED
@@ -64,4 +75,3 @@ Not required; report behavioral metrics.
 None/full report.
 ### Follow-up observations
 Concrete failing/passing slices only.
-

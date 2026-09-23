@@ -63,7 +63,7 @@ On a locked conflict, stop with all required `ARCHITECTURE_BLOCKER` fields; do n
 DONE. Independent verification PASS (Debug/Release ctest 14/14).
 ### Changes made
 - Host `src/compiler/`: encoded 38-family identity table expanded to the sitting 866 language+MTP tensors; vision `model.visual.*` excluded; MTP classified retained-disabled.
-- Offline CLI `qw38-compile --checkpoint DIR --output FILE [--no-verify]` reads HF `config.json`, `model.safetensors.index.json`, and shard headers/payloads with a narrow JSON/safetensors parser (no PyTorch/TF).
+- Offline CLI `qw38-compile --checkpoint DIR --output FILE [--verify-reconstruction]` reads HF `config.json`, `model.safetensors.index.json`, and shard headers/payloads with a narrow JSON/safetensors parser (no PyTorch/TF). Full reconstruction is opt-in; compilation reports artifact and source-metadata identities either way.
 - Typed `std::expected` stages: config/architecture validation, header classification (names/shapes/dtypes/sharing), schema emit, streaming transform/write, independent reconstruction.
 - V0 identity transforms: BF16 dense `[N/8,K/256,8,256]` tiles streamed in 4 KiB units; conv `[channel,1,tap]`→`[tap,channel]`; generated 32 FP32 RoPE `ω_j=θ^{-2j/64}` as `rope.inv_freq`.
 - Artifact metadata: SHA-256 of index/config/tokenizer, compiler revision `qw38-bf16-identity` 0.1.0, precision policy V0, scope `language_plus_mtp_descriptors`, shared MTP embed/`lm_head` aliases, language GDN/conv/KV state schema, decode scratch schema. Graph bindings carry `layer_index` for diagnostic one-layer consumption.
@@ -98,4 +98,4 @@ None.
 ### Follow-up observations
 - TASK-002 graph validation allows `LM_HEAD` bindings only with role `LmHeadWeight`, so `model.language_model.norm.weight` and `mtp.norm.weight` are stored in the tensor directory but not graph-bound as head norms.
 - Generated RoPE required an FP32 vector storage/layout that TASK-002 did not define; `StorageClass::Fp32` / `cuda_fp32_vector_v0` is the additive ABI used here.
-- Full-checkpoint `.qw38` emission is implemented and reconstruction-checked in the CLI (`--no-verify` to skip the second pass) but is omitted from default ctest because the identity payload is ~54 GiB.
+- Full-checkpoint `.qw38` emission is implemented. The separate reconstruction check is opt-in with `--verify-reconstruction`; it is omitted from default ctest because the identity payload is ~54 GiB.

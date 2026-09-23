@@ -241,10 +241,16 @@ std::expected<Session, Error> Session::create(
   }
 
   Session s;
+  try {
+    s.execution_state_ = std::make_shared<SessionExecutionState>();
+  } catch (std::bad_alloc const&) {
+    return std::unexpected(make_error(ErrorCode::AllocationFailed, "session.create",
+                                      "host execution-state allocation failed"));
+  }
   s.stream_ = std::move(stream);
   s.kv_capacity_ = kv_capacity;
-  s.gdn_position_.fill(0);
-  s.kv_populated_.fill(0);
+  s.execution_state_->gdn_position.fill(0);
+  s.execution_state_->kv_populated.fill(0);
   s.persistent_bytes_ = *persist;
   s.arena_ = std::move(*arena);
 
@@ -301,7 +307,7 @@ std::expected<Session, Error> Session::create(
   if (auto st = qw38::cuda::zero(s.scratch_, *s.stream_); !st) {
     return std::unexpected(from_cuda(st.error()));
   }
-  s.conv_cursor_.fill(0);
+  s.execution_state_->conv_cursor.fill(0);
   if (auto st = s.stream_->sync(); !st) {
     return std::unexpected(from_cuda(st.error()));
   }
@@ -366,27 +372,38 @@ std::expected<void, Error> Session::zero_persistent() {
 }
 
 std::expected<void, Error> Session::reset() {
+  if (!stream_ || !execution_state_) {
+    return std::unexpected(make_error(ErrorCode::InvalidArgument,
+                                      "session.reset", "session is closed"));
+  }
   if (auto st = zero_persistent(); !st) {
+    execution_state_->poison();
     return st;
   }
   if (auto st = stream_->sync(); !st) {
+    execution_state_->poison();
     return std::unexpected(from_cuda(st.error()));
   }
-  conv_cursor_.fill(0);
-  gdn_position_.fill(0);
-  kv_populated_.fill(0);
+  execution_state_->conv_cursor.fill(0);
+  execution_state_->gdn_position.fill(0);
+  execution_state_->kv_populated.fill(0);
+  execution_state_->recover();
   return {};
 }
 
 std::expected<void, Error> Session::validate_metadata() const {
-  for (auto populated : kv_populated_) {
+  if (!execution_state_) {
+    return std::unexpected(make_error(ErrorCode::InvalidArgument,
+                                      "session", "session is closed"));
+  }
+  for (auto populated : execution_state_->kv_populated) {
     if (populated > kv_capacity_) {
       return std::unexpected(make_error(ErrorCode::InvalidPopulatedLength,
                                         "session.populated",
                                         "populated length exceeds capacity"));
     }
   }
-  for (auto cursor : conv_cursor_) {
+  for (auto cursor : execution_state_->conv_cursor) {
     if (cursor >= kConvTaps) {
       return std::unexpected(make_error(ErrorCode::InvalidArgument,
                                         "session.cursor",
@@ -402,6 +419,11 @@ std::expected<SessionSnapshot, Error> Session::save() const {
     return std::unexpected(
         make_error(ErrorCode::Internal, "session.save", "missing stream"));
   }
+  if (!execution_state_ || execution_state_->is_poisoned()) {
+    return std::unexpected(make_error(ErrorCode::InvalidArgument,
+                                      "session.save",
+                                      "session is poisoned; reset or restore first"));
+  }
   if (auto st = validate_metadata(); !st) {
     return std::unexpected(st.error());
   }
@@ -409,23 +431,27 @@ std::expected<SessionSnapshot, Error> Session::save() const {
   snap.gdn_s.resize(static_cast<std::size_t>(gdn_s_.bytes()));
   snap.conv_history.resize(static_cast<std::size_t>(conv_history_.bytes()));
   snap.kv.resize(static_cast<std::size_t>(kv_.bytes()));
-  snap.conv_cursor = conv_cursor_;
-  snap.gdn_position = gdn_position_;
-  snap.kv_populated = kv_populated_;
+  snap.conv_cursor = execution_state_->conv_cursor;
+  snap.gdn_position = execution_state_->gdn_position;
+  snap.kv_populated = execution_state_->kv_populated;
   if (auto st = qw38::cuda::copy_d2h(snap.gdn_s, gdn_s_.data(), *stream_); !st) {
+    execution_state_->poison();
     return std::unexpected(from_cuda(st.error()));
   }
   if (auto st =
           qw38::cuda::copy_d2h(snap.conv_history, conv_history_.data(), *stream_);
       !st) {
+    execution_state_->poison();
     return std::unexpected(from_cuda(st.error()));
   }
   if (!kv_.empty()) {
     if (auto st = qw38::cuda::copy_d2h(snap.kv, kv_.data(), *stream_); !st) {
+      execution_state_->poison();
       return std::unexpected(from_cuda(st.error()));
     }
   }
   if (auto st = stream_->sync(); !st) {
+    execution_state_->poison();
     return std::unexpected(from_cuda(st.error()));
   }
   return snap;
@@ -439,7 +465,7 @@ std::expected<SessionSnapshot, Error> Session::save() const {
 }
 
 std::expected<void, Error> Session::restore(SessionSnapshot const& snap) {
-  if (!stream_) {
+  if (!stream_ || !execution_state_) {
     return std::unexpected(
         make_error(ErrorCode::Internal, "session.restore", "missing stream"));
   }
@@ -464,24 +490,29 @@ std::expected<void, Error> Session::restore(SessionSnapshot const& snap) {
     }
   }
   if (auto st = qw38::cuda::copy_h2d(gdn_s_.data(), snap.gdn_s, *stream_); !st) {
+    execution_state_->poison();
     return std::unexpected(from_cuda(st.error()));
   }
   if (auto st =
           qw38::cuda::copy_h2d(conv_history_.data(), snap.conv_history, *stream_);
       !st) {
+    execution_state_->poison();
     return std::unexpected(from_cuda(st.error()));
   }
   if (!kv_.empty()) {
     if (auto st = qw38::cuda::copy_h2d(kv_.data(), snap.kv, *stream_); !st) {
+      execution_state_->poison();
       return std::unexpected(from_cuda(st.error()));
     }
   }
   if (auto st = stream_->sync(); !st) {
+    execution_state_->poison();
     return std::unexpected(from_cuda(st.error()));
   }
-  conv_cursor_ = snap.conv_cursor;
-  gdn_position_ = snap.gdn_position;
-  kv_populated_ = snap.kv_populated;
+  execution_state_->conv_cursor = snap.conv_cursor;
+  execution_state_->gdn_position = snap.gdn_position;
+  execution_state_->kv_populated = snap.kv_populated;
+  execution_state_->recover();
   return {};
 }
 
@@ -622,6 +653,10 @@ std::expected<WorkspaceView, Error> Session::scratch(
 
 std::expected<void, Error> Session::set_populated_length(
     std::uint32_t attention_layer, std::uint64_t populated) {
+  if (!execution_state_ || execution_state_->is_poisoned()) {
+    return std::unexpected(make_error(ErrorCode::InvalidArgument, "session",
+                                      "session is poisoned or closed"));
+  }
   if (attention_layer >= kAttnLayers) {
     return std::unexpected(make_error(ErrorCode::InvalidArgument, "kv.layer",
                                       "attention layer index must be < 16"));
@@ -631,52 +666,87 @@ std::expected<void, Error> Session::set_populated_length(
                                       "kv.populated",
                                       "populated length exceeds capacity"));
   }
-  kv_populated_[attention_layer] = populated;
+  execution_state_->kv_populated[attention_layer] = populated;
   return {};
+}
+
+std::expected<std::uint64_t, Error> Session::kv_populated(
+    std::uint32_t attention_layer) const {
+  if (attention_layer >= kAttnLayers || !execution_state_) {
+    return std::unexpected(make_error(ErrorCode::InvalidArgument, "kv.layer",
+                                      "attention layer index is invalid"));
+  }
+  return execution_state_->kv_populated[attention_layer];
 }
 
 std::expected<KvPopulatedSlot, Error> Session::kv_populated_slot(
     std::uint32_t attention_layer) {
+  if (!execution_state_ || execution_state_->is_poisoned()) {
+    return std::unexpected(make_error(ErrorCode::InvalidArgument, "session",
+                                      "session is poisoned or closed"));
+  }
   if (attention_layer >= kAttnLayers) {
     return std::unexpected(make_error(ErrorCode::InvalidArgument, "kv.layer",
                                       "attention layer index must be < 16"));
   }
-  return KvPopulatedSlot::bind(&kv_populated_[attention_layer], kv_capacity_);
+  return KvPopulatedSlot::bind(&execution_state_->kv_populated[attention_layer], kv_capacity_);
 }
 
 std::expected<ConvCursorSlot, Error> Session::conv_cursor_slot(
     std::uint32_t gdn_layer) {
+  if (!execution_state_ || execution_state_->is_poisoned()) {
+    return std::unexpected(make_error(ErrorCode::InvalidArgument, "session",
+                                      "session is poisoned or closed"));
+  }
   if (gdn_layer >= kConvLayers) {
     return std::unexpected(make_error(ErrorCode::InvalidArgument, "conv.layer",
                                       "GDN layer index must be < 48"));
   }
-  return ConvCursorSlot::bind(&conv_cursor_[gdn_layer]);
+  return ConvCursorSlot::bind(&execution_state_->conv_cursor[gdn_layer]);
 }
 
 std::expected<GdnPositionSlot, Error> Session::gdn_position_slot(
     std::uint32_t gdn_layer) {
+  if (!execution_state_ || execution_state_->is_poisoned()) {
+    return std::unexpected(make_error(ErrorCode::InvalidArgument, "session",
+                                      "session is poisoned or closed"));
+  }
   if (gdn_layer >= kGdnLayers) {
     return std::unexpected(make_error(ErrorCode::InvalidArgument, "gdn.layer",
                                       "GDN layer index must be < 48"));
   }
-  return GdnPositionSlot::bind(&gdn_position_[gdn_layer]);
+  return GdnPositionSlot::bind(&execution_state_->gdn_position[gdn_layer]);
 }
 
 std::expected<void, Error> Session::set_conv_cursor(
     std::array<std::uint32_t, kConvLayers> cursor) {
+  if (!execution_state_ || execution_state_->is_poisoned()) {
+    return std::unexpected(make_error(ErrorCode::InvalidArgument, "session",
+                                      "session is poisoned or closed"));
+  }
   for (auto c : cursor) {
     if (c >= kConvTaps) {
       return std::unexpected(make_error(ErrorCode::InvalidArgument, "conv.cursor",
                                         "convolution cursor must be < 3"));
     }
   }
-  conv_cursor_ = cursor;
+  execution_state_->conv_cursor = cursor;
   return {};
 }
 
 qw38::cuda::Stream const* detail::SessionPlanAccess::stream(
     Session const& session) noexcept {
   return session.stream_.get();
+}
+
+SessionExecutionState* detail::SessionPlanAccess::execution_state(
+    Session& session) noexcept {
+  return session.execution_state_.get();
+}
+
+SessionExecutionState const* detail::SessionPlanAccess::execution_state(
+    Session const& session) noexcept {
+  return session.execution_state_.get();
 }
 
 std::expected<KvPopulatedSlot, Error> detail::SessionPlanAccess::kv_populated(

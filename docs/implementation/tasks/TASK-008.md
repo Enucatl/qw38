@@ -54,6 +54,10 @@ No.
 ## Architecture blocker rule
 On locked conflict stop and report all required blocker fields; do not change precision or semantic roles.
 ## Completion report
+Historical note: the independent QK RMS → BF16 → RoPE path below described
+TASK-008 at completion. TASK-014 later owns attention preparation and its
+different materialization boundary; use the current TASK-014/runtime contract
+for present behavior.
 ### Result
 DONE
 ### Changes made
@@ -88,4 +92,3 @@ Not required.
 None.
 ### Follow-up observations
 Independent QK RMS then RoPE materializes a BF16 vector between the two launches. TASK-014's fused preparation kernel can keep the pre-RoPE head in FP32 and round once after rotation; that is a later fusion cut, not a V0 precision change. Text-only RoPE takes one integer position (equal T/H/W). Packed dense CUDA remains TASK-009.
-

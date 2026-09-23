@@ -18,7 +18,7 @@ V0's reference backend is NVIDIA CUDA. Its reference GPU is the NVIDIA GeForce R
 
 The physical V0 runtime artifact and lowering are CUDA/Blackwell-oriented. Model semantics, logical tensor identities, quantization contracts, and the semantic graph remain portable; physical `.qw38` packing and CUDA lowering may be backend-specific. Compatibility with pre-Blackwell GPUs or older toolchains is not a V0 architecture constraint.
 
-These assumptions constrain architecture, but container and toolchain mechanics do not change Q4G64, state layout, precision, the semantic graph, or the execution schedule. Concrete platform, compiler, build, and container rules are normative in [technology-baseline.md](../implementation/technology-baseline.md). C++ and CUDA implementation conventions are normative in [code-standards.md](../implementation/code-standards.md). The future `docs/implementation/implementation_ledger.md` will define implementation order; it is not part of Architecture V0.
+These assumptions constrain architecture, but container and toolchain mechanics do not change Q4G64, state layout, precision, the semantic graph, or the execution schedule. Concrete platform, compiler, build, and container rules are normative in [technology-baseline.md](../implementation/technology-baseline.md). C++ and CUDA implementation conventions are normative in [code-standards.md](../implementation/code-standards.md). The implementation order is defined by [the task ledger](../implementation/task_ledger.md).
 
 # Architecture decision traceability
 

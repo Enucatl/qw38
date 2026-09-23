@@ -91,8 +91,9 @@ container image digest were not preserved. Consequently, the timing below is
 retained only as a historical log and is **withdrawn as reproducible measurement
 evidence**. Future reported measurements must use the identity-bound wrapper in
 `docs/implementation/dev-environment.md`. Q4 decode mixer, eight regions, 8
-timed mixer iterations after 2 warmups; each iteration issued 9 kernel launches
-and 1 device copy. Historical command:
+timed mixer iterations after 2 warmups; the source report recorded 9 kernel
+launches and 1 device copy. Those counts are superseded by the current
+eight-launch, zero-copy path and are withdrawn with the timing. Historical command:
 
 ```text
 docker run --gpus all --rm -u "$(id -u):$(id -g)" \
@@ -110,8 +111,7 @@ Diagnostic only; does not authorize fusion, layout, or precision change.
 ### Architecture blocker
 None.
 ### Follow-up observations
-- Region 2 stays two MMV launches (qkv then z) in one named region; no fusion.
-- Region 8 is `copy_d2d` then in-place `ResidualAddFp32` (TASK-009 epilogue unchanged).
-- Mixer writes `residual_h_mid`; MLP still adds in place on `h_mid` (next-layer ping-pong into `residual_h` remains TASK-016).
+- Historical: Region 2 stays two MMV launches (qkv then z) in one named region; no fusion.
+- Superseded: Region 8 was `copy_d2d` then in-place `ResidualAddFp32`. The current caller writes projection plus original residual directly to the distinct output buffer.
+- Superseded: the original TASK-010 in-place `h_mid` description does not define the current ping-pong output contract.
 - Delivered with commit and push after verification PASS.
-

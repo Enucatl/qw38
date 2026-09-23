@@ -2,7 +2,6 @@
 
 #include "cuda/activation.hpp"
 #include "cuda/attention.hpp"
-#include "cuda/copy.hpp"
 #include "cuda/decode_mmv.hpp"
 
 #include "format/constants.hpp"
@@ -288,8 +287,12 @@ DecodeMmvDesc mmv_from_weight(AttnWeightBinding const& w) {
 }
 
 std::expected<ConstTensorView, Error> require_payload(
-    Model const& model, std::string const& name) {
-  auto v = model.payload(name);
+    Model const& model, std::string const& name,
+    qw38::format::TensorRole role, std::uint32_t layer) {
+  auto id = model.resolve_tensor(name, qw38::format::SemanticNodeKind::GatedAttention,
+                                 role, layer);
+  if (!id) return std::unexpected(id.error());
+  auto v = model.payload(*id);
   if (!v) {
     return std::unexpected(v.error());
   }
@@ -297,11 +300,15 @@ std::expected<ConstTensorView, Error> require_payload(
 }
 
 std::expected<ConstTensorView, Error> optional_scales(
-    Model const& model, std::string const& name, PhysicalLayoutId layout) {
+    Model const& model, std::string const& name, PhysicalLayoutId layout,
+    std::uint32_t layer) {
   if (layout == PhysicalLayoutId::CudaBf16DenseTileV0) {
     return ConstTensorView{};
   }
-  auto v = model.scales(name);
+  auto id = model.resolve_tensor(name, qw38::format::SemanticNodeKind::GatedAttention,
+                                 qw38::format::TensorRole::DenseWeight, layer);
+  if (!id) return std::unexpected(id.error());
+  auto v = model.scales(*id);
   if (!v) {
     return std::unexpected(v.error());
   }
@@ -718,17 +725,29 @@ std::expected<AttentionMixerPlan, Error> bind_attention_mixer_plan(
   AttentionMixerPlan plan;
   plan.prep = std::move(*prep);
   plan.core = std::move(*cp);
+  plan.core.session_state = plan.prep.session_state;
   return plan;
 }
 
 std::expected<AttentionMixerPlan, Error> bind_attention_mixer_plan(
     Model const& model, Session& session, std::uint32_t layer,
     qw38::cuda::Stream const& stream, float eps) {
+  auto const* session_stream = detail::SessionPlanAccess::stream(session);
+  if (session_stream == nullptr || session_stream->empty() || stream.empty() ||
+      model.device() != stream.device() ||
+      session_stream->native() != stream.native()) {
+    return std::unexpected(arg_error(
+        "stream", "model and attention plan must use the session device and stream"));
+  }
+  auto* session_state = detail::SessionPlanAccess::execution_state(session);
+  if (session_state == nullptr || session_state->is_poisoned()) {
+    return std::unexpected(arg_error("session", "session is poisoned or closed"));
+  }
   auto prep = bind_attention_prep_plan(model, session, layer, stream, eps);
   if (!prep) return std::unexpected(prep.error());
-  auto out = require_payload(model, attn_o_name(layer));
+  auto out = require_payload(model, attn_o_name(layer), qw38::format::TensorRole::DenseWeight, layer);
   if (!out) return std::unexpected(out.error());
-  auto scales = optional_scales(model, attn_o_name(layer), out->layout);
+  auto scales = optional_scales(model, attn_o_name(layer), out->layout, layer);
   if (!scales) return std::unexpected(scales.error());
   AttentionMixerBindViews views;
   views.prep.qg = prep->qg.codes;
@@ -755,12 +774,27 @@ std::expected<AttentionMixerPlan, Error> bind_attention_mixer_plan(
   views.residual_out = session.residual_h_mid();
   views.residual_out.rank = 2;
   views.residual_out.extent = {1, kHidden};
-  return bind_attention_mixer_plan(views, stream, eps);
+  auto plan = bind_attention_mixer_plan(views, stream, eps);
+  if (!plan) return std::unexpected(plan.error());
+  plan->prep.session_state = session_state;
+  plan->core.session_state = session_state;
+  return plan;
 }
 
 std::expected<AttentionPrepPlan, Error> bind_attention_prep_plan(
     Model const& model, Session& session, std::uint32_t layer,
     qw38::cuda::Stream const& stream, float eps) {
+  auto const* session_stream = detail::SessionPlanAccess::stream(session);
+  if (session_stream == nullptr || session_stream->empty() || stream.empty() ||
+      model.device() != stream.device() ||
+      session_stream->native() != stream.native()) {
+    return std::unexpected(arg_error(
+        "stream", "model and attention plan must use the session device and stream"));
+  }
+  auto* session_state = detail::SessionPlanAccess::execution_state(session);
+  if (session_state == nullptr || session_state->is_poisoned()) {
+    return std::unexpected(arg_error("session", "session is poisoned or closed"));
+  }
   auto attn_i = attn_state_index(layer);
   if (!attn_i) {
     return std::unexpected(attn_i.error());
@@ -772,13 +806,13 @@ std::expected<AttentionPrepPlan, Error> bind_attention_prep_plan(
   auto const kn_n = attn_k_norm_name(layer);
   auto const norm_n = attn_norm_name(layer);
 
-  auto qg = require_payload(model, q_n);
-  auto k = require_payload(model, k_n);
-  auto v = require_payload(model, v_n);
-  auto gamma = require_payload(model, norm_n);
-  auto gamma_q = require_payload(model, qn_n);
-  auto gamma_k = require_payload(model, kn_n);
-  auto inv = require_payload(model, "rope.inv_freq");
+  auto qg = require_payload(model, q_n, qw38::format::TensorRole::DenseWeight, layer);
+  auto k = require_payload(model, k_n, qw38::format::TensorRole::DenseWeight, layer);
+  auto v = require_payload(model, v_n, qw38::format::TensorRole::DenseWeight, layer);
+  auto gamma = require_payload(model, norm_n, qw38::format::TensorRole::AdditiveNorm, layer);
+  auto gamma_q = require_payload(model, qn_n, qw38::format::TensorRole::QkNorm, layer);
+  auto gamma_k = require_payload(model, kn_n, qw38::format::TensorRole::QkNorm, layer);
+  auto inv = require_payload(model, "rope.inv_freq", qw38::format::TensorRole::VectorWeight, layer);
   if (!qg) {
     return std::unexpected(qg.error());
   }
@@ -800,9 +834,9 @@ std::expected<AttentionPrepPlan, Error> bind_attention_prep_plan(
   if (!inv) {
     return std::unexpected(inv.error());
   }
-  auto qg_s = optional_scales(model, q_n, qg->layout);
-  auto k_s = optional_scales(model, k_n, k->layout);
-  auto v_s = optional_scales(model, v_n, v->layout);
+  auto qg_s = optional_scales(model, q_n, qg->layout, layer);
+  auto k_s = optional_scales(model, k_n, k->layout, layer);
+  auto v_s = optional_scales(model, v_n, v->layout, layer);
   if (!qg_s) {
     return std::unexpected(qg_s.error());
   }
@@ -848,11 +882,17 @@ std::expected<AttentionPrepPlan, Error> bind_attention_prep_plan(
   views.populated = *populated;
   views.kv_capacity = session.kv_capacity();
   views.language_layer = layer;
-  return bind_attention_prep_plan(views, stream, eps);
+  auto plan = bind_attention_prep_plan(views, stream, eps);
+  if (!plan) return std::unexpected(plan.error());
+  plan->session_state = session_state;
+  return plan;
 }
 
 std::expected<void, Error> execute_decode_attention_prep(
     AttentionPrepPlan const& plan, std::uint64_t position) {
+  if (plan.session_state != nullptr && plan.session_state->is_poisoned()) {
+    return std::unexpected(arg_error("session", "session is poisoned"));
+  }
   if (plan.stream == nullptr || plan.stream->empty()) {
     return std::unexpected(arg_error("stream", "empty stream"));
   }
@@ -894,6 +934,7 @@ std::expected<void, Error> execute_decode_attention_prep(
   if (auto st = qw38::cuda::launch_hidden_rms(residual, gamma, plan.eps, 1,
                                               normalized, *plan.stream);
       !st) {
+    if (plan.session_state != nullptr) plan.session_state->poison();
     return std::unexpected(from_cuda(st.error()));
   }
 
@@ -923,6 +964,7 @@ std::expected<void, Error> execute_decode_attention_prep(
   v_range.epilogue = DecodeEpilogue::StoreBf16;
   DecodeMmvRangeDesc ranges{range_descs};
   if (auto st = qw38::cuda::launch_decode_mmv_ranges(ranges, *plan.stream); !st) {
+    if (plan.session_state != nullptr) plan.session_state->poison();
     return std::unexpected(from_cuda(st.error()));
   }
 
@@ -931,27 +973,39 @@ std::expected<void, Error> execute_decode_attention_prep(
           qg, k, v, gamma_q, gamma_k, inv_freq, plan.eps, pos, q, g, kv,
           plan.attn_layer, plan.kv_capacity, position, *plan.stream);
       !st) {
+    if (plan.session_state != nullptr) plan.session_state->poison();
     return std::unexpected(from_cuda(st.error()));
   }
 
   if (auto st = plan.stream->sync(); !st) {
+    if (plan.session_state != nullptr) plan.session_state->poison();
     return std::unexpected(from_cuda(st.error()));
   }
-  return plan.populated.commit_append(position);
+  auto committed = plan.populated.commit_append(position);
+  if (!committed && plan.session_state != nullptr) {
+    plan.session_state->poison();
+  }
+  return committed;
 }
 
 std::expected<TensorView, Error> execute_attention_core(
     AttentionCorePlan const& plan) {
+  if (plan.session_state != nullptr && plan.session_state->is_poisoned()) {
+    return std::unexpected(arg_error("session", "session is poisoned"));
+  }
   if (plan.stream == nullptr || plan.stream->empty()) {
+    if (plan.session_state != nullptr) plan.session_state->poison();
     return std::unexpected(arg_error("stream", "empty stream"));
   }
   auto current = plan.populated.value();
   if (!current) {
+    if (plan.session_state != nullptr) plan.session_state->poison();
     return std::unexpected(current.error());
   }
   std::uint64_t const populated = *current;
   std::uint64_t const nseg64 = attn_segment_count(populated);
   if (nseg64 > std::numeric_limits<std::uint32_t>::max()) {
+    if (plan.session_state != nullptr) plan.session_state->poison();
     return std::unexpected(arg_error("populated", "segment count exceeds CUDA launch range"));
   }
   std::uint32_t const nseg = static_cast<std::uint32_t>(nseg64);
@@ -964,23 +1018,20 @@ std::expected<TensorView, Error> execute_attention_core(
   auto* residual_out = static_cast<float*>(plan.residual_out.pointer);
   if (q == nullptr || g == nullptr || kv == nullptr || partials == nullptr ||
       y == nullptr || residual == nullptr || residual_out == nullptr) {
+    if (plan.session_state != nullptr) plan.session_state->poison();
     return std::unexpected(arg_error("attention", "core views are null"));
   }
   if (auto st = qw38::cuda::launch_attention_scan(
           q, kv, plan.attn_layer, plan.kv_capacity, populated, partials, nseg,
           *plan.stream);
       !st) {
+    if (plan.session_state != nullptr) plan.session_state->poison();
     return std::unexpected(from_cuda(st.error()));
   }
   if (auto st = qw38::cuda::launch_attention_merge(partials, g, nseg, y,
-                                                     *plan.stream);
+                                                    *plan.stream);
       !st) {
-    return std::unexpected(from_cuda(st.error()));
-  }
-  if (auto st = qw38::cuda::copy_d2d(
-          residual_out, residual, kHidden * qw38::format::kFp32Size,
-          *plan.stream);
-      !st) {
+    if (plan.session_state != nullptr) plan.session_state->poison();
     return std::unexpected(from_cuda(st.error()));
   }
   DecodeMmvDesc out = mmv_from_weight(plan.out);
@@ -988,10 +1039,16 @@ std::expected<TensorView, Error> execute_attention_core(
       y, DecodeDtype::Bf16, qw38::cuda::kDecodeLayoutBf16VectorV0,
       out.k, static_cast<std::uint64_t>(out.k) * 2u, 2, false);
   out.residual = decode_vector_view(
-      residual_out, DecodeDtype::Fp32, qw38::cuda::kDecodeLayoutFp32VectorV0,
-      out.n, static_cast<std::uint64_t>(out.n) * 4u, 4, true);
+      const_cast<float*>(residual), DecodeDtype::Fp32,
+      qw38::cuda::kDecodeLayoutFp32VectorV0, out.n,
+      static_cast<std::uint64_t>(out.n) * 4u, 4, false);
+  out.output = decode_vector_view(
+      residual_out, DecodeDtype::Fp32,
+      qw38::cuda::kDecodeLayoutFp32VectorV0, out.n,
+      static_cast<std::uint64_t>(out.n) * 4u, 4, true);
   out.epilogue = DecodeEpilogue::ResidualAddFp32;
   if (auto st = qw38::cuda::launch_decode_mmv(out, *plan.stream); !st) {
+    if (plan.session_state != nullptr) plan.session_state->poison();
     return std::unexpected(from_cuda(st.error()));
   }
   return plan.residual_out;
@@ -1002,7 +1059,11 @@ std::expected<TensorView, Error> execute_decode_attention(
   if (auto st = execute_decode_attention_prep(plan.prep, position); !st) {
     return std::unexpected(st.error());
   }
-  return execute_attention_core(plan.core);
+  auto result = execute_attention_core(plan.core);
+  if (!result && plan.prep.session_state != nullptr) {
+    plan.prep.session_state->poison();
+  }
+  return result;
 }
 
 }  // namespace qw38::runtime

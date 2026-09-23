@@ -82,8 +82,29 @@ struct SessionSnapshot {
   std::array<std::uint64_t, kAttnLayers> kv_populated{};
 };
 
+// Host metadata borrowed by bound plans. Shared only so its address and array
+// storage remain stable when Session ownership is moved; it does not own CUDA
+// tensor storage.
+class SessionExecutionState {
+ public:
+  [[nodiscard]] bool is_poisoned() const noexcept { return poisoned_; }
+  void poison() noexcept { poisoned_ = true; }
+  void recover() noexcept { poisoned_ = false; }
+
+ private:
+  friend class Session;
+  std::array<std::uint32_t, kConvLayers> conv_cursor{};
+  std::array<std::uint64_t, kGdnLayers> gdn_position{};
+  std::array<std::uint64_t, kAttnLayers> kv_populated{};
+  bool poisoned_{};
+};
+
 class Session {
  public:
+  // Plans bound to a Session borrow its allocations and execution metadata.
+  // They follow a moved-from source to the destination object. Move-assigning
+  // over a destination invalidates its old plans; shutdown/destruction
+  // invalidates every plan borrowed from that Session.
   Session(Session&&) noexcept = default;
   Session& operator=(Session&&) noexcept = default;
   ~Session() = default;
@@ -110,16 +131,14 @@ class Session {
       qw38::format::ScratchKind kind) const;
 
   [[nodiscard]] std::uint64_t kv_capacity() const noexcept { return kv_capacity_; }
-  [[nodiscard]] std::uint64_t kv_populated(
-      std::uint32_t attention_layer) const noexcept {
-    return kv_populated_[attention_layer];
-  }
+  [[nodiscard]] std::expected<std::uint64_t, Error> kv_populated(
+      std::uint32_t attention_layer) const;
   [[nodiscard]] std::expected<void, Error> set_populated_length(
       std::uint32_t attention_layer, std::uint64_t populated);
 
   [[nodiscard]] std::array<std::uint32_t, kConvLayers> const& conv_cursor()
       const noexcept {
-    return conv_cursor_;
+    return execution_state_->conv_cursor;
   }
   [[nodiscard]] std::expected<void, Error> set_conv_cursor(
       std::array<std::uint32_t, kConvLayers> cursor);
@@ -159,14 +178,18 @@ class Session {
   std::array<std::uint32_t, kConvLayers> conv_cursor_{};
   std::array<std::uint64_t, kGdnLayers> gdn_position_{};
   std::uint64_t kv_capacity_{0};
-  std::array<std::uint64_t, kAttnLayers> kv_populated_{};
   std::uint64_t persistent_bytes_{0};
+  std::shared_ptr<SessionExecutionState> execution_state_;
 };
 
 namespace detail {
 
 struct SessionPlanAccess {
   [[nodiscard]] static qw38::cuda::Stream const* stream(
+      Session const& session) noexcept;
+  [[nodiscard]] static SessionExecutionState* execution_state(
+      Session& session) noexcept;
+  [[nodiscard]] static SessionExecutionState const* execution_state(
       Session const& session) noexcept;
   [[nodiscard]] static std::expected<KvPopulatedSlot, Error> kv_populated(
       Session& session, std::uint32_t attention_layer);

@@ -92,6 +92,89 @@ qw38::format::TensorRecord const* Model::find_tensor(
   return nullptr;
 }
 
+std::expected<std::uint32_t, Error> resolve_semantic_tensor(
+    qw38::format::ArtifactSchema const& schema, std::string_view logical_name,
+    qw38::format::SemanticNodeKind kind, qw38::format::TensorRole role,
+    std::uint32_t layer) {
+  if (layer >= kLanguageLayers) {
+    return std::unexpected(make_error(ErrorCode::InvalidArgument, "layer",
+                                      "semantic layer index is invalid"));
+  }
+  qw38::format::TensorRecord const* record = nullptr;
+  for (auto const& tensor : schema.tensors) {
+    if (tensor.logical_name == logical_name) {
+      if (record != nullptr) {
+        return std::unexpected(make_error(ErrorCode::MalformedArtifact,
+                                          "tensor", "duplicate logical name"));
+      }
+      record = &tensor;
+    }
+  }
+  if (record == nullptr) {
+    return std::unexpected(make_error(ErrorCode::InvalidArgument,
+                                      "tensor", "required semantic tensor is missing"));
+  }
+  auto const instance = 1u + 2u * layer +
+                        static_cast<std::uint32_t>(kind == qw38::format::SemanticNodeKind::Mlp);
+  std::uint32_t matches = 0;
+  for (auto const& binding : schema.graph_bindings) {
+    if (binding.tensor_id != record->tensor_id) continue;
+    if (binding.instance_id == instance && binding.kind == kind &&
+        binding.role == role && binding.layer_index == layer) {
+      ++matches;
+    } else if (record->logical_name != "rope.inv_freq" ||
+               binding.kind != qw38::format::SemanticNodeKind::GatedAttention ||
+               binding.role != qw38::format::TensorRole::VectorWeight ||
+               binding.layer_index >= kLanguageLayers ||
+               (binding.instance_id != 1u + 2u * binding.layer_index &&
+                !(binding.instance_id == 132u && binding.layer_index == 0u))) {
+      return std::unexpected(make_error(ErrorCode::MalformedArtifact,
+                                        "graph_bindings", "tensor has a wrong semantic binding"));
+    }
+  }
+  if (matches != 1) {
+    return std::unexpected(make_error(ErrorCode::MalformedArtifact,
+                                      "graph_bindings", "required binding is missing or duplicated"));
+  }
+  return record->tensor_id;
+}
+
+std::expected<std::uint32_t, Error> Model::resolve_tensor(
+    std::string_view logical_name, qw38::format::SemanticNodeKind kind,
+    qw38::format::TensorRole role, std::uint32_t layer) const {
+  return resolve_semantic_tensor(schema_, logical_name, kind, role, layer);
+}
+
+std::expected<ConstTensorView, Error> Model::payload(
+    std::uint32_t tensor_id) const {
+  for (auto const& u : uploaded_) {
+    if (u.tensor_id == tensor_id) {
+      if (u.payload.pointer == nullptr) {
+        return std::unexpected(make_error(ErrorCode::InvalidArgument, "payload",
+                                          "tensor has no payload"));
+      }
+      return u.payload;
+    }
+  }
+  return std::unexpected(make_error(ErrorCode::InvalidArgument, "tensor",
+                                    "tensor ID is not uploaded"));
+}
+
+std::expected<ConstTensorView, Error> Model::scales(
+    std::uint32_t tensor_id) const {
+  for (auto const& u : uploaded_) {
+    if (u.tensor_id == tensor_id) {
+      if (u.scales.pointer == nullptr) {
+        return std::unexpected(make_error(ErrorCode::InvalidArgument, "scales",
+                                          "tensor has no scales"));
+      }
+      return u.scales;
+    }
+  }
+  return std::unexpected(make_error(ErrorCode::InvalidArgument, "tensor",
+                                    "tensor ID is not uploaded"));
+}
+
 std::expected<ConstTensorView, Error> Model::payload(
     std::string_view logical_name) const {
   auto const* rec = find_tensor(logical_name);

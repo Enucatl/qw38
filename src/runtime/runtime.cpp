@@ -6,6 +6,14 @@
 #include <new>
 
 namespace qw38::runtime {
+namespace {
+
+Error closed_error(std::string_view operation) {
+  return make_error(ErrorCode::RuntimeClosed, operation,
+                    "runtime has been shut down");
+}
+
+}  // namespace
 
 std::expected<Runtime, Error> Runtime::create() {
   try {
@@ -51,6 +59,9 @@ std::expected<void, Error> Runtime::shutdown() {
 }
 
 std::expected<Model, Error> Runtime::load(std::filesystem::path const& path) {
+  if (!stream_) {
+    return std::unexpected(closed_error("runtime.load"));
+  }
   auto art = qw38::format::Artifact::open(path);
   if (!art) {
     return std::unexpected(from_format(art.error()));
@@ -60,11 +71,17 @@ std::expected<Model, Error> Runtime::load(std::filesystem::path const& path) {
 
 std::expected<Model, Error> Runtime::upload(
     qw38::format::Artifact const& artifact) {
+  if (!stream_) {
+    return std::unexpected(closed_error("runtime.upload"));
+  }
   return Model::upload(artifact, *stream_);
 }
 
 std::expected<Session, Error> Runtime::create_session(Model const& model,
                                                       std::uint64_t kv_capacity) {
+  if (!stream_) {
+    return std::unexpected(closed_error("runtime.create_session"));
+  }
   if (model.device() != device_) {
     return std::unexpected(make_error(
         ErrorCode::InvalidArgument, "runtime.create_session",

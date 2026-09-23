@@ -1,6 +1,6 @@
 # Code standards
 
-This document is normative for V0 implementation work. [Architecture V0](../architecture/architecture-v0.md) defines the model/runtime architecture, while the [technology baseline](technology-baseline.md) defines the reference platform, toolchain, build, and container environment. The future `implementation_ledger.md` will define implementation order; it is intentionally not created here.
+This document is normative for V0 implementation work. [Architecture V0](../architecture/architecture-v0.md) defines the model/runtime architecture, while the [technology baseline](technology-baseline.md) defines the reference platform, toolchain, build, and container environment. The [task ledger](task_ledger.md) defines implementation order.
 
 # Design philosophy
 
@@ -196,3 +196,34 @@ Future implementation task specifications must treat:
 - this code standard as authority for C++/CUDA implementation conventions.
 
 If task instructions conflict with these documents, report the conflict rather than silently resolving it.
+# Boundary, lifetime, and evidence contracts
+
+- Validate at the public bind/launch boundary: device and memory space,
+  constness, dtype, logical and physical geometry, layout, byte extent and
+  alignment, and permitted overlap. Describe every grouped operand separately.
+  Bound counts and checked arithmetic precede indexing, multiplication,
+  allocation, and span construction.
+- Keep storage capacity separate from logical extent. Derive checked token and
+  layer subviews from arenas; do not weaken semantic shape checks for oversized
+  storage. Binder changes exercise views produced by a real `Session`.
+- State borrowed-plan owners, movement and invalidation rules, device/stream,
+  and completion guarantee. Stateful execution defines failed, recoverable, and
+  closed states with explicit commit points. Failure checks inspect device bytes
+  and host metadata together, including failures after earlier mutation.
+- Separate mutable binding descriptions from validated execution plans. Make
+  validated plan state private or otherwise prevent callers from changing a
+  validated pointer/layout. Recheck changing position, capacity, and health at
+  execution; avoid generic operator frameworks.
+- Prove repairs through their production caller. Shared interface changes name
+  affected tests, CLIs, and excluded benchmarks. Numerical tests state input and
+  store precision and rounding placement, and use independent asymmetric cases
+  for orientation, operand identity, edge values, overflow, and non-finite data.
+- Bounded-memory claims cover each relevant BF16, quantized, identity,
+  reconstruction, and error branch. Isolate memory checks from process RSS
+  high-water marks. Added copies, launches, synchronizations, and hot allocations
+  are visible schedule changes; build and smoke affected benchmark consumers
+  without putting timings in correctness tests.
+- Completion reports map each locked requirement to implementation and a
+  discriminating test. Unmet requirements remain blockers or require an explicit
+  amendment. Give repaired findings stable IDs with caller, regression, and
+  remaining limitation.

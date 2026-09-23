@@ -21,12 +21,17 @@ struct CompileOptions {
       .major = kCompilerMajor,
       .minor = kCompilerMinor,
       .patch = kCompilerPatch};
-  bool verify_reconstruction{true};
+  bool verify_reconstruction{false};
   WeightFormatPolicy format_policy{WeightFormatPolicy::IdentityBf16};
 };
 
 struct CompileResult {
   qw38::format::ArtifactIdentity identity{};
+  qw38::format::Hash256 source_metadata_hash{};
+  qw38::format::Hash256 config_hash{};
+  qw38::format::Hash256 tokenizer_hash{};
+  WeightFormatPolicy format_policy{WeightFormatPolicy::IdentityBf16};
+  bool reconstruction_verified{};
   std::uint64_t peak_rss_bytes{};
   std::uint32_t language_instances{};
   std::uint32_t mtp_instances{};
@@ -78,11 +83,32 @@ build_identity_schema(ClassifiedCheckpoint const& classified,
         .minor = kCompilerMinor,
         .patch = kCompilerPatch});
 
+// Metadata-only contract check. Parses checkpoint/config/index/header metadata
+// and artifact metadata but never opens tensor payload bytes.
+[[nodiscard]] std::expected<void, CompilerError> verify_artifact_metadata(
+    std::filesystem::path const& artifact,
+    std::filesystem::path const& checkpoint, WeightFormatPolicy policy,
+    qw38::format::CompilerRevision const& revision = {
+        .ident = kCompilerIdent,
+        .major = kCompilerMajor,
+        .minor = kCompilerMinor,
+        .patch = kCompilerPatch});
+
+// Compare the semantic schema independently of artifact and checkpoint I/O.
+[[nodiscard]] std::expected<void, CompilerError> compare_artifact_schema(
+    qw38::format::ArtifactSchema const& actual,
+    qw38::format::ArtifactSchema const& expected);
+
 [[nodiscard]] std::expected<void, CompilerError> verify_quantized_tensor(
     std::string_view name, qw38::format::LogicalQuantizerId quantizer,
     qw38::format::PhysicalLayoutId layout, std::uint64_t n, std::uint64_t k,
     std::span<std::byte const> source, std::span<std::byte const> payload,
     std::span<std::byte const> scales);
+
+[[nodiscard]] std::expected<void, CompilerError> verify_bf16_tensor(
+    qw38::format::TensorRecord const& record,
+    std::span<std::byte const> payload,
+    std::span<std::byte const> source);
 
 [[nodiscard]] std::expected<void, CompilerError> verify_artifact_identities(
     qw38::format::ArtifactSchema const& artifact,

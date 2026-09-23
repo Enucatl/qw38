@@ -152,28 +152,26 @@ bool write_attn_artifact(std::filesystem::path const& path, HostAttn const& host
   auto kn_second = bf16_vec(14, attn_k_norm_name(kSecondLayer), kHeadDim);
   schema.tensors = {gamma, qg, k, v, qn, kn, rope, o, gamma_second,
                     qg_second, k_second, v_second, qn_second, kn_second};
-  schema.graph_bindings = {
-      GraphBinding{.instance_id = 1,
-                   .kind = SemanticNodeKind::GatedAttention,
-                   .role = TensorRole::NormGamma,
-                   .layer_index = kLayer,
-                   .tensor_id = 1},
-      GraphBinding{.instance_id = 1,
-                   .kind = SemanticNodeKind::GatedAttention,
-                   .role = TensorRole::DenseWeight,
-                   .layer_index = kLayer,
-                   .tensor_id = 2},
-      GraphBinding{.instance_id = 1,
-                   .kind = SemanticNodeKind::GatedAttention,
-                   .role = TensorRole::VectorWeight,
-                   .layer_index = kLayer,
-                   .tensor_id = 7},
-      GraphBinding{.instance_id = 1,
-                   .kind = SemanticNodeKind::GatedAttention,
-                   .role = TensorRole::DenseWeight,
-                   .layer_index = kLayer,
-                   .tensor_id = 8},
+  auto bind = [&](std::uint32_t id, std::uint32_t layer, TensorRole role) {
+    schema.graph_bindings.push_back(GraphBinding{
+        .instance_id = 1u + 2u * layer,
+        .kind = SemanticNodeKind::GatedAttention, .role = role,
+        .layer_index = layer, .tensor_id = id});
   };
+  bind(1, kLayer, TensorRole::AdditiveNorm);
+  for (auto id : {2u, 3u, 4u, 8u}) {
+    bind(id, kLayer, TensorRole::DenseWeight);
+  }
+  bind(5, kLayer, TensorRole::QkNorm);
+  bind(6, kLayer, TensorRole::QkNorm);
+  bind(7, kLayer, TensorRole::VectorWeight);
+  bind(9, kSecondLayer, TensorRole::AdditiveNorm);
+  for (auto id : {10u, 11u, 12u}) {
+    bind(id, kSecondLayer, TensorRole::DenseWeight);
+  }
+  bind(13, kSecondLayer, TensorRole::QkNorm);
+  bind(14, kSecondLayer, TensorRole::QkNorm);
+  bind(7, kSecondLayer, TensorRole::VectorWeight);
   auto state = language_persistent_schema();
   schema.state.assign(state.begin(), state.end());
   schema.scratch = qw38::runtime::test::language_scratch();
@@ -300,6 +298,22 @@ int main() {
   if (!p1 || !p2 || !p_second) {
     fail("bind plans");
     return 1;
+  }
+  auto alternate_stream = qw38::cuda::Stream::create();
+  expect(static_cast<bool>(alternate_stream), "create alternate same-device stream");
+  if (alternate_stream) {
+    auto wrong_prep = bind_attention_prep_plan(*model, *s1, 3,
+                                                *alternate_stream);
+    auto wrong_mixer = bind_attention_mixer_plan(*model, *s1, 3,
+                                                  *alternate_stream);
+    expect(!wrong_prep &&
+               wrong_prep.error().code == qw38::runtime::ErrorCode::InvalidArgument,
+           "attention preparation rejects non-owning stream");
+    expect(!wrong_mixer &&
+               wrong_mixer.error().code == qw38::runtime::ErrorCode::InvalidArgument,
+           "attention mixer rejects non-owning stream");
+    expect(s1->kv_populated(0) == 0 && static_cast<bool>(s1->save()),
+           "wrong-stream attention bind leaves session usable and unchanged");
   }
 
   auto r2 = host.residual;
@@ -484,6 +498,14 @@ int main() {
                gpu.size() * sizeof(float), rt->stream())),
            "mixer residual download");
     expect(static_cast<bool>(rt->stream().sync()), "mixer residual sync");
+    std::vector<float> original(kHidden);
+    expect(static_cast<bool>(qw38::cuda::copy_d2h(
+               original.data(), mixer_session->residual_h().pointer,
+               original.size() * sizeof(float), rt->stream())) &&
+               static_cast<bool>(rt->stream().sync()),
+           "download attention input residual after output projection");
+    expect(original == host.residual,
+           "attention output preserves its input residual exactly");
     expect_fp32_close(gpu, cpu->residual,
                       "full mixer residual token " + std::to_string(t),
                       qw38::reference::tol::kAttnMixerResidualAbs,
@@ -682,6 +704,87 @@ int main() {
          "read reset kv");
   expect(static_cast<bool>(rt->stream().sync()), "sync reset kv");
   expect(marker == 0, "reset zeros cache bytes");
+
+  std::optional<qw38::runtime::AttentionMixerPlan> bound_mixer;
+  std::optional<qw38::runtime::Session> moved_session;
+  {
+    auto source = rt->create_session(*model, kCap);
+    expect(static_cast<bool>(source), "create move-source attention session");
+    if (source) {
+      auto plan = bind_attention_mixer_plan(*model, *source, 3, rt->stream());
+      expect(static_cast<bool>(plan), "bind attention plan before session move");
+      if (plan) {
+        bound_mixer.emplace(std::move(*plan));
+        moved_session.emplace(std::move(*source));
+      }
+    }
+  }
+  if (bound_mixer && moved_session) {
+    expect(upload_residual(*moved_session, host.residual, rt->stream(), "moved") &&
+               static_cast<bool>(execute_decode_attention(*bound_mixer, 0)),
+           "attention plan executes after move-source destruction");
+    auto move_snapshot = moved_session->save();
+    expect(move_snapshot && move_snapshot->kv_populated[0] == 1,
+           "moved attention session receives bound plan metadata");
+    auto destination = rt->create_session(*model, kCap);
+    expect(static_cast<bool>(destination),
+           "create attention move-assignment destination");
+    if (destination) {
+      *destination = std::move(*moved_session);
+      expect(upload_residual(*destination, host.residual, rt->stream(), "assigned") &&
+                 static_cast<bool>(execute_decode_attention(*bound_mixer, 1)),
+             "attention plan executes after move assignment");
+      auto assignment_snapshot = destination->save();
+      expect(assignment_snapshot && assignment_snapshot->kv_populated[0] == 2,
+             "move-assigned attention session receives bound plan metadata");
+    }
+  }
+
+  {
+    auto failed_session = rt->create_session(*model, kCap);
+    auto control_session = rt->create_session(*model, kCap);
+    expect(failed_session && control_session,
+           "create attention core failure/recovery sessions");
+    if (failed_session && control_session) {
+      auto failed_plan = bind_attention_mixer_plan(*model, *failed_session, 3,
+                                                    rt->stream());
+      auto control_plan = bind_attention_mixer_plan(*model, *control_session, 3,
+                                                     rt->stream());
+      auto initial = failed_session->save();
+      expect(failed_plan && control_plan && initial,
+             "bind and snapshot attention failure/recovery control");
+      if (failed_plan && control_plan && initial &&
+          upload_residual(*failed_session, host.residual, rt->stream(), "fail") &&
+          upload_residual(*control_session, host.residual, rt->stream(), "control")) {
+        expect(static_cast<bool>(execute_decode_attention(*control_plan, 0)),
+               "clean attention control token succeeds");
+        auto control = control_session->save();
+        auto broken = *failed_plan;
+        broken.core.q.pointer = nullptr;
+        auto failed = execute_decode_attention(broken, 0);
+        expect(!failed && failed.error().code == qw38::runtime::ErrorCode::InvalidArgument,
+               "attention core failure after preparation is reported");
+        expect(failed_session->kv_populated(0) == 1,
+               "failed attention core follows committed KV preparation");
+        expect(!failed_session->save() &&
+                   !execute_decode_attention(*failed_plan, 1),
+               "poisoned attention session rejects snapshot and retry");
+        expect(static_cast<bool>(failed_session->restore(*initial)),
+               "restore clears failed attention execution state");
+        expect(static_cast<bool>(execute_decode_attention(*failed_plan, 0)),
+               "attention replays after restoring pre-token snapshot");
+        auto recovered = failed_session->save();
+        expect(control && recovered &&
+                   recovered->gdn_s == control->gdn_s &&
+                   recovered->conv_history == control->conv_history &&
+                   recovered->kv == control->kv &&
+                   recovered->conv_cursor == control->conv_cursor &&
+                   recovered->gdn_position == control->gdn_position &&
+                   recovered->kv_populated == control->kv_populated,
+               "attention recovery exactly matches clean control state and metadata");
+      }
+    }
+  }
 
   if (g_failures != 0) {
     std::cerr << g_failures << " attention integration failures\n";

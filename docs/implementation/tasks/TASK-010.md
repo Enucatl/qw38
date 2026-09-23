@@ -54,6 +54,11 @@ Report one representative decode MLP timing as diagnostic only.
 ## Architecture blocker rule
 On locked conflict stop with full required blocker report; do not change fusion/materialization.
 ## Completion report
+Historical note: the in-place residual-add wording and benchmark identity below
+describe the original TASK-010 completion report. Current MLP output-buffer and
+session-stream contracts are defined by [AR-03/05/09](../../../astra_review.md)
+and the current runtime binders; the old mutable tag/path is not an artifact
+identity.
 ### Result
 DONE
 ### Changes made
@@ -104,4 +109,3 @@ None.
 ### Follow-up observations
 - Down residual-add updates `h_mid` in place. The next-layer ping-pong into `residual_h` remains a layer-integration concern (TASK-016).
 - Declared composed tolerances: RMS BF16 8e-3; SwiGLU BF16 2e-2 abs / 1e-3 rel; final residual 5e-2 abs / 1e-3 rel (GEMV reduction-order plus one BF16 store per stage).
-

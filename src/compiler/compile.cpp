@@ -19,6 +19,7 @@
 #include <limits>
 #include <string>
 #include <unordered_map>
+#include <tuple>
 #include <unordered_set>
 
 namespace qw38::compiler {
@@ -419,27 +420,100 @@ std::expected<void, CompilerError> compare_bytes(std::span<std::byte const> a,
   return {};
 }
 
-std::expected<std::vector<std::byte>, CompilerError> reconstruct_bf16_payload(
-    TensorRecord const& record, std::span<std::byte const> payload) {
+std::expected<void, CompilerError> verify_bf16_payload_impl(
+    TensorRecord const& record, std::span<std::byte const> payload,
+    std::span<std::byte const> source) {
   auto const& shape = record.shape;
+  if (shape.rank == 0 || shape.rank > shape.logical.size()) {
+    return std::unexpected(make_error(CompilerErrorCode::ShapeMismatch,
+                                      record.logical_name,
+                                      "BF16 logical rank is invalid"));
+  }
+  std::uint64_t elements = 1;
+  for (std::uint8_t i = 0; i < shape.rank; ++i) {
+    auto const dim = shape.logical[i];
+    if (dim == 0 || elements > std::numeric_limits<std::uint64_t>::max() / dim) {
+      return std::unexpected(make_error(CompilerErrorCode::Unrepresentable,
+                                        record.logical_name,
+                                        "BF16 logical element count is invalid"));
+    }
+    elements *= dim;
+  }
+  if (elements > std::numeric_limits<std::size_t>::max() / 2 ||
+      source.size() != elements * 2) {
+    return std::unexpected(make_error(CompilerErrorCode::ShapeMismatch,
+                                      record.logical_name,
+                                      "BF16 source size differs from geometry"));
+  }
+  if (payload.size() != source.size()) {
+    return std::unexpected(make_error(CompilerErrorCode::ShapeMismatch,
+                                      record.logical_name,
+                                      "BF16 payload size differs from source"));
+  }
   if (record.mapping.kind == MappingKind::TapMajorConvC1T) {
     if (shape.rank != 3 || shape.logical[1] != 1) {
       return std::unexpected(make_error(CompilerErrorCode::ShapeMismatch,
                                         record.logical_name,
                                         "tap-major mapping has invalid logical shape"));
     }
-    return conv_from_tap_major(payload, shape.logical[0], shape.logical[2]);
+    auto const channels = shape.logical[0];
+    auto const taps = shape.logical[2];
+    for (std::uint64_t c = 0; c < channels; ++c) {
+      for (std::uint64_t t = 0; t < taps; ++t) {
+        auto const src_offset = (c * taps + t) * 2;
+        auto const payload_offset = (t * channels + c) * 2;
+        if (std::memcmp(source.data() + src_offset,
+                        payload.data() + payload_offset, 2) != 0) {
+          return std::unexpected(make_error(CompilerErrorCode::HashMismatch,
+                                            record.logical_name,
+                                            "reconstructed bytes differ from source"));
+        }
+      }
+    }
+    return {};
   }
   if (record.mapping.kind == MappingKind::DenseTileNK) {
-    if (shape.rank != 2) {
+    if (shape.rank != 2 || shape.logical[0] % kDenseTileRows != 0 ||
+        shape.logical[1] % kDenseTileK != 0) {
       return std::unexpected(make_error(CompilerErrorCode::ShapeMismatch,
                                         record.logical_name,
                                         "dense-tile mapping has invalid logical shape"));
     }
-    return row_major_from_tile_nk(payload, shape.logical[0], shape.logical[1]);
+    auto const n = shape.logical[0];
+    auto const k = shape.logical[1];
+    auto const tiles_k = k / kDenseTileK;
+    for (std::uint64_t tile_n = 0; tile_n < n / kDenseTileRows; ++tile_n) {
+      for (std::uint64_t tile_k = 0; tile_k < tiles_k; ++tile_k) {
+        for (std::uint64_t row = 0; row < kDenseTileRows; ++row) {
+          auto const logical_row = tile_n * kDenseTileRows + row;
+          auto const logical_offset = (logical_row * k) + tile_k * kDenseTileK;
+          auto const payload_offset =
+              ((tile_n * tiles_k + tile_k) * kDenseTileRows + row) *
+              kDenseTileK;
+          auto const bytes = kDenseTileK * 2;
+          if (std::memcmp(source.data() + logical_offset * 2,
+                          payload.data() + payload_offset * 2,
+                          static_cast<std::size_t>(bytes)) != 0) {
+            return std::unexpected(make_error(CompilerErrorCode::HashMismatch,
+                                              record.logical_name,
+                                              "reconstructed bytes differ from source"));
+          }
+        }
+      }
+    }
+    return {};
   }
   if (record.mapping.kind == MappingKind::Identity) {
-    return std::vector<std::byte>(payload.begin(), payload.end());
+    constexpr std::size_t kChunkBytes = 1u << 20;
+    for (std::size_t offset = 0; offset < source.size(); offset += kChunkBytes) {
+      auto const count = std::min(kChunkBytes, source.size() - offset);
+      if (std::memcmp(source.data() + offset, payload.data() + offset, count) != 0) {
+        return std::unexpected(make_error(CompilerErrorCode::HashMismatch,
+                                          record.logical_name,
+                                          "reconstructed bytes differ from source"));
+      }
+    }
+    return {};
   }
   return std::unexpected(make_error(CompilerErrorCode::Internal,
                                     record.logical_name,
@@ -447,6 +521,12 @@ std::expected<std::vector<std::byte>, CompilerError> reconstruct_bf16_payload(
 }
 
 }  // namespace
+
+std::expected<void, CompilerError> verify_bf16_tensor(
+    TensorRecord const& record, std::span<std::byte const> payload,
+    std::span<std::byte const> source) {
+  return verify_bf16_payload_impl(record, payload, source);
+}
 
 std::vector<StateAllocation> language_state_schema() {
   auto const schema = qw38::format::v0_language_state_schema();
@@ -744,6 +824,10 @@ std::expected<CompileResult, CompilerError> compile_checkpoint(
 
   CompileResult result{};
   result.identity = *identity;
+  result.source_metadata_hash = ckpt->source_hash;
+  result.config_hash = ckpt->config_hash;
+  result.tokenizer_hash = ckpt->tokenizer_hash;
+  result.format_policy = options.format_policy;
   result.language_instances =
       count_instances(schema->graph_bindings, SourceClass::Language);
   result.mtp_instances = count_instances(schema->graph_bindings,
@@ -759,6 +843,7 @@ std::expected<CompileResult, CompilerError> compile_checkpoint(
         !st) {
       return std::unexpected(st.error());
     }
+    result.reconstruction_verified = true;
   }
   result.peak_rss_bytes = current_peak_rss_bytes();
   return result;
@@ -883,8 +968,13 @@ std::expected<void, CompilerError> verify_quantized_tensor(
 
 std::expected<void, CompilerError> verify_compiled_artifact(
     std::filesystem::path const& artifact_path,
-    std::filesystem::path const& checkpoint, WeightFormatPolicy /*policy*/,
+    std::filesystem::path const& checkpoint, WeightFormatPolicy policy,
     CompilerRevision const& revision) {
+  if (auto st = verify_artifact_metadata(artifact_path, checkpoint, policy,
+                                        revision);
+      !st) {
+    return st;
+  }
   auto ckpt = open_checkpoint(checkpoint);
   if (!ckpt) {
     return std::unexpected(ckpt.error());
@@ -956,14 +1046,154 @@ std::expected<void, CompilerError> verify_compiled_artifact(
         }
         continue;
       }
-      auto restored = reconstruct_bf16_payload(*record, *payload);
-      if (!restored) {
-        return std::unexpected(restored.error());
-      }
-      if (auto st = compare_bytes(*restored, *src, exp.name); !st) {
+      if (auto st = verify_bf16_tensor(*record, *payload, *src); !st) {
         return st;
       }
     }
+  }
+  return {};
+}
+
+std::expected<void, CompilerError> verify_artifact_metadata(
+    std::filesystem::path const& artifact_path,
+    std::filesystem::path const& checkpoint, WeightFormatPolicy policy,
+    CompilerRevision const& revision) {
+  auto ckpt = open_checkpoint(checkpoint);
+  if (!ckpt) {
+    return std::unexpected(ckpt.error());
+  }
+  auto art = Artifact::open(artifact_path);
+  if (!art) {
+    return std::unexpected(from_format(art.error()));
+  }
+  auto expected = build_schema(ckpt->classified, ckpt->source_hash,
+                               ckpt->config_hash, ckpt->tokenizer_hash,
+                               revision, policy);
+  if (!expected) {
+    return std::unexpected(expected.error());
+  }
+
+  return compare_artifact_schema(art->schema(), *expected);
+}
+
+std::expected<void, CompilerError> compare_artifact_schema(
+    ArtifactSchema const& actual, ArtifactSchema const& expected) {
+  auto mismatch = [](std::string field, std::string detail) {
+    return std::unexpected(make_error(CompilerErrorCode::ShapeMismatch,
+                                      std::move(field), std::move(detail)));
+  };
+  if (actual.manifest_version != expected.manifest_version) {
+    return mismatch("manifest_version", "does not match requested schema");
+  }
+  if (actual.compiler != expected.compiler) {
+    return mismatch("compiler", "does not match requested compiler revision");
+  }
+  if (actual.source_hash != expected.source_hash ||
+      actual.config_hash != expected.config_hash ||
+      actual.tokenizer_hash != expected.tokenizer_hash) {
+    return mismatch("source_metadata", "checkpoint metadata identity differs");
+  }
+  auto got_precision = actual.precision;
+  auto want_precision = expected.precision;
+  auto by_precision_domain = [](auto const& a, auto const& b) {
+    return std::tuple{a.domain, a.dtype} < std::tuple{b.domain, b.dtype};
+  };
+  std::sort(got_precision.bindings.begin(), got_precision.bindings.end(),
+            by_precision_domain);
+  std::sort(want_precision.bindings.begin(), want_precision.bindings.end(),
+            by_precision_domain);
+  auto got_state = actual.state;
+  auto want_state = expected.state;
+  auto by_state_kind = [](auto const& a, auto const& b) {
+    return a.kind < b.kind;
+  };
+  std::sort(got_state.begin(), got_state.end(), by_state_kind);
+  std::sort(want_state.begin(), want_state.end(), by_state_kind);
+  auto got_scratch = actual.scratch;
+  auto want_scratch = expected.scratch;
+  auto by_scratch_kind = [](auto const& a, auto const& b) {
+    return a.kind < b.kind;
+  };
+  std::sort(got_scratch.begin(), got_scratch.end(), by_scratch_kind);
+  std::sort(want_scratch.begin(), want_scratch.end(), by_scratch_kind);
+  if (got_precision != want_precision || actual.scope != expected.scope ||
+      got_state != want_state || got_scratch != want_scratch) {
+    return mismatch("policy_or_state_schema",
+                    "precision, semantic scope, state, or scratch differs");
+  }
+
+  auto got_tensors = actual.tensors;
+  auto want_tensors = expected.tensors;
+  auto by_tensor_name = [](TensorRecord const& a, TensorRecord const& b) {
+    return a.logical_name < b.logical_name;
+  };
+  std::sort(got_tensors.begin(), got_tensors.end(), by_tensor_name);
+  std::sort(want_tensors.begin(), want_tensors.end(), by_tensor_name);
+  if (got_tensors.size() != want_tensors.size()) {
+    return mismatch("tensor_directory", "tensor membership count differs");
+  }
+  for (std::size_t i = 0; i < want_tensors.size(); ++i) {
+    auto got = got_tensors[i];
+    auto want = want_tensors[i];
+    got.tensor_id = 0;
+    want.tensor_id = 0;
+    got.payload = {};
+    got.scales = {};
+    want.payload = {};
+    want.scales = {};
+    if (got != want) {
+      return mismatch("tensor." + want.logical_name,
+                      got.logical_name != want.logical_name
+                          ? "tensor membership differs"
+                          : "shape, storage, quantizer, layout, or mapping differs");
+    }
+  }
+
+  auto got_graph = actual.graph_bindings;
+  auto want_graph = expected.graph_bindings;
+  auto name_for = [](ArtifactSchema const& schema, std::uint32_t id)
+      -> std::string_view {
+    for (auto const& tensor : schema.tensors) {
+      if (tensor.tensor_id == id) return tensor.logical_name;
+    }
+    return {};
+  };
+  auto graph_key = [&](ArtifactSchema const& schema, GraphBinding const& b) {
+    return std::tuple{b.instance_id, b.kind, b.role, b.layer_index,
+                      name_for(schema, b.tensor_id)};
+  };
+  std::sort(got_graph.begin(), got_graph.end(), [&](auto const& a, auto const& b) {
+    return graph_key(actual, a) < graph_key(actual, b);
+  });
+  std::sort(want_graph.begin(), want_graph.end(), [&](auto const& a, auto const& b) {
+    return graph_key(expected, a) < graph_key(expected, b);
+  });
+  if (got_graph.size() != want_graph.size() ||
+      !std::equal(got_graph.begin(), got_graph.end(), want_graph.begin(),
+                  [&](auto const& a, auto const& b) {
+                    return graph_key(actual, a) == graph_key(expected, b);
+                  })) {
+    return mismatch("graph_bindings", "semantic binding set differs");
+  }
+
+  auto got_shared = actual.shared_bindings;
+  auto want_shared = expected.shared_bindings;
+  auto shared_key = [&](ArtifactSchema const& schema, SharedBinding const& b) {
+    return std::tuple{name_for(schema, b.owner_tensor_id),
+                      name_for(schema, b.alias_tensor_id), b.role};
+  };
+  std::sort(got_shared.begin(), got_shared.end(), [&](auto const& a, auto const& b) {
+    return shared_key(actual, a) < shared_key(actual, b);
+  });
+  std::sort(want_shared.begin(), want_shared.end(), [&](auto const& a, auto const& b) {
+    return shared_key(expected, a) < shared_key(expected, b);
+  });
+  if (got_shared.size() != want_shared.size() ||
+      !std::equal(got_shared.begin(), got_shared.end(), want_shared.begin(),
+                  [&](auto const& a, auto const& b) {
+                    return shared_key(actual, a) == shared_key(expected, b);
+                  })) {
+    return mismatch("shared_bindings", "canonical sharing differs");
   }
   return {};
 }

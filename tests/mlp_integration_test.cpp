@@ -120,7 +120,7 @@ bool write_mlp_artifact(std::filesystem::path const& path, HostMlp const& host) 
   schema.graph_bindings = {
       GraphBinding{.instance_id = 2,
                    .kind = SemanticNodeKind::Mlp,
-                   .role = TensorRole::NormGamma,
+                   .role = TensorRole::AdditiveNorm,
                    .layer_index = 0,
                    .tensor_id = 1},
       GraphBinding{.instance_id = 2,

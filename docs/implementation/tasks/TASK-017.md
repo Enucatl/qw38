@@ -28,7 +28,7 @@ Production prefill, sampling policy, tokenizer payload in artifact, MTP executio
 ## Required interfaces
 Concrete compiled-model plan, session capacity, `decode_token(token_id, position)` returning FP32 logits/view and argmax; CLI clearly labels primary-language scope and slow prompt setup.
 ## Required semantics
-Exactly 64 language layers; MTP disabled; embedding and lm_head untied; each token commits state in order; populated length/position remain coherent; logits are FP32.
+Exactly 64 language layers; MTP disabled; embedding and lm_head untied; each token commits state in order; populated length/position remain coherent; logits are FP32. Per-layer progress remains pending until all layers and output work complete; one global token position commits at that boundary. A failure after any layer mutation poisons the session until reset or valid snapshot restore; it cannot be retried at the same position as if earlier layers had not advanced.
 ## Data representation
 Use artifact bindings and session schema; no runtime repack/full dequantization; active state byte formula remains language-only.
 ## Implementation constraints
@@ -41,9 +41,10 @@ Runtime model plan/scheduler, decode CLI, full-model smoke/integration fixtures.
 ### Unit tests
 Graph count/order/binding validation, token/position/capacity errors, MTP disabled, logits shape/dtype.
 ### Reference/numerical tests
-Small deterministic full-stack fixture and selected authoritative-checkpoint checkpoints versus BF16 control/reference.
+Small deterministic full-stack fixture and selected authoritative-checkpoint checkpoints versus an independent source-model oracle. BF16 engine control must first agree with source logits and selected residual/state checkpoints within declared tolerances before V0-versus-BF16 differences are attributed to quantization.
 ### Integration tests
 Reset, multi-token decode, slow prompt setup, save/restore continuation, deterministic repeated greedy output; complete authoritative model produces finite logits.
+Inject failure after an earlier layer advanced; verify execution and snapshots reject while poisoned, then compare continuation after reset/restore with a clean control. Inspect persistent bytes and host metadata together.
 ## Benchmark required
 No performance gate; record smoke latency only as diagnostic.
 ## Acceptance criteria
@@ -52,6 +53,8 @@ No performance gate; record smoke latency only as diagnostic.
 - [ ] Final output is 248320 finite FP32 logits plus deterministic argmax.
 - [ ] MTP stays retained but disabled and output is labeled language-only.
 - [ ] No production-prefill shortcut is claimed.
+- [ ] Pin source weights/config/tokenizer, source software revision, token IDs, precision settings, and hashes for initial and continued-token logits plus selected residual/state checkpoints.
+- [ ] Budget the one-layer-resident BF16 diagnostic explicitly; report untested coverage and preserve exact equality only for deterministic replay of the same implementation/schedule.
 ## Architecture blocker rule
 On locked conflict stop with full blocker report; do not omit/reorder layers or enable unresolved MTP.
 ## Completion report

@@ -43,7 +43,7 @@ TensorView make_view(void* ptr, ArithmeticDtype dtype, PhysicalLayoutId layout,
   v.layout = layout;
   v.storage = storage;
   v.space = MemorySpace::Device;
-  v.writable = writable;
+  (void)writable;  // Mutability is represented by TensorView/ConstTensorView.
   v.rank = rank;
   v.extent[0] = e0;
   v.extent[1] = e1;

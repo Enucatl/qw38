@@ -4,6 +4,8 @@
 #include <cstdint>
 #include <cstring>
 #include <iostream>
+#include <limits>
+#include <span>
 #include <string_view>
 #include <vector>
 
@@ -64,10 +66,14 @@ int main() {
     fail(qw38::compiler::error_message(tiled.error()));
   } else {
     expect(tiled->size() == src.size(), "tile preserves numel");
-    expect(tiled_element_index(n, k, 0, 0) == 0, "first element stays first");
-    expect(tiled_element_index(n, k, 0, 256) == 8 * 256,
+    expect(tiled_element_index(n, k, 0, 0) &&
+               *tiled_element_index(n, k, 0, 0) == 0,
+           "first element stays first");
+    expect(tiled_element_index(n, k, 0, 256) &&
+               *tiled_element_index(n, k, 0, 256) == 8 * 256,
            "next K-tile starts after 8 rows of 256");
-    expect(tiled_element_index(n, k, 8, 0) == 2 * 8 * 256,
+    expect(tiled_element_index(n, k, 8, 0) &&
+               *tiled_element_index(n, k, 8, 0) == 2 * 8 * 256,
            "next N-tile follows both K tiles");
     auto restored = row_major_from_tile_nk(*tiled, n, k);
     if (!restored) {
@@ -80,6 +86,22 @@ int main() {
   auto bad = tile_nk_from_row_major(src, 7, k);
   expect(!bad && bad.error().code == CompilerErrorCode::ShapeMismatch,
          "tile mapping rejects unaligned N");
+  auto empty = std::span<std::byte const>{};
+  constexpr auto huge_k = std::uint64_t{1} << 61;
+  for (auto transform : {tile_nk_from_row_major, row_major_from_tile_nk}) {
+    auto overflow = transform(empty, 8, huge_k);
+    expect(!overflow && overflow.error().code == CompilerErrorCode::Unrepresentable,
+           "dense transform rejects element overflow before access");
+    expect(!transform(empty, 0, 256), "dense transform rejects zero dimension");
+    expect(!transform(std::span<std::byte const>{src}.first(src.size() - 2), n, k),
+           "dense transform rejects short payload");
+    auto long_bytes = src;
+    long_bytes.resize(src.size() + 2);
+    expect(!transform(long_bytes, n, k),
+           "dense transform rejects long payload");
+  }
+  expect(!tiled_element_index(n, k, n, 0),
+         "dense index rejects out-of-range row");
 
   constexpr std::uint64_t channels = 32;
   constexpr std::uint64_t taps = 4;
@@ -100,6 +122,18 @@ int main() {
     expect(src10 == dst01, "[c=1,t=0] maps to [t=0,c=1]");
     auto back = conv_from_tap_major(*tap, channels, taps);
     expect(static_cast<bool>(back) && *back == conv, "exact conv inverse");
+  }
+  for (auto transform : {conv_to_tap_major, conv_from_tap_major}) {
+    auto overflow = transform(empty, std::numeric_limits<std::uint64_t>::max(), 2);
+    expect(!overflow && overflow.error().code == CompilerErrorCode::Unrepresentable,
+           "conv transform rejects element overflow before access");
+    expect(!transform(empty, 0, 4), "conv transform rejects zero dimension");
+    expect(!transform(std::span<std::byte const>{conv}.first(conv.size() - 2), channels, taps),
+           "conv transform rejects short payload");
+    auto long_bytes = conv;
+    long_bytes.resize(conv.size() + 2);
+    expect(!transform(long_bytes, channels, taps),
+           "conv transform rejects long payload");
   }
 
   // These bits are independently rounded from ω_j = 10,000,000^(-2j/64),

@@ -4,6 +4,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <limits>
 #include <span>
 #include <string_view>
 #include <type_traits>
@@ -374,6 +375,12 @@ int main() {
   expect(static_cast<bool>(s1->set_populated_length(0, 3)),
          "populated within cap");
   expect(s1->kv_populated(0) == 3, "populated stored");
+  for (std::uint32_t index : {std::uint32_t{16},
+                              std::numeric_limits<std::uint32_t>::max()}) {
+    auto out_of_range = s1->kv_populated(index);
+    expect(!out_of_range && out_of_range.error().code == ErrorCode::InvalidArgument,
+           "out-of-range KV metadata index rejected");
+  }
 
   auto cursor = s1->conv_cursor();
   cursor[1] = 2;
@@ -405,6 +412,12 @@ int main() {
            "restore rejects invalid convolution cursor");
     expect(s1->kv_populated(0) == 3 && s1->conv_cursor()[1] == 2,
            "rejected restore leaves metadata unchanged");
+    auto after_rejected_restore = s1->save();
+    expect(after_rejected_restore &&
+               after_rejected_restore->gdn_s == snap2->gdn_s &&
+               after_rejected_restore->conv_history == snap2->conv_history &&
+               after_rejected_restore->kv == snap2->kv,
+           "preflight restore rejection preserves device state and usability");
   }
   qw38::cuda::testing::fail_next_stream_sync();
   auto failed_reset = s1->reset();
@@ -412,6 +425,15 @@ int main() {
          "injected deferred reset failure is reported");
   expect(s1->kv_populated(0) == 3 && s1->conv_cursor()[1] == 2,
          "failed reset does not commit host metadata");
+  auto poisoned_after_reset = s1->save();
+  expect(!poisoned_after_reset &&
+             poisoned_after_reset.error().code == ErrorCode::InvalidArgument,
+         "failed reset poisons session and rejects snapshot");
+  std::byte reset_byte{0xff};
+  expect(static_cast<bool>(qw38::cuda::copy_d2h(
+             &reset_byte, s1->gdn_s().pointer, 1, rt->stream())) &&
+             static_cast<bool>(rt->stream().sync()) && reset_byte == std::byte{},
+         "failed reset synchronized mutated device state before reporting failure");
   expect(static_cast<bool>(s1->reset()), "reset");
   expect(s1->kv_populated(0) == 0, "reset clears populated");
   expect(s1->conv_cursor()[1] == 0, "reset clears cursor");
@@ -434,6 +456,16 @@ int main() {
            "injected deferred restore failure is reported");
     expect(s1->kv_populated(0) == 0 && s1->conv_cursor()[1] == 0,
            "failed restore does not commit host metadata");
+    auto poisoned_after_restore = s1->save();
+    expect(!poisoned_after_restore &&
+               poisoned_after_restore.error().code == ErrorCode::InvalidArgument,
+           "failed restore poisons session and rejects snapshot");
+    std::byte restored_byte{};
+    expect(static_cast<bool>(qw38::cuda::copy_d2h(
+               &restored_byte, s1->gdn_s().pointer, 1, rt->stream())) &&
+               static_cast<bool>(rt->stream().sync()) &&
+               restored_byte == snap2->gdn_s[0],
+           "failed restore synchronized changed device state");
     expect(static_cast<bool>(s1->restore(*snap2)), "restore");
     expect(s1->kv_populated(0) == 3, "restore populated");
     expect(s1->conv_cursor()[1] == 2, "restore cursor");
@@ -585,6 +617,30 @@ int main() {
         expect(static_cast<bool>(lifetime_runtime->stream().sync()),
                "Runtime remains usable after Session destruction");
       }
+    }
+  }
+
+  {
+    auto closed_runtime = Runtime::create();
+    auto artifact = qw38::format::Artifact::open(fx.path);
+    expect(closed_runtime && artifact, "prepare closed Runtime API checks");
+    if (closed_runtime && artifact) {
+      auto const allocations_before = qw38::cuda::malloc_count();
+      expect(static_cast<bool>(closed_runtime->shutdown()),
+             "shutdown closes an unshared Runtime");
+      expect(static_cast<bool>(closed_runtime->shutdown()),
+             "repeated Runtime shutdown is safe");
+      auto closed_upload = closed_runtime->upload(*artifact);
+      auto closed_load = closed_runtime->load(fx.path);
+      auto closed_session = closed_runtime->create_session(*model, 1);
+      expect(!closed_upload && closed_upload.error().code == ErrorCode::RuntimeClosed,
+             "upload after shutdown returns typed closed error");
+      expect(!closed_load && closed_load.error().code == ErrorCode::RuntimeClosed,
+             "load after shutdown returns typed closed error");
+      expect(!closed_session && closed_session.error().code == ErrorCode::RuntimeClosed,
+             "session creation after shutdown returns typed closed error");
+      expect(qw38::cuda::malloc_count() == allocations_before,
+             "closed Runtime rejects operations before device allocation");
     }
   }
 

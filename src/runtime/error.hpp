@@ -19,6 +19,7 @@ enum class ErrorCode : std::uint16_t {
   AllocationFailed = 7,
   InvalidArgument = 8,
   Internal = 9,
+  RuntimeClosed = 10,
 };
 
 struct Error {

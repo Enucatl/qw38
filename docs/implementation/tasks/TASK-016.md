@@ -21,6 +21,8 @@ Expose binding, residual, scratch, and persistent-state errors before scaling to
 | P-01–P-02, S-01–S-02, M-01 | Precision/state/scratch contracts | LOCKED |
 ## Starting point
 Complete GDN+MLP and attention+MLP paths work separately.
+The focused review-repair checks and trace evidence are recorded in
+[`task-016-prerequisite-evidence.md`](../task-016-prerequisite-evidence.md).
 ## Scope
 Build immutable plans and deterministic fixtures for one GDN-style language layer and one full-attention-style language layer through the same runtime/session/tensor binding/scratch/residual machinery. Execute consecutive tokens and compare each materialized boundary, state update, and final residual to reference/BF16 control.
 ## Out of scope
@@ -31,6 +33,10 @@ Concrete `LanguageLayerPlan`-equivalent tagged plan (no virtual operator framewo
 Layer ordering is mixer residual transition then post-mixer MLP transition. Input residual remains valid for its owning add. Only the correct state family changes.
 ## Data representation
 Bindings come from artifact tensor IDs/layouts; two FP32 residual buffers ping-pong; arena aliases follow proven lifetimes; session state remains layer-indexed.
+Resolve canonical V0 logical names once at model-plan construction into typed
+tensor IDs and semantic slots. Validate each binding's graph membership, role,
+shape, layout, and layer there. Never choose operands by matching shape or
+directory order; test swapped same-shaped operands and distinct layer instances.
 ## Implementation constraints
 No per-call plan construction/allocation; no cross-layer scratch leakage; deterministic one-stream ordering.
 ## Tuning defaults
@@ -51,6 +57,9 @@ No.
 - [ ] Residual ping-pong, scratch reuse, and tensor bindings are correct.
 - [ ] Only expected persistent state changes.
 - [ ] Multi-token and restore continuation pass.
+- [ ] Bind through actual uploaded-model and Session views; cover multiple state indices, a second session, supported Session movement, full relevant state bytes, and untouched-state isolation.
+- [ ] Report the first differing materialized boundary on mismatch; preserve exact equality checks for deterministic snapshot/replay.
+- [ ] Demonstrate same-stream ownership and failed-operation/session-health behavior required by AR-03–AR-05.
 ## Architecture blocker rule
 On locked conflict stop with full blocker report; do not introduce a generic graph/operator architecture.
 ## Completion report
@@ -65,4 +74,3 @@ Not required.
 None/full report.
 ### Follow-up observations
 Concrete only.
-

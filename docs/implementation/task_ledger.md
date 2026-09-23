@@ -16,7 +16,7 @@ Implement Architecture V0 as a sequence of small, testable increments that reach
 - Completion requires every acceptance criterion and required test in the task file.
 - A locked-decision conflict stops the sequence with `ARCHITECTURE_BLOCKER`; it never authorizes an implicit redesign.
 - Every blocker report contains: `Decision ID`, `Attempted implementation`, `Observed problem`, `Evidence`, `Why this is architectural rather than tuning`, `Smallest plausible alternative`, and `Affected downstream tasks`.
-- Ordinary tasks implement V0 as written. Only TASK-023 through TASK-030 may challenge the named selected hypotheses, and each must keep unrelated variables fixed.
+- Ordinary tasks implement V0 as written. Only TASK-024 through TASK-031 may challenge the named selected hypotheses, and each must keep unrelated variables fixed. TASK-023 establishes the baseline; TASK-031 is EXP-H.
 - Keep benchmarks separate from correctness tests. Preserve exact commands, results, artifact/binary identities, and hardware context in each completion report.
 - Status values are `TODO`, `IN_PROGRESS`, `BLOCKED`, and `DONE`; all tasks begin `TODO`.
 
@@ -93,3 +93,30 @@ TASK-001 → 002 → 003 → 004 → 005 → 006
 
 | Amendment | Date | Decisions affected | Summary |
 | --------- | ---- | ------------------ | ------- |
+
+## Repair index
+
+The AR IDs below are stable references from the repository-root
+`astra_review.md`. Focused commands, measurements, and limits for TASK-016
+prerequisites are in [`task-016-prerequisite-evidence.md`](task-016-prerequisite-evidence.md).
+A code repair is closed only when its production caller, discriminating
+regression, and limits are recorded here.
+
+| ID | Finding | Status | Current contract, production path, and remaining evidence |
+| -- | ------- | ------ | ------------------------------------------------------- |
+| AR-01 | No source or generated payload digests | Closed by policy | [`code-standards.md`](code-standards.md#checkpoint-and-qw38-payload-digest-policy); checkpoint source identity is index metadata only; manifest digest remains the sole content digest. |
+| AR-02 | Verify artifact policy and schema from metadata | Focused checks pass | [`verify_artifact_metadata`](../../src/compiler/compile.cpp) precedes reconstruction; synthetic schema comparison covers policy, bindings, format, shape and ordering. Full checkpoint caller evidence follows the promotion cadence. |
+| AR-03 | Failed-state recovery and complete-token commit | Component checks pass; TASK-017 remains | [`Session`](../../src/runtime/session.cpp) poisons failed stateful operations; reset/restore and GDN/attention failure/recovery checks compare device bytes and metadata. Global token commit awaits TASK-017. |
+| AR-04 | Move-stable plan metadata | Focused checks pass | [`SessionExecutionState`](../../src/runtime/session.hpp) keeps borrowed counters stable; bound GDN/attention plans execute after move construction and assignment. |
+| AR-05 | One session stream at session-backed binders | Focused checks pass | MLP, attention, and GDN binders reject an alternate same-device stream before execution. |
+| AR-06 | Checked geometry and descriptors | Focused checks pass | Checked runtime views, state indices, and compiler transforms reject rank/count/index/overflow and payload-size errors. |
+| AR-07 | Bounded BF16 reconstruction verification | Focused checks pass | [`verify_bf16_payload`](../../src/compiler/compile.cpp) detects corruption in all BF16 mappings and adds less than 0.5 MiB peak RSS for isolated 8/32 MiB identity/tiled inputs. |
+| AR-08 | Closed Runtime API | Focused checks pass | [`Runtime`](../../src/runtime/runtime.cpp) rejects post-shutdown upload/session creation; repeated shutdown is safe. |
+| AR-09 | Attention direct residual output | Focused checks and trace pass | [`execute_attention_core`](../../src/runtime/attention.cpp) preserves Q4/BF16 input residuals; isolated BF16 trace records six kernels and no D2D copy. |
+| AR-10 | Benchmark consumers and launch accounting | Focused checks and trace pass | Excluded MLP/GDN benchmarks build and smoke; GDN trace records eight kernels per execution and no D2D copy. |
+| AR-11 | Completion semantics before 64-layer composition | Partial | GDN capture is rejected before mutation; GDN/attention completion remains component-owned and TASK-017 must establish one token commit/sync boundary with measured eager behavior. |
+| AR-12 | Semantic operand resolution boundary | Binder resolver checks pass | [`resolve_semantic_tensor`](../../src/runtime/model.cpp) resolves canonical V0 names to IDs and validates graph node/role/layer at plan binding; binders validate shape/layout before returning plans. Full one-layer composition remains TASK-016. |
+| AR-13 | Integration checkpoint and independent source evidence | Planning carried forward | [`TASK-016`](tasks/TASK-016.md) and [`TASK-017`](tasks/TASK-017.md) include session-backed integration and pinned source-oracle evidence; no oracle run exists yet. |
+| AR-14 | Quality-gate recovery procedure | Documented | [`TASK-018`](tasks/TASK-018.md) requires preserving baseline, diagnosis, accepted amendment, and unchanged gate retest; no quality failure has been observed. |
+| AR-15 | Concrete code-boundary and evidence standards | Implemented | [`code-standards.md`](code-standards.md#boundary-lifetime-and-evidence-contracts) covers boundary, lifetime, production-path, numerical, resource, schedule, and closure requirements. |
+| AR-16 | Historical authority reconciliation | Partial | Ledger ranges/links and stale TASK-008/010/012/013 claims were corrected or marked historical; no standalone `review.md` exists, and broader historical reports remain unreconciled. |

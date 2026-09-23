@@ -137,9 +137,9 @@ GdnFrontBindViews dummy_ok_views(std::uint32_t* cursor) {
   v.normalized = make_view(dummy_ptr(0x1C0000), ArithmeticDtype::Bf16,
                            PhysicalLayoutId::CudaBf16RowMajorV0, StorageClass::Bf16,
                            true, 1, kHidden);
-  v.workspace = make_view(p, ArithmeticDtype::Fp32,
-                          PhysicalLayoutId::CudaFp32VectorV0, StorageClass::Fp32,
-                          true, 1, kGdnWorkspaceBytesPerToken / 4);
+  v.workspace = *qw38::runtime::WorkspaceView::from_tensor(make_view(
+      p, ArithmeticDtype::Fp32, PhysicalLayoutId::CudaFp32VectorV0,
+      StorageClass::Fp32, true, 1, kGdnWorkspaceBytesPerToken / 4));
   v.history = make_view(dummy_ptr(0x1D0000), ArithmeticDtype::Bf16,
                         PhysicalLayoutId::CudaBf16ConvHistoryV0, StorageClass::Bf16,
                         true, 2, kConvHistoryTaps, kQkvWidth);
@@ -508,7 +508,10 @@ void test_workspace_and_missing_model(Stream const& stream) {
   auto view = make_view(ws->data(), ArithmeticDtype::Fp32,
                         PhysicalLayoutId::CudaFp32VectorV0, StorageClass::Fp32, true,
                         1, kGdnWorkspaceBytesPerToken / 4);
-  auto slices = bind_gdn_workspace(view);
+  auto workspace = qw38::runtime::WorkspaceView::from_tensor(view);
+  expect(static_cast<bool>(workspace), "workspace factory");
+  if (!workspace) return;
+  auto slices = bind_gdn_workspace(*workspace);
   expect(static_cast<bool>(slices), "workspace bind");
   if (slices) {
     expect(slices->qkv.pointer != slices->convolved.pointer, "qkv != convolved");
@@ -1203,6 +1206,8 @@ void test_session_history_wrap_reset_zero_padding() {
   if (!plan) {
     return;
   }
+  plan->session_state =
+      qw38::runtime::detail::SessionPlanAccess::execution_state(*session);
   for (std::uint32_t step = 0; step < 4; ++step) {
     expect(static_cast<bool>(execute_gdn_front(plan->front)),
            "execute session-backed GDN front through wrap");
@@ -1255,9 +1260,11 @@ void test_session_history_wrap_reset_zero_padding() {
   expect(!deferred && deferred.error().code == qw38::runtime::ErrorCode::Cuda,
          "injected deferred GDN failure is reported");
   auto after_failure = session->save();
-  expect(after_failure && after_failure->conv_cursor[0] == 0 &&
-             after_failure->gdn_position[0] == 0,
-         "failed GDN execution does not commit continuation metadata");
+  expect(!after_failure &&
+             after_failure.error().code == qw38::runtime::ErrorCode::InvalidArgument,
+         "failed GDN execution poisons snapshot boundary");
+  expect(!execute_decode_gdn(*plan, 0),
+         "poisoned GDN session rejects retry before reset");
   expect(static_cast<bool>(session->reset()),
          "reset device state after injected GDN failure");
 

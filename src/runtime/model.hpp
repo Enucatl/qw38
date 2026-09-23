@@ -49,6 +49,15 @@ class Model {
 
   [[nodiscard]] qw38::format::TensorRecord const* find_tensor(
       std::string_view logical_name) const noexcept;
+  // V0 compatibility boundary: resolve a canonical logical name to the
+  // artifact tensor ID and require its exact graph role/layer membership.
+  [[nodiscard]] std::expected<std::uint32_t, Error> resolve_tensor(
+      std::string_view logical_name, qw38::format::SemanticNodeKind kind,
+      qw38::format::TensorRole role, std::uint32_t layer) const;
+  [[nodiscard]] std::expected<ConstTensorView, Error> payload(
+      std::uint32_t tensor_id) const;
+  [[nodiscard]] std::expected<ConstTensorView, Error> scales(
+      std::uint32_t tensor_id) const;
   [[nodiscard]] std::expected<ConstTensorView, Error> payload(
       std::string_view logical_name) const;
   [[nodiscard]] std::expected<ConstTensorView, Error> scales(
@@ -77,5 +86,11 @@ class Model {
   std::uint64_t device_bytes_{0};
   int device_{-1};
 };
+
+// Also usable by host-only schema tests before an artifact is uploaded.
+[[nodiscard]] std::expected<std::uint32_t, Error> resolve_semantic_tensor(
+    qw38::format::ArtifactSchema const& schema, std::string_view logical_name,
+    qw38::format::SemanticNodeKind kind, qw38::format::TensorRole role,
+    std::uint32_t layer);
 
 }  // namespace qw38::runtime
