@@ -39,10 +39,21 @@ Accept zero or one explicit task ID.
   task whose dependencies are all `DONE`.
 - Ledger order is the only implicit priority.
 
+An explicitly selected task may be `IN_PROGRESS` when the user manually
+approves continuing that task. Treat approval as specific to the task ID and
+continuation request; a request to start or select a task is not, by itself,
+approval to resume existing work. On approval, continue from the recorded state
+and preserve prior implementation, evidence, and completion-report content; do
+not reset or repeat completed work unless the task's remaining acceptance
+criteria require it. Without explicit approval, stop at admission, report the
+current status and ask whether the user wants to continue that task. `IN_PROGRESS`
+tasks are never selected implicitly when no ID is supplied.
+
 Before any mutation, reject the invocation when any of these gates fail:
 
-- more than one ID was supplied, the ID is unknown, its status is not `TODO`,
-  its dependencies are incomplete, or no eligible task exists;
+- more than one ID was supplied, the ID is unknown, its status is neither
+  `TODO` nor an explicitly approved `IN_PROGRESS` continuation, its
+  dependencies are incomplete, or no eligible task exists;
 - the task file or any normative document is missing;
 - the ledger row and task file disagree on identity, name, status, or
   dependencies;
@@ -64,9 +75,10 @@ Missing Architecture V0 decision:
 Evidence inspected:
 ```
 
-After admission, change the selected ledger row to `IN_PROGRESS`, and update
-the task-file status when the task file has a status field. Do not activate
-downstream tasks.
+After admitting a `TODO` task, change its ledger row to `IN_PROGRESS` and update
+the task-file status when it has a status field. For an approved
+`IN_PROGRESS` continuation, preserve the existing status and resume the
+unfinished work in place. Do not activate downstream tasks.
 
 ## Implementation
 
