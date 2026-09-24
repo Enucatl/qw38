@@ -29,8 +29,10 @@ CompilerError qerr(CompilerErrorCode code, std::string_view detail) {
 std::uint32_t quantizer_group_size(LogicalQuantizerId id) noexcept {
   switch (id) {
     case LogicalQuantizerId::Q4G64V0:
+    case LogicalQuantizerId::Q4G64CandidateV1:
       return qw38::format::kQ4GroupSize;
     case LogicalQuantizerId::Q8G32V0:
+    case LogicalQuantizerId::Q8G32CandidateV1:
       return qw38::format::kQ8GroupSize;
     case LogicalQuantizerId::None:
       return 0;
@@ -41,8 +43,10 @@ std::uint32_t quantizer_group_size(LogicalQuantizerId id) noexcept {
 int quantizer_qmax(LogicalQuantizerId id) noexcept {
   switch (id) {
     case LogicalQuantizerId::Q4G64V0:
+    case LogicalQuantizerId::Q4G64CandidateV1:
       return 7;
     case LogicalQuantizerId::Q8G32V0:
+    case LogicalQuantizerId::Q8G32CandidateV1:
       return 127;
     case LogicalQuantizerId::None:
       return 0;

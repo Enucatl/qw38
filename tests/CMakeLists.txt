@@ -166,6 +166,15 @@ add_test(NAME pack_layout COMMAND qw38_pack_layout_test)
 add_test(NAME quant_reference COMMAND qw38_quant_reference_test)
 add_test(NAME quant_compiler_integration COMMAND qw38_quant_compiler_integration_test)
 
+add_executable(qw38_candidate_failure_test candidate_failure_test.cpp)
+target_link_libraries(qw38_candidate_failure_test PRIVATE qw38_compiler qw38_runtime)
+target_compile_features(qw38_candidate_failure_test PRIVATE cxx_std_23)
+target_compile_options(qw38_candidate_failure_test PRIVATE
+  $<$<COMPILE_LANGUAGE:CXX>:-Wall -Wextra -Wpedantic>
+)
+add_test(NAME candidate_failure COMMAND qw38_candidate_failure_test)
+set_tests_properties(candidate_failure PROPERTIES LABELS "compiler;quantizer;runtime;gpu")
+
 set_tests_properties(
   compiler_identity compiler_transform compiler_bf16_verification compiler_integration
   PROPERTIES

@@ -64,6 +64,32 @@ WeightFormat select_weight_format(TensorFamily family,
   if (policy == WeightFormatPolicy::IdentityBf16) {
     return fmt;
   }
+  if (policy == WeightFormatPolicy::CandidateV1) {
+    bool const q8 = family == TensorFamily::LmHead ||
+                    family == TensorFamily::LinearAttnInProjQkv ||
+                    family == TensorFamily::LinearAttnInProjZ ||
+                    family == TensorFamily::LinearAttnOutProj ||
+                    family == TensorFamily::SelfAttnQProj ||
+                    family == TensorFamily::SelfAttnKProj ||
+                    family == TensorFamily::SelfAttnVProj ||
+                    family == TensorFamily::SelfAttnOProj;
+    if (q8) {
+      fmt.storage = StorageClass::Int8Grouped;
+      fmt.quantizer = LogicalQuantizerId::Q8G32CandidateV1;
+      fmt.layout = PhysicalLayoutId::CudaQ8G32CandidateV1;
+      return fmt;
+    }
+    bool const q4 = family == TensorFamily::MlpGateProj ||
+                    family == TensorFamily::MlpUpProj ||
+                    family == TensorFamily::MlpDownProj;
+    if (q4) {
+      fmt.storage = StorageClass::Int4Grouped;
+      fmt.quantizer = LogicalQuantizerId::Q4G64CandidateV1;
+      fmt.layout = PhysicalLayoutId::CudaQ4G64CandidateV1;
+      return fmt;
+    }
+    // Inactive MTP weights keep their V0 representation until activation.
+  }
   if (family_uses_q8g32(family)) {
     fmt.storage = StorageClass::Int8Grouped;
     fmt.quantizer = LogicalQuantizerId::Q8G32V0;

@@ -7,13 +7,18 @@
 #include <cstdint>
 #include <cstring>
 #include <filesystem>
+#include <fstream>
 #include <iostream>
+#include <iterator>
+#include <sstream>
 #include <span>
 #include <string>
 #include <string_view>
+#include <tuple>
 #include <vector>
 
 using qw38::compiler::compile_synthetic;
+using qw38::compiler::CompilerErrorCode;
 using qw38::compiler::current_peak_rss_bytes;
 using qw38::compiler::dequantize_to_bf16;
 using qw38::compiler::expand_identity_table;
@@ -116,6 +121,20 @@ std::vector<std::byte> take_tile(std::span<std::byte const> src, std::uint64_t k
   return out;
 }
 
+std::uint64_t current_rss_bytes() {
+  std::ifstream status("/proc/self/status");
+  std::string line;
+  while (std::getline(status, line)) {
+    if (line.starts_with("VmRSS:")) {
+      std::istringstream value(line.substr(6));
+      std::uint64_t kib = 0;
+      value >> kib;
+      return kib * 1024;
+    }
+  }
+  return 0;
+}
+
 }  // namespace
 
 int main() {
@@ -200,6 +219,136 @@ int main() {
   conv.bytes = pattern(32 * 4, 4);
   auto vec = synth_from(find_expected(TensorFamily::LinearAttnALog), 5);
   std::vector<SyntheticTensor> fixture{embed, head, dense, conv, vec};
+
+  {
+    auto mlp = small_matrix(find_expected(TensorFamily::MlpDownProj), 8, 256, 6);
+    auto candidate_fixture = fixture;
+    candidate_fixture.push_back(mlp);
+    qw38::format::CompilerRevision candidate_rev{
+        .ident = qw38::compiler::kCandidateCompilerIdent,
+        .major = 0, .minor = 1, .patch = 1};
+    auto const candidate_path = dir.path() / "candidate.qw38";
+    auto const replay_path = dir.path() / "candidate-replay.qw38";
+    auto const failed_path = dir.path() / "candidate-failure.qw38";
+    auto bad_fixture = candidate_fixture;
+    bad_fixture.back().bytes[0] = std::byte{0xC0};
+    bad_fixture.back().bytes[1] = std::byte{0x7F}; // BF16 NaN in final matrix
+    auto const rss_before_failure = current_rss_bytes();
+    auto failed = compile_synthetic(
+        failed_path, hash_seed(0x11), hash_seed(0x22), hash_seed(0x33),
+        candidate_rev, std::move(bad_fixture), WeightFormatPolicy::CandidateV1);
+    auto const rss_after_failure = current_rss_bytes();
+    expect(!failed && failed.error().code == CompilerErrorCode::Nonfinite,
+           "late candidate compiler rejection is typed");
+    expect(!std::filesystem::exists(failed_path),
+           "failed candidate compile does not publish an artifact");
+    bool temporary_left = false;
+    for (auto const& entry : std::filesystem::directory_iterator(dir.path())) {
+      temporary_left |= entry.path().filename().string().starts_with(
+          "candidate-failure.qw38.tmp.");
+    }
+    expect(!temporary_left, "failed candidate compile removes its temporary file");
+    expect(rss_before_failure != 0 && rss_after_failure != 0 &&
+               rss_after_failure <= rss_before_failure + (16u << 20),
+           "late compiler failure has bounded current host RSS");
+    auto first = compile_synthetic(
+        candidate_path, hash_seed(0x11), hash_seed(0x22), hash_seed(0x33),
+        candidate_rev, candidate_fixture, WeightFormatPolicy::CandidateV1);
+    auto replay = compile_synthetic(
+        replay_path, hash_seed(0x11), hash_seed(0x22), hash_seed(0x33),
+        candidate_rev, candidate_fixture, WeightFormatPolicy::CandidateV1);
+    expect(first && replay, "candidate synthetic compilation succeeds twice");
+    if (first && replay) {
+      std::ifstream a(candidate_path, std::ios::binary);
+      std::ifstream b(replay_path, std::ios::binary);
+      std::vector<char> bytes_a(std::istreambuf_iterator<char>{a}, {});
+      std::vector<char> bytes_b(std::istreambuf_iterator<char>{b}, {});
+      expect(bytes_a == bytes_b, "candidate compilation is byte deterministic");
+      auto candidate = Artifact::open(candidate_path);
+      expect(static_cast<bool>(candidate), "reader accepts candidate artifact");
+      if (candidate) {
+        expect(candidate->precision().id ==
+                   qw38::format::PrecisionPolicyId::CandidateV1,
+               "candidate precision policy is explicit");
+        for (auto const& [name, quantizer, layout, source] : {
+                 std::tuple{head.expected.name,
+                            LogicalQuantizerId::Q8G32CandidateV1,
+                            PhysicalLayoutId::CudaQ8G32CandidateV1,
+                            &head.bytes},
+                 std::tuple{dense.expected.name,
+                            LogicalQuantizerId::Q8G32CandidateV1,
+                            PhysicalLayoutId::CudaQ8G32CandidateV1,
+                            &dense.bytes},
+                 std::tuple{mlp.expected.name,
+                            LogicalQuantizerId::Q4G64CandidateV1,
+                            PhysicalLayoutId::CudaQ4G64CandidateV1,
+                            &mlp.bytes}}) {
+          auto const* rec = candidate->find_tensor(name);
+          expect(rec && rec->quantizer == quantizer && rec->layout == layout,
+                 "candidate family has declared quantizer and layout");
+          if (!rec) continue;
+          auto payload = candidate->payload(name);
+          auto scales = candidate->scales(name);
+          auto want = quantize_bf16(quantizer, 8, 256, *source);
+          expect(payload && scales && want, "candidate tensor spans and logical codes");
+          if (!payload || !scales || !want) continue;
+          auto got = unpack_cuda_v0(quantizer, layout, 8, 256,
+                                    *payload, *scales);
+          expect(got && got->codes == want->codes &&
+                     got->scales == want->scales,
+                 "candidate reader reconstructs selected logical values");
+          expect(static_cast<bool>(verify_quantized_tensor(
+                     name, quantizer, layout, 8, 256,
+                     *source, *payload, *scales)),
+                 "candidate independent source reconstruction");
+        }
+        auto bad = candidate->schema();
+        for (auto& rec : bad.tensors) {
+          if (rec.logical_name == mlp.expected.name) {
+            rec.layout = PhysicalLayoutId::CudaQ4G64V0;
+          }
+        }
+        expect(!qw38::format::validate_schema(bad),
+               "reader schema rejects candidate/V0 layout mismatch");
+        bad = candidate->schema();
+        for (auto& rec : bad.tensors) {
+          if (rec.logical_name == mlp.expected.name) {
+            ++rec.scales.length;
+          }
+        }
+        expect(!qw38::format::validate_schema(bad),
+               "reader schema rejects candidate scale length mismatch");
+        bad = candidate->schema();
+        for (auto& rec : bad.tensors) {
+          if (rec.logical_name == mlp.expected.name) {
+            rec.quantizer = static_cast<LogicalQuantizerId>(0x01FF);
+          }
+        }
+        expect(!qw38::format::validate_schema(bad),
+               "reader schema rejects unknown candidate quantizer ID");
+        bad = candidate->schema();
+        bad.precision.id = qw38::format::PrecisionPolicyId::V0;
+        expect(!qw38::format::validate_schema(bad),
+               "reader schema rejects candidate IDs under V0 policy");
+        auto const* mlp_rec = candidate->find_tensor(mlp.expected.name);
+        if (mlp_rec) {
+          std::vector<std::byte> malformed(bytes_a.size());
+          std::memcpy(malformed.data(), bytes_a.data(), bytes_a.size());
+          malformed[static_cast<std::size_t>(mlp_rec->payload.offset)] =
+              std::byte{0x88};
+          expect(!Artifact::parse(std::move(malformed)),
+                 "candidate reader rejects forbidden code before binding");
+          malformed.resize(bytes_a.size());
+          std::memcpy(malformed.data(), bytes_a.data(), bytes_a.size());
+          auto const scale = static_cast<std::size_t>(mlp_rec->scales.offset);
+          malformed[scale] = std::byte{0x00};
+          malformed[scale + 1] = std::byte{0x7C};
+          expect(!Artifact::parse(std::move(malformed)),
+                 "candidate reader rejects nonfinite scale before binding");
+        }
+      }
+    }
+  }
 
   qw38::format::CompilerRevision rev{.ident = kProductionCompilerIdent,
                                      .major = 0,

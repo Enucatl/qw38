@@ -61,6 +61,8 @@ enum class LogicalQuantizerId : std::uint16_t {
   None = 0x0100,
   Q4G64V0 = 0x0101,
   Q8G32V0 = 0x0102,
+  Q4G64CandidateV1 = 0x0103,
+  Q8G32CandidateV1 = 0x0104,
 };
 
 enum class PhysicalLayoutId : std::uint16_t {
@@ -74,6 +76,8 @@ enum class PhysicalLayoutId : std::uint16_t {
   CudaFp32GdnSHvKV0 = 0x0207,
   CudaBf16ConvHistoryV0 = 0x0208,
   CudaBf16KvCacheV0 = 0x0209,
+  CudaQ4G64CandidateV1 = 0x020B,
+  CudaQ8G32CandidateV1 = 0x020C,
 };
 
 enum class SemanticNodeKind : std::uint16_t {
@@ -87,6 +91,7 @@ enum class SemanticNodeKind : std::uint16_t {
 
 enum class PrecisionPolicyId : std::uint16_t {
   V0 = 0x0401,
+  CandidateV1 = 0x0402,
 };
 
 enum class SemanticScope : std::uint16_t {

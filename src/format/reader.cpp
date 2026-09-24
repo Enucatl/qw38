@@ -392,7 +392,9 @@ std::expected<void, FormatError> validate_quantized_payloads(
           "canonical owner is missing"));
     }
     if (owner->quantizer != LogicalQuantizerId::Q4G64V0 &&
-        owner->quantizer != LogicalQuantizerId::Q8G32V0) {
+        owner->quantizer != LogicalQuantizerId::Q8G32V0 &&
+        owner->quantizer != LogicalQuantizerId::Q4G64CandidateV1 &&
+        owner->quantizer != LogicalQuantizerId::Q8G32CandidateV1) {
       continue;
     }
     auto codes = slice(file, owner->payload, "tensor.payload");

@@ -7,6 +7,7 @@
 #include <cstring>
 #include <iostream>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 using qw38::format::dense_pad_k;
@@ -49,8 +50,10 @@ LogicalWeightCodes make_logical(LogicalQuantizerId id, std::uint64_t n,
   m.quantizer = id;
   m.n = n;
   m.k = k;
-  m.group_size = (id == LogicalQuantizerId::Q4G64V0) ? kQ4GroupSize : kQ8GroupSize;
-  m.qmax = (id == LogicalQuantizerId::Q4G64V0) ? 7 : 127;
+  bool const q4 = id == LogicalQuantizerId::Q4G64V0 ||
+                  id == LogicalQuantizerId::Q4G64CandidateV1;
+  m.group_size = q4 ? kQ4GroupSize : kQ8GroupSize;
+  m.qmax = q4 ? 7 : 127;
   m.codes.assign(static_cast<std::size_t>(n * k), 0);
   m.scales.assign(static_cast<std::size_t>(n * (k / m.group_size)), 0);
   return m;
@@ -183,6 +186,43 @@ std::vector<std::byte> golden_q8_scales(LogicalWeightCodes const& m) {
 }  // namespace
 
 int main() {
+  for (auto const& [quantizer, layout] : {
+           std::pair{LogicalQuantizerId::Q4G64CandidateV1,
+                     PhysicalLayoutId::CudaQ4G64CandidateV1},
+           std::pair{LogicalQuantizerId::Q8G32CandidateV1,
+                     PhysicalLayoutId::CudaQ8G32CandidateV1}}) {
+    auto m = make_logical(quantizer, 5, 192);
+    m.codes[4 * 192 + 191] = -7;
+    m.scales[4 * (192 / m.group_size) + 191 / m.group_size] = 0x3C00;
+    auto packed = pack_cuda_v0(quantizer, layout, m);
+    expect(static_cast<bool>(packed), "candidate tail pack");
+    if (!packed) continue;
+    expect(packed->codes == (m.qmax == 7 ? golden_q4_codes(m)
+                                        : golden_q8_codes(m)),
+           "candidate independent golden codes including padding");
+    expect(packed->scales == (m.qmax == 7 ? golden_q4_scales(m)
+                                         : golden_q8_scales(m)),
+           "candidate independent golden scales including padding");
+    auto unpacked = qw38::format::unpack_cuda_v0(
+        quantizer, layout, m.n, m.k, packed->codes, packed->scales);
+    expect(unpacked && unpacked->codes == m.codes &&
+               unpacked->scales == m.scales,
+           "candidate tail independent unpack");
+    auto bad_codes = packed->codes;
+    bad_codes.back() = std::byte{1};
+    expect(!qw38::format::validate_cuda_v0(
+               quantizer, layout, m.n, m.k, bad_codes, packed->scales),
+           "candidate nonzero padded code rejected");
+    auto bad_scales = packed->scales;
+    bad_scales.back() = std::byte{1};
+    expect(!qw38::format::validate_cuda_v0(
+               quantizer, layout, m.n, m.k, packed->codes, bad_scales),
+           "candidate nonzero padded scale rejected");
+    expect(!quantizer_layout_pair_ok(quantizer,
+             m.qmax == 7 ? PhysicalLayoutId::CudaQ4G64V0
+                         : PhysicalLayoutId::CudaQ8G32V0),
+           "candidate ID cannot bind V0 physical layout");
+  }
   expect(quantizer_layout_pair_ok(LogicalQuantizerId::Q4G64V0,
                                   PhysicalLayoutId::CudaQ4G64V0),
          "Q4 pair ok");

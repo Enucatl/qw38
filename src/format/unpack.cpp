@@ -34,10 +34,12 @@ std::expected<std::int8_t, FormatError> decode_q8_byte(std::uint8_t b) {
 }
 
 int qmax_of(LogicalQuantizerId id) noexcept {
-  if (id == LogicalQuantizerId::Q4G64V0) {
+  if (id == LogicalQuantizerId::Q4G64V0 ||
+      id == LogicalQuantizerId::Q4G64CandidateV1) {
     return 7;
   }
-  if (id == LogicalQuantizerId::Q8G32V0) {
+  if (id == LogicalQuantizerId::Q8G32V0 ||
+      id == LogicalQuantizerId::Q8G32CandidateV1) {
     return 127;
   }
   return 0;
@@ -91,12 +93,15 @@ std::expected<void, FormatError> validate_cuda_v0(
     std::uint64_t scales_file_offset) {
   if (!quantizer_layout_pair_ok(quantizer, layout) ||
       (layout != PhysicalLayoutId::CudaQ4G64V0 &&
-       layout != PhysicalLayoutId::CudaQ8G32V0)) {
+       layout != PhysicalLayoutId::CudaQ8G32V0 &&
+       layout != PhysicalLayoutId::CudaQ4G64CandidateV1 &&
+       layout != PhysicalLayoutId::CudaQ8G32CandidateV1)) {
     return std::unexpected(unpack_err(
         FormatErrorCode::InvalidQuantizerLayoutPair, "quantized.payload",
         "logical quantizer and physical layout disagree"));
   }
-  auto const is_q4 = layout == PhysicalLayoutId::CudaQ4G64V0;
+  auto const is_q4 = layout == PhysicalLayoutId::CudaQ4G64V0 ||
+                     layout == PhysicalLayoutId::CudaQ4G64CandidateV1;
   auto const group = is_q4 ? kQ4GroupSize : kQ8GroupSize;
   auto const packed_row =
       is_q4 ? kQ4PackedBytesPerTileRow : kQ8PackedBytesPerTileRow;
@@ -243,14 +248,17 @@ std::expected<LogicalWeightCodes, FormatError> unpack_cuda_v0(
   }
   if (!quantizer_layout_pair_ok(quantizer, layout) ||
       (layout != PhysicalLayoutId::CudaQ4G64V0 &&
-       layout != PhysicalLayoutId::CudaQ8G32V0)) {
+       layout != PhysicalLayoutId::CudaQ8G32V0 &&
+       layout != PhysicalLayoutId::CudaQ4G64CandidateV1 &&
+       layout != PhysicalLayoutId::CudaQ8G32CandidateV1)) {
     return std::unexpected(unpack_err(
         FormatErrorCode::InvalidQuantizerLayoutPair, "unpack",
         "logical quantizer and physical layout disagree"));
   }
   std::uint32_t group = 0;
   std::uint32_t packed_row = 0;
-  if (layout == PhysicalLayoutId::CudaQ4G64V0) {
+  if (layout == PhysicalLayoutId::CudaQ4G64V0 ||
+      layout == PhysicalLayoutId::CudaQ4G64CandidateV1) {
     group = kQ4GroupSize;
     packed_row = kQ4PackedBytesPerTileRow;
   } else {
@@ -307,7 +315,8 @@ std::expected<LogicalWeightCodes, FormatError> unpack_cuda_v0(
         auto const tile_row =
             (tn * tiles_k + tk) * kDenseTileRows + r;
         std::int8_t decoded = 0;
-        if (layout == PhysicalLayoutId::CudaQ4G64V0) {
+        if (layout == PhysicalLayoutId::CudaQ4G64V0 ||
+            layout == PhysicalLayoutId::CudaQ4G64CandidateV1) {
           auto const byte_i = c_in_tile / 2;
           auto const raw = static_cast<std::uint8_t>(
               codes[static_cast<std::size_t>(tile_row * packed_row + byte_i)]);

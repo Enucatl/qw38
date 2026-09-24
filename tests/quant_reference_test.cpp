@@ -153,7 +153,8 @@ std::int8_t oracle_code(PackedMatrix const& packed, std::uint64_t row,
   auto const col_tile = col / 256;
   auto const col_in_tile = col % 256;
   auto const tile_row = (row_tile * tiles_k + col_tile) * 8 + row_in_tile;
-  if (packed.quantizer == LogicalQuantizerId::Q4G64V0) {
+  if (packed.quantizer == LogicalQuantizerId::Q4G64V0 ||
+      packed.quantizer == LogicalQuantizerId::Q4G64CandidateV1) {
     auto const byte = static_cast<std::uint8_t>(
         packed.codes[static_cast<std::size_t>(tile_row * 128 + col_in_tile / 2)]);
     auto const nibble = static_cast<std::int8_t>(
@@ -195,7 +196,9 @@ std::vector<float> oracle_packed_gemv(PackedMatrix const& packed,
              << 8));
         weight = oracle_bf16(bits);
       } else {
-        auto const group = packed.quantizer == LogicalQuantizerId::Q4G64V0 ? 64u : 32u;
+        auto const group = packed.quantizer == LogicalQuantizerId::Q4G64V0 ||
+                                   packed.quantizer == LogicalQuantizerId::Q4G64CandidateV1
+                               ? 64u : 32u;
         // V0 rounds decoded operands to BF16 before FP32 accumulation.
         weight = oracle_round_bf16(static_cast<float>(oracle_code(packed, row, col)) *
                                    oracle_scale(packed, row, col, group));
@@ -242,6 +245,12 @@ int main() {
                   256, 4.0f, "q8-8x256");
   check_roundtrip(LogicalQuantizerId::Q8G32V0, PhysicalLayoutId::CudaQ8G32V0, 16,
                   512, 0.9f, "q8-16x512");
+  check_roundtrip(LogicalQuantizerId::Q4G64CandidateV1,
+                  PhysicalLayoutId::CudaQ4G64CandidateV1, 8, 256, 1.0f,
+                  "candidate-q4-8x256");
+  check_roundtrip(LogicalQuantizerId::Q8G32CandidateV1,
+                  PhysicalLayoutId::CudaQ8G32CandidateV1, 8, 256, 0.9f,
+                  "candidate-q8-8x256");
 
   {
     // Raw Q4 tile bytes exercise lower/upper nibbles, both signs, ±7 edges,
@@ -275,6 +284,10 @@ int main() {
     constexpr std::array<std::uint32_t, 3> expected{
         0xbf200000u, 0xbf700000u, 0x40400000u};  // -0.625, -0.9375, 3
     expect_oracle_contract(packed, x, expected, "Q4 raw contraction oracle");
+    packed.layout = PhysicalLayoutId::CudaQ4G64CandidateV1;
+    packed.quantizer = LogicalQuantizerId::Q4G64CandidateV1;
+    expect_oracle_contract(packed, x, expected,
+                           "candidate Q4 raw contraction oracle");
   }
 
   {
@@ -300,6 +313,10 @@ int main() {
     constexpr std::array<std::uint32_t, 2> expected{
         0xc17c0000u, 0xc1780000u};  // -15.75, -15.5
     expect_oracle_contract(packed, x, expected, "Q8 raw contraction oracle");
+    packed.layout = PhysicalLayoutId::CudaQ8G32CandidateV1;
+    packed.quantizer = LogicalQuantizerId::Q8G32CandidateV1;
+    expect_oracle_contract(packed, x, expected,
+                           "candidate Q8 raw contraction oracle");
   }
 
   {

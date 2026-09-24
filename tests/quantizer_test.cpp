@@ -8,6 +8,7 @@
 #include <iostream>
 #include <limits>
 #include <string_view>
+#include <tuple>
 #include <vector>
 
 using qw38::compiler::CompilerErrorCode;
@@ -41,6 +42,61 @@ std::vector<float> zeros(std::size_t n) { return std::vector<float>(n, 0.0f); }
 }  // namespace
 
 int main() {
+  for (auto const& [id, group, qmax] : {
+           std::tuple{LogicalQuantizerId::Q4G64CandidateV1, 64u, 7},
+           std::tuple{LogicalQuantizerId::Q8G32CandidateV1, 32u, 127}}) {
+    auto zero = quantize_group(id, zeros(group));
+    expect(zero && zero->scale_bits == 0 &&
+               std::all_of(zero->codes.begin(), zero->codes.end(),
+                           [](auto code) { return code == 0; }),
+           "candidate zero group has zero codes and scale");
+    std::vector<float> values(group, 0.0f);
+    values[0] = static_cast<float>(qmax);
+    values[1] = 1.5f;
+    values[2] = 2.5f;
+    values[3] = -1.5f;
+    values[4] = -2.5f;
+    values[5] = 0.5f;
+    values[6] = -0.5f;
+    values[7] = static_cast<float>(-qmax);
+    auto golden = quantize_group(id, values);
+    expect(golden && golden->scale_bits == 0x3C00 &&
+               golden->codes[0] == qmax && golden->codes[1] == 2 &&
+               golden->codes[2] == 2 && golden->codes[3] == -2 &&
+               golden->codes[4] == -2 && golden->codes[5] == 0 &&
+               golden->codes[6] == 0 && golden->codes[7] == -qmax,
+           "candidate frozen signed/tie encoding and FP16 scale");
+    auto const min_scale = fp16_to_fp32(kFp16MinNormal);
+    values.assign(group, 0.0f);
+    values[0] = min_scale;
+    auto floored = quantize_group(id, values);
+    expect(floored && floored->scale_bits == kFp16MinNormal &&
+               floored->codes[0] == 1,
+           "candidate minimum normal scale");
+    values[0] = 1.0e10f;
+    auto too_large = quantize_group(id, values);
+    expect(!too_large && too_large.error().code ==
+                             CompilerErrorCode::Unrepresentable,
+           "candidate unrepresentable scale is rejected");
+    values[0] = std::numeric_limits<float>::quiet_NaN();
+    auto nonfinite = quantize_group(id, values);
+    expect(!nonfinite && nonfinite.error().code == CompilerErrorCode::Nonfinite,
+           "candidate nonfinite source is rejected");
+  }
+  {
+    auto const next = std::nextafter(2.0f, 3.0f);
+    std::vector<float> values(64, 0.0f);
+    values[0] = next * 7.0f;
+    auto ceiled = quantize_group(LogicalQuantizerId::Q4G64CandidateV1, values);
+    expect(ceiled && ceiled->scale_bits == 0x4001,
+           "candidate Q4 scale ceilings to next FP16 value");
+    std::vector<float> q8_values(32, 0.0f);
+    q8_values[0] = next * 127.0f;
+    auto q8_ceiled = quantize_group(LogicalQuantizerId::Q8G32CandidateV1,
+                                    q8_values);
+    expect(q8_ceiled && q8_ceiled->scale_bits == 0x4001,
+           "candidate Q8 scale ceilings to next FP16 value");
+  }
   expect(rne_to_int(1.5f) == 2, "RNE 1.5 -> 2");
   expect(rne_to_int(2.5f) == 2, "RNE 2.5 -> 2");
   expect(rne_to_int(-1.5f) == -2, "RNE -1.5 -> -2");

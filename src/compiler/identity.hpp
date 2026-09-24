@@ -61,6 +61,10 @@ inline constexpr char const kLmHeadName[] = "lm_head.weight";
 inline constexpr char const kFinalNormName[] = "model.language_model.norm.weight";
 inline constexpr char const kCompilerIdent[] = "qw38-bf16-identity";
 inline constexpr char const kProductionCompilerIdent[] = "qw38-v0";
+// Identities of the frozen TASK-020 policy JSON and train calibration manifest.
+// Both cover metadata only; BF16 and .qw38 payloads are never hashed.
+inline constexpr char const kCandidateCompilerIdent[] =
+    "qw38-candidate-v1-policy-2ef01bff2b40095f08aedad3b84c50317ffec66e940019342bd12abcda50110e-cal-8ac4a9cab7181c7f7008f95b52420f0d76775524ac64868d0351411c2c2021a4";
 inline constexpr std::uint32_t kCompilerMajor = 0;
 inline constexpr std::uint32_t kCompilerMinor = 1;
 // Patch 1 freezes generated RoPE FP32 bytes rather than delegating rounding to

@@ -184,6 +184,7 @@ struct ArtifactSchema {
 };
 
 [[nodiscard]] PrecisionPolicyRecord v0_precision_policy();
+[[nodiscard]] PrecisionPolicyRecord candidate_v1_precision_policy();
 [[nodiscard]] std::array<StateAllocation, 3> v0_language_state_schema();
 [[nodiscard]] std::array<ScratchAllocation, 7> v0_language_scratch_schema();
 

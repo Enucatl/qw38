@@ -9,6 +9,7 @@ namespace qw38::cuda {
 [[nodiscard]] std::uint64_t malloc_count() noexcept;
 [[nodiscard]] std::uint64_t free_count() noexcept;
 [[nodiscard]] std::uint64_t live_bytes() noexcept;
+[[nodiscard]] std::uint64_t peak_live_bytes() noexcept;
 
 void record_malloc(std::uint64_t bytes) noexcept;
 void record_free(std::uint64_t bytes) noexcept;

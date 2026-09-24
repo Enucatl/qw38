@@ -41,6 +41,12 @@ bool quantizer_layout_pair_ok(LogicalQuantizerId quantizer,
   if (quantizer == LogicalQuantizerId::Q8G32V0) {
     return layout == PhysicalLayoutId::CudaQ8G32V0;
   }
+  if (quantizer == LogicalQuantizerId::Q4G64CandidateV1) {
+    return layout == PhysicalLayoutId::CudaQ4G64CandidateV1;
+  }
+  if (quantizer == LogicalQuantizerId::Q8G32CandidateV1) {
+    return layout == PhysicalLayoutId::CudaQ8G32CandidateV1;
+  }
   if (quantizer == LogicalQuantizerId::None) {
     return layout == PhysicalLayoutId::CudaBf16DenseTileV0 ||
            layout == PhysicalLayoutId::CudaBf16RowMajorV0 ||
@@ -82,7 +88,8 @@ std::expected<PackedMatrix, FormatError> pack_cuda_v0(
   }
   std::uint32_t packed_row = 0;
   std::uint32_t groups_in_tile = 0;
-  if (layout == PhysicalLayoutId::CudaQ4G64V0) {
+  if (layout == PhysicalLayoutId::CudaQ4G64V0 ||
+      layout == PhysicalLayoutId::CudaQ4G64CandidateV1) {
     if (logical.group_size != kQ4GroupSize) {
       return std::unexpected(pack_err(FormatErrorCode::InvalidMapping, "pack",
                                       "Q4G64 group size must be 64"));
@@ -166,7 +173,8 @@ std::expected<PackedMatrix, FormatError> pack_cuda_v0(
             store_u16_le(out.scales.data() + scale_base + g * kFp16Size, sb);
           }
         }
-        if (layout == PhysicalLayoutId::CudaQ4G64V0) {
+        if (layout == PhysicalLayoutId::CudaQ4G64V0 ||
+            layout == PhysicalLayoutId::CudaQ4G64CandidateV1) {
           for (std::uint32_t c = 0; c < kDenseTileK; c += 2) {
             auto const col0 = tk * kDenseTileK + c;
             std::int8_t a = 0;

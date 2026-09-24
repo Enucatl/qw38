@@ -35,6 +35,8 @@ bool is_known(LogicalQuantizerId value) noexcept {
     case LogicalQuantizerId::None:
     case LogicalQuantizerId::Q4G64V0:
     case LogicalQuantizerId::Q8G32V0:
+    case LogicalQuantizerId::Q4G64CandidateV1:
+    case LogicalQuantizerId::Q8G32CandidateV1:
       return true;
   }
   return false;
@@ -44,6 +46,8 @@ bool is_known(PhysicalLayoutId value) noexcept {
   switch (value) {
     case PhysicalLayoutId::CudaQ4G64V0:
     case PhysicalLayoutId::CudaQ8G32V0:
+    case PhysicalLayoutId::CudaQ4G64CandidateV1:
+    case PhysicalLayoutId::CudaQ8G32CandidateV1:
     case PhysicalLayoutId::CudaBf16DenseTileV0:
     case PhysicalLayoutId::CudaBf16RowMajorV0:
     case PhysicalLayoutId::CudaBf16VectorV0:
@@ -71,7 +75,8 @@ bool is_known(SemanticNodeKind value) noexcept {
 }
 
 bool is_known(PrecisionPolicyId value) noexcept {
-  return value == PrecisionPolicyId::V0;
+  return value == PrecisionPolicyId::V0 ||
+         value == PrecisionPolicyId::CandidateV1;
 }
 
 bool is_known(SemanticScope value) noexcept {
@@ -205,6 +210,10 @@ char const* name_of(LogicalQuantizerId value) noexcept {
       return "q4g64_v0";
     case LogicalQuantizerId::Q8G32V0:
       return "q8g32_v0";
+    case LogicalQuantizerId::Q4G64CandidateV1:
+      return "q4g64_candidate_v1";
+    case LogicalQuantizerId::Q8G32CandidateV1:
+      return "q8g32_candidate_v1";
   }
   return "unknown_quantizer";
 }
@@ -215,6 +224,10 @@ char const* name_of(PhysicalLayoutId value) noexcept {
       return "cuda_q4g64_v0";
     case PhysicalLayoutId::CudaQ8G32V0:
       return "cuda_q8g32_v0";
+    case PhysicalLayoutId::CudaQ4G64CandidateV1:
+      return "cuda_q4g64_candidate_v1";
+    case PhysicalLayoutId::CudaQ8G32CandidateV1:
+      return "cuda_q8g32_candidate_v1";
     case PhysicalLayoutId::CudaBf16DenseTileV0:
       return "cuda_bf16_dense_tile_v0";
     case PhysicalLayoutId::CudaBf16RowMajorV0:
@@ -257,6 +270,8 @@ char const* name_of(PrecisionPolicyId value) noexcept {
   switch (value) {
     case PrecisionPolicyId::V0:
       return "precision_v0";
+    case PrecisionPolicyId::CandidateV1:
+      return "precision_candidate_v1";
   }
   return "unknown_precision_policy";
 }
@@ -369,6 +384,8 @@ bool layout_is_weight(PhysicalLayoutId layout) noexcept {
   switch (layout) {
     case PhysicalLayoutId::CudaQ4G64V0:
     case PhysicalLayoutId::CudaQ8G32V0:
+    case PhysicalLayoutId::CudaQ4G64CandidateV1:
+    case PhysicalLayoutId::CudaQ8G32CandidateV1:
     case PhysicalLayoutId::CudaBf16DenseTileV0:
     case PhysicalLayoutId::CudaBf16RowMajorV0:
     case PhysicalLayoutId::CudaBf16VectorV0:
@@ -398,6 +415,8 @@ bool layout_is_tiled_dense(PhysicalLayoutId layout) noexcept {
   switch (layout) {
     case PhysicalLayoutId::CudaQ4G64V0:
     case PhysicalLayoutId::CudaQ8G32V0:
+    case PhysicalLayoutId::CudaQ4G64CandidateV1:
+    case PhysicalLayoutId::CudaQ8G32CandidateV1:
     case PhysicalLayoutId::CudaBf16DenseTileV0:
       return true;
     default:
