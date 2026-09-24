@@ -23,10 +23,10 @@ now expand these contracts with matching titles, dependencies, scopes and
 acceptance criteria. Their former specifications are superseded; the earlier
 TASK-018 report is explicitly preserved as historical evidence, valid only
 within its recorded identities and coverage. TASK-018 owns reconciliation
-of affected architecture documents, the evidence inventory and protocol freeze.
-Its current candidate is `BLOCKED` on the review findings recorded in the task
-execution blockers table. Updating the task specifications does not complete
-any downstream implementation or acceptance gate.
+of affected architecture documents, the evidence inventory and protocol freeze;
+those obligations are complete as of 2026-09-24. Updating the task
+specifications does not complete any downstream implementation or acceptance
+gate.
 
 The amendment reopens Q-01/Q-02 (projection/head precision), the projection
 operand part of P-02 (activation quantization), A-01/L-01 (weight views/packing),
@@ -67,7 +67,7 @@ screening may precede full quality acceptance; production promotion may not.
   choices are allowed, with weight-only and activation-only error ablations.
 - Keep benchmarks separate from correctness tests. Preserve exact commands, results, artifact/binary identities, and hardware context in each completion report.
 - Status values are `TODO`, `IN_PROGRESS`, `BLOCKED`, and `DONE`. TASK-018 is
-  `BLOCKED` on unresolved review findings; downstream contracts remain `TODO`.
+  `DONE`; downstream contracts remain `TODO`.
 - A rejected candidate is a useful experiment result. Record the reason and
   select the next eligible candidate without weakening acceptance criteria.
   Missing required evidence cannot be described as a pass.
@@ -224,7 +224,7 @@ an achieved performance target.
 | TASK-015 | Segmented online decode attention | M5 | TASK-014 | Causal GQA segment scan, fixed-order merge, gating, output residual | DONE |
 | TASK-016 | One-layer integration checkpoint | M6 | TASK-013, TASK-015 | One GDN-style and one attention-style layer through common runtime | DONE |
 | TASK-017 | Complete primary-language decode | M6 | TASK-016 | Embedding, 64 layers, persistent state, final norm, Q8 head, logits | DONE |
-| TASK-018 | Replan contracts and preserve evaluation controls | M7 | TASK-017 | Reconciled task/architecture authority, evidence inventory, frozen screening/calibration/acceptance protocol | BLOCKED |
+| TASK-018 | Replan contracts and preserve evaluation controls | M7 | TASK-017 | Reconciled task/architecture authority, evidence inventory, frozen screening/calibration/acceptance protocol | DONE |
 | TASK-019 | SM120 quantization and kernel feasibility | M7 | TASK-018 | Real-shape NVFP4/MXFP4/Q4 comparison, native instruction evidence, conversion costs and memory budget | TODO |
 | TASK-020 | Calibrated precision policy and candidate selection | M7 | TASK-019 | Weight/activation error ablations, family policy, quality screening and provisional format/layout decision | TODO |
 | TASK-021 | Native quantized artifact and compiler | M8 | TASK-020 | Versioned quantizer/scales/layout, calibrated source-to-artifact path and independent reconstruction | TODO |
@@ -520,12 +520,11 @@ TASK-001 → 002 → 003 → 004 → 005 → 006
 | Task | Blocker | Evidence | Required follow-up |
 | ---- | ------- | -------- | ------------------ |
 | TASK-017 | Resolved: stale compiler executable reported a graph-binding failure. | Current compiler source already assigns retained MTP layer bindings index 0; rebuilding produced both production and BF16 identity artifacts. | Completed primary-language decode and independent BF16/source validation; see [`TASK-017`](tasks/TASK-017.md). |
-| TASK-018 | Fresh review of the requested documentation/reproducibility repairs is pending. | Sol re-review identified conflicting candidate gates, an underspecified sampler and incomplete report fields. Follow-up edits apply EVAL-01/PERF-01 directly in Architecture V0, specify `Salesforce/wikitext` with config/revision and exact hash preimage bytes/order, and record concrete blocker/follow-up obligations in TASK-018. Prior document-check passes did not resolve the review findings; no fresh review pass is recorded. | Obtain fresh review of the repairs before closing TASK-018 or advancing TASK-019/020. |
+| TASK-018 | Resolved: authority and sampler reproducibility findings were corrected and independently reviewed. | Fresh Sol high review of commit `bc3e33823b2a638004a00d30e15260990861a76` returned PASS with no findings or evidence requests. | TASK-020 materializes calibration/development token manifests before fitting; TASK-022/026 rebind preserved evaluation inputs to the reconciled policy identity before acceptance. |
 
 ## Preserved evidence from the former TASK-018
 
-TASK-018 is `BLOCKED` under the revised contract pending the follow-up listed
-in the task execution blockers table. The former V0
+TASK-018 is `DONE` under the revised contract. The former V0
 216-case paired quality gate has no result and is not marked complete by this
 replan. The following records describe historical development work; acceptance
 of the selected candidate belongs to TASK-022/026.

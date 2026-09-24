@@ -2,7 +2,7 @@
 
 ## Status
 
-BLOCKED
+DONE
 
 ## Milestone
 
@@ -109,9 +109,9 @@ No new throughput benchmark. Preserve the recorded populated-decode profile and 
 ## Acceptance criteria
 
 - [x] TASK-018–031 titles, dependencies, scopes and acceptance criteria match OVERALL-01; prior TASK-018 evidence is retained.
-- [ ] Affected architecture and policy documents have consistent decision authority and remapped task references.
+- [x] Affected architecture and policy documents have consistent decision authority and remapped task references.
 - [x] The evidence inventory identifies valid controls, incomplete/invalid attempts and regeneration owners without claiming an old-V0 quality pass.
-- [ ] Calibration/development/evaluation separation, shape/workload matrix, memory reserve and comparison protocol are frozen; TASK-020 must materialize the frozen non-evaluation token manifests before fitting/screening.
+- [x] Calibration/development/evaluation separation, shape/workload matrix, memory reserve and comparison protocol are frozen; TASK-020 must materialize the frozen non-evaluation token manifests before fitting/screening.
 - [x] The 216-case core, P100 review and six 32768 cases retain unchanged gates and explicit downstream owners.
 
 ## Architecture blocker rule
@@ -122,7 +122,7 @@ A rejected candidate is a recorded result; use the eligible fallback within OVER
 
 ### Result
 
-BLOCKED — pending fresh review of the documentation repairs requested after Sol re-review. Architecture V0 now applies EVAL-01 to the selected candidate versus Q4_K_M, limits BF16 to optional sanity checks, reports full-vocabulary teacher KL as unavailable, and defers performance targets to PERF-01. The calibration protocol now names the full dataset repository and exact hash-preimage bytes; the blocker and follow-up sections record concrete remaining obligations. Prior document-check passes did not resolve the review findings, and these repairs do not establish a fresh review pass. Do not advance TASK-019/020 until fresh review passes.
+DONE — architecture and policy ownership, evidence inventory, and the frozen comparison protocol pass fresh independent review. The selected candidate is the QW38 arm against unchanged Q4_K_M EVAL-01 references; V0 evidence remains a historical control. TASK-020 must materialize the frozen calibration/development token manifests before fitting or screening; TASK-022/026 must rebind preserved evaluation inputs to the reconciled policy identity before acceptance.
 
 ### Changes made
 
@@ -142,8 +142,9 @@ and timing evidence):
 Follow-up repair validation: manually compared the operative Architecture V0
 instructions with EVAL-01/PERF-01 and checked the sampler's byte specification
 and report/ledger consistency. `git diff --check` passed again. The four
-document checkers above were not rerun for these prose edits; fresh independent
-review remains pending.
+document checkers above were not rerun for these final prose edits; the fresh
+independent reviewer requested no additional evidence and independently
+confirmed the final candidate's authority, sampler, identities, and report.
 
 These checks establish document/model-config consistency only. They do not
 establish model runtime correctness, evaluation acceptance, corpus provenance,
@@ -166,20 +167,22 @@ acceptance.
 
 ### Architecture blocker
 
-No Architecture V0 decision blocker was identified. The reported conflicts
-are resolved by the existing OVERALL-01 and EVAL-01/PERF-01 authority; no new
-architecture decision or threshold change is required. TASK-018 remains
-blocked pending fresh review of the documentation and reproducibility repairs
-recorded here and in the implementation ledger.
+None. The reported conflicts were resolved by aligning Architecture V0 with
+OVERALL-01 and EVAL-01/PERF-01; no new architecture decision or threshold
+change was required.
 
 ### Follow-up observations
 
-Obtain fresh review of the repaired candidate gates, sampler specification and
-completion report before closing TASK-018 or advancing TASK-019/020.
-TASK-020 must materialize the exact calibration/development token manifests
-before fitting/screening. TASK-022/026 must rebind preserved evaluation inputs
-to the reconciled policy identity before acceptance. These downstream gaps are
-separate from TASK-018's pending review.
+The remaining downstream evidence is owned by later tasks: TASK-020 must
+materialize the exact calibration/development token manifests before
+fitting/screening; TASK-022/026 must rebind preserved evaluation inputs to the
+reconciled policy identity before acceptance.
+
+### Independent review
+
+Fresh independent review by `gpt-6-sol` at high reasoning: **PASS**, no
+findings and no targeted evidence requested. Reviewed candidate:
+`bc3e33823b2a638004a00d30e15260990861a76`.
 
 ### OVERALL-01 reconciliation, evidence inventory, and protocol freeze — 2026-09-24
 
