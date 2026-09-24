@@ -2,9 +2,12 @@
 
 **Decision date:** 2026-09-23. **Status:** selected implementation policy.
 **Suites:** `qw38-language-v1`, `qw38-performance-v1`.
-**Owners:** implementation TASK-018 (quality), TASK-023 (performance).
-This document selects the evaluation contract; it contains no model-quality
-measurements and does not mark TASK-018 complete.
+**Historical owners:** implementation TASK-018 (quality), TASK-023
+(performance), as recorded when EVAL-01/PERF-01 were first selected.
+OVERALL-01 assigns candidate core acceptance to TASK-022, production-prefill
+and 32768 acceptance to TASK-026, and matched performance to TASK-027. This
+document selects the evaluation and measurement contracts; it contains no
+model-quality measurements.
 
 ## Decision and authority
 
@@ -15,22 +18,44 @@ are both required. Weight reconstruction error, intermediate tensor error, raw
 logit MAE, and token-for-token agreement across different implementations cannot
 substitute for these model-level checks.
 
-This is the normative selection requested to resolve
-`TASK_CONTRACT_INCOMPLETE` for TASK-018. For Architecture V0 it supersedes the
-following historical provisions of [quantization-validation.md](quantization-validation.md):
+This policy was originally selected to resolve
+`TASK_CONTRACT_INCOMPLETE` for the former TASK-018. For Architecture V0 it
+supersedes the following historical provisions of
+[quantization-validation.md](quantization-validation.md):
 the prohibition on naming a suite or acceptance threshold, the unselected
 evaluation/prompt/capability flags, and treating behavioral evidence as merely
 secondary. Its language+MTP priority was already superseded by Architecture V0.
 The historical document and its generated JSON describe the earlier methodology;
-their unselected flags are not blockers for this decision. Calibration corpus,
-MTP validation, and a general quality/compression Pareto frontier remain open.
+their unselected flags are not blockers for this decision. Calibration was open
+at the time; TASK-018 now freezes separate calibration and development sources,
+with exact token manifests owned by TASK-020. MTP validation and a general
+quality/compression Pareto frontier remain open.
 
 EVAL-01 makes the initial Architecture V0 NLL budgets operational and defines
-the capability rule precisely. It does not amend weight formats, precision,
-state layout, semantic graph, or experiment ordering. PERF-01 below selects
+the capability rule precisely. EVAL-01 itself does not amend weight formats,
+precision, state layout, or semantic graph. OVERALL-01 separately supersedes
+the former experiment ordering for TASK-018 onward. PERF-01 below selects
 the additional llama.cpp performance comparison requested by the user.
 Evaluation changes require a new suite/policy version and an explicit decision;
-results cannot be used to loosen the current suite after inspecting V0 failures.
+results cannot be used to loosen the current suite after inspecting candidate
+failures.
+
+## OVERALL-01 ownership and authority
+
+The implementation ledger's OVERALL-01 amendment supersedes this document's
+former experiment order and task ownership, not EVAL-01 thresholds, fixtures,
+scoring, uncertainty rules, coverage, or PERF-01 measurement definitions.
+TASK-018 reconciles documentation and inventories existing evidence; it does
+not require another exhaustive old-V0 run. TASK-022 owns selected-candidate
+decode and the 216-case core. TASK-026 owns production-prefill core coverage
+and the six frozen 32768 retrieval cases. TASK-027 owns the matched PERF-01
+comparison. Existing V0 and Q4_K_M records remain controls with their captured
+scope and identity; incomplete arms cannot establish acceptance.
+
+For the revised acceptance gates below, the QW38 arm is the selected candidate
+built under TASK-019–021, run through decode in TASK-022 and through production
+prefill plus decode in TASK-026. Historical V0 runs remain development controls;
+a new exhaustive V0 arm is not required for candidate acceptance.
 
 ## What DS4 actually does
 
@@ -69,9 +94,9 @@ model through CUDA llama.cpp**, following DS4's approach, plus the known
 retrieval answers below. The frozen teacher continuation is an external
 quantized-model target; it is not a claim of source-checkpoint truth or general
 held-out perplexity. The full behavior comparison is Q4_K_M llama.cpp versus
-V0 on identical frozen IDs and answer keys. BF16 is limited to an optional
-elementary tensor/load sanity check; it is not a full evaluation arm. Public
-questions may have appeared in model training; make no contamination-free
+the selected QW38 candidate on identical frozen IDs and answer keys. BF16 is
+limited to an optional elementary tensor/load sanity check; it is not a full
+evaluation arm. Public questions may have appeared in model training; make no contamination-free
 benchmark claim. All v1 inputs and references are held out from QW38 quantizer
 calibration and parameter fitting.
 
@@ -92,9 +117,9 @@ Declare these slices before running the candidate:
 
 Collect a llama.cpp Q4_K_M teacher reference of at most **24 generated tokens
 per prompt** for NLL. Independently generate up to **256 tokens** with both
-llama.cpp and V0 for text comparison. Short teacher references intentionally
-follow DS4's cheap continuation screen; they cannot validate long-form
-reasoning by themselves.
+llama.cpp and the candidate for text comparison. Short teacher references
+intentionally follow DS4's cheap continuation screen; they cannot validate
+long-form reasoning by themselves.
 
 ### C92: fixed capability questions
 
@@ -111,7 +136,7 @@ Use DS4's `eval_system_prompt()` and `build_question_prompt()` text at that
 revision, then apply the QW38 chat template. Preserve option ordering. Do not
 include titles, keys, provenance annotations, or private rationales in prompts.
 No few-shot examples, tools, retrieval assistance, retries, or answer repair.
-Generate at most **2048 tokens** per case with llama.cpp and V0, once each.
+Generate at most **2048 tokens** per case with llama.cpp and the candidate, once each.
 
 Also collect a separate llama.cpp Q4_K_M teacher reference of at most **24
 tokens per C92 prompt** for NLL. The answer key grades capabilities; a teacher
@@ -168,9 +193,10 @@ special tokens, appended to the frozen generation prefix. Score every answer
 token; do not add EOS to this retrieval target. This directly measures the known
 answer, separately from teacher-continuation agreement.
 
-The **TASK-018 core** requires horizons 512 and 4096 (12 cases). Freeze the
-32768 cases at the same time; their execution belongs to TASK-022, when
-production prefill exists. This is a selected staged requirement, not an
+The 216-case core requires retrieval horizons 512 and 4096 (12 cases). Freeze
+the 32768 cases with the same inputs; candidate decode/core execution belongs
+to TASK-022 and production-prefill plus 32768 acceptance belongs to TASK-026.
+This is a selected staged requirement, not an
 implementer-selected feasible subset. An optional capacity probe uses the same
 six cases at `262144 - 32` prompt tokens if the complete session fits; otherwise
 record the memory/capacity limit. Never describe this synthetic retrieval suite
@@ -211,12 +237,12 @@ Allocate evaluation capacity for the complete prompt plus its output cap, up to
 the supported model limit. Never truncate prompts to fit a convenience default;
 an allocation/limit failure is missing evidence with its required bytes recorded.
 
-The Q4_K_M llama.cpp teacher generates P100/C92 reference token IDs. V0
-teacher-forces **those same IDs**. This avoids using V0 output to select its
-own evaluation targets. Generate llama.cpp greedy outputs on the fixed
-questions and grade both llama.cpp and V0 against the fixed answer keys. BF16
-is limited to an optional elementary tensor/load sanity check; it is not a
-generation or scoring arm.
+The Q4_K_M llama.cpp teacher generates P100/C92 reference token IDs. The
+candidate teacher-forces **those same IDs**. This avoids using candidate output
+to select its own evaluation targets. Generate llama.cpp greedy outputs on the
+fixed questions and grade both llama.cpp and the candidate against the fixed
+answer keys. BF16 is limited to an optional elementary tensor/load sanity
+check; it is not a generation or scoring arm.
 
 After the reference IDs are frozen, run a probability-only llama.cpp replay on
 the same 192 P100/C92 prompts with `n_probs=20`. Require generated IDs, stop
@@ -246,9 +272,10 @@ Freeze in this order:
    implementation, policy, tokenizer/template assets, and the manifest itself.
    Use UTF-8/LF JSONL plus little-endian uint32 token arrays and byte masks;
    hash the stored file bytes. Record manifest-relative paths and lengths.
-6. Validate the fixture inventory, then run llama.cpp and V0. Any later change to
-   prompts, keys, masks, rendering, references, or grading invalidates comparison
-   under this suite identity and requires a versioned decision and paired rerun.
+6. Validate the fixture inventory, then run llama.cpp and the candidate. Any
+   later change to prompts, keys, masks, rendering, references, or grading
+   invalidates comparison under this suite identity and requires a versioned
+   decision and paired rerun.
 
 Source checkpoint identity uses index/config metadata only. GGUF teacher
 identity uses GGUF metadata, declared file size, and runtime-reported model
@@ -269,9 +296,9 @@ Require finite logits, complete state commits, valid token IDs, and deterministi
 same-schedule replay. Preserve the TASK-017 source comparison; do not introduce
 a new arbitrary full-model logit MAE tolerance for this suite.
 
-Run every L12 and required R case through both llama.cpp and V0. Fixed answer
-keys grade each arm. A llama.cpp/V0 difference is a measured behavior
-difference; it does not change the keys or authorize answer repair. BF16 may
+Run every L12 and required R case through both llama.cpp and the candidate.
+Fixed answer keys grade each arm. A llama.cpp/candidate difference is a measured
+behavior difference; it does not change the keys or authorize answer repair. BF16 may
 receive a small elementary tensor/load sanity check, but that check is not
 part of suite coverage or a quality gate.
 
@@ -285,27 +312,27 @@ never concatenate documents or carry state between prompts. No sliding windows
 or overlap are needed for v1.
 
 Compute stable FP32 log-softmax over the **full 248320-token vocabulary** for
-V0 logits on P100/C92 teacher targets:
+candidate logits on P100/C92 teacher targets:
 `logp[k] = z[k] - max(z) - log(sum(exp(z - max(z))))`.
 Accumulate negative log probabilities and counts in FP64. For each arm,
 `NLL = sum(masked -logp[target]) / sum(mask)`. The llama.cpp server's captured
 target-token log probabilities come from its declared `n_probs` output and are
 not full-vocabulary logits. Record requested/effective top-k size and target
 coverage separately; never infer full-vocabulary KL from truncated top-k
-values. The llama.cpp/V0 target-NLL delta is V0 minus llama.cpp on aligned
-target IDs.
+values. The llama.cpp/candidate target-NLL delta is candidate minus llama.cpp
+on aligned target IDs.
 Never average unweighted case means. Store per-case numerators and counts.
 
 For the teacher-target corpus, P100 + C92 form the NLL aggregate. Require
 **aggregate delta <= +0.03 nats/token** and **each declared slice delta <= +0.06**
-for V0 minus llama.cpp NLL. Slices are P100 English, Italian and code
+for candidate minus llama.cpp NLL. Slices are P100 English, Italian and code
 production; and each of the four C92 families. The REST interface exposes
 chosen-token log probabilities only for generated teacher continuations, so
 paired teacher NLL is unavailable for L12 and fixed-answer R targets (including
 32768); report those NLL values as `null` with that reason. Their answer graders
 remain required. Report context bins by actual prompt length wherever P100/C92
 teacher targets populate them; empty bins and R horizons are untested for paired
-NLL, never zero. The 32768 execution remains assigned to TASK-022. These are
+NLL, never zero. The 32768 execution remains assigned to TASK-026. These are
 retained engineering budgets for the paired NLL cases, not empirical claims
 about acceptable degradation for every application.
 
@@ -315,17 +342,18 @@ The Q4_K_M llama.cpp REST API exposes only requested top-k token log
 probabilities, not a full-vocabulary logit vector. Record its requested and
 effective `n_probs`, the number of target IDs present in returned top-k lists,
 and selected target log probabilities. Compare llama.cpp's sparse top-20 ID
-sets with V0's exact full-vocabulary top-20 IDs at aligned teacher positions;
-report overlap as `|intersection| / 20` and report the teacher top-20 scope.
+sets with the candidate's exact full-vocabulary top-20 IDs at aligned teacher
+positions; report overlap as `|intersection| / 20` and report the teacher top-20
+scope.
 Full-vocabulary KL and largest-KL positions are unavailable for this arm and
 must be `null`; never present truncated probabilities as full-vocabulary KL.
-For V0, retain its full-vocabulary target NLL and next-token diagnostics.
+For the candidate, retain its full-vocabulary target NLL and next-token diagnostics.
 Compare greedy token agreement and common-prefix length between llama.cpp and
-V0 as descriptive values without an additional numeric threshold.
+the candidate as descriptive values without an additional numeric threshold.
 
 ### Generated capability answers
 
-Save complete token IDs and decoded llama.cpp/V0 text before grading. Grade the
+Save complete token IDs and decoded llama.cpp/candidate text before grading. Grade the
 generated answer, not the likelihood of multiple-choice options. A grader uses
 the last nonempty line after trimming ASCII whitespace; it must begin exactly
 `Answer: `. Earlier prose is allowed, later nonempty prose makes the answer
@@ -348,13 +376,13 @@ intentional and its scores must be labeled with the QW38 grader version.
 
 Every case scores 0 or 1, once. Missing/malformed answers and output-cap stops
 score 0; an infrastructure failure is missing evidence, not a model score.
-Report per-slice accuracy, paired llama-pass/V0-fail and llama-fail/V0-pass
-counts, and their IDs. Report the 92-case micro-average, but it cannot cancel a
-slice regression. No LLM judge, substring grading, subjective answer repair,
+Report per-slice accuracy, paired llama-pass/candidate-fail and
+llama-fail/candidate-pass counts, and their IDs. Report the 92-case micro-average,
+but it cannot cancel a slice regression. No LLM judge, substring grading, subjective answer repair,
 or checkpoint-specific extractor tuning is part of C92.
 
 For every C92 slice and its aggregate, let
-`loss = accuracy_llama_cpp - accuracy_V0`:
+`loss = accuracy_llama_cpp - accuracy_candidate`:
 
 - PASS the finite-suite regression screen if `loss <= 0.02`.
 - If `loss > 0.02` and the lower end of the paired 95% interval is above 0.02,
@@ -389,12 +417,12 @@ limit the inferential value; raw paired counts remain required.
 ### Open-ended generated text
 
 Produce a side-by-side report for all P100 outputs, with Q4_K_M's short teacher
-continuation and llama.cpp/V0 full outputs. Report first-token match, token
+continuation and llama.cpp/candidate full outputs. Report first-token match, token
 divergence and common-prefix length as descriptive values only. Different
 valid wording is acceptable.
 
-A reviewer records, for each llama.cpp and V0 output: requested language followed,
-requested format followed, question addressed, a concrete factual/code error
+A reviewer records, for each llama.cpp and candidate output: requested language
+followed, requested format followed, question addressed, a concrete factual/code error
 with explanation if present, and degeneration. Each item is `yes`, `no`, or
 `not_applicable`, with a note for every negative assessment. Degeneration means
 empty output without a requested empty answer, unrelated text throughout, or a
@@ -402,15 +430,16 @@ loop of an identical contiguous 8-token block repeated at least four times.
 List cap-truncated answers separately. Do not treat a code snippet's visual
 plausibility as an executed test or a reviewer impression as benchmark accuracy.
 
-A llama.cpp/V0 difference with an alleged material error that has not been
-adjudicated leaves this part INCONCLUSIVE. A confirmed V0-only factual/code error, instruction failure,
-or degeneration blocks acceptance; stylistic preferences do not. Record reviewer
+A llama.cpp/candidate difference with an alleged material error that has not been
+adjudicated leaves this part INCONCLUSIVE. A confirmed candidate-only factual/code
+error, instruction failure, or degeneration blocks acceptance; stylistic
+preferences do not. Record reviewer
 identity, decision, and supporting text. This qualitative gate is deliberately
 reviewed, not represented as an automatically reproducible scalar score.
 
 ## State continuation and execution coverage
 
-For V0, run deterministic token streams made by cycling
+For the candidate, run deterministic token streams made by cycling
 the P100 `case_000` prompt IDs, truncated at the required lengths. This stream
 tests state behavior and is excluded from language-quality averages.
 
@@ -424,17 +453,18 @@ Retain TASK-017's late-failure/poison/reset/restore regression.
 Record in-memory versus serialized snapshot coverage; disk persistence is not a
 new runtime requirement if only the existing in-memory snapshot API is provided.
 
-TASK-018 uses repeated decode for all V0 prompt ingestion. Use a fresh llama.cpp
-request/slot for each prompt and keep server prompt-cache settings identical to
-the teacher-reference capture. Repeat the same settings in a fresh request for
+The historical old-V0 control used repeated decode for prompt ingestion. Use a
+fresh llama.cpp request/slot for each prompt and keep server prompt-cache
+settings identical to the teacher-reference capture. Repeat the same settings
+in a fresh request for
 `case_000`, `recNu3MXkvWUzHZr9`, `L01`, and `R-512-s0-d0.1`; require identical
 greedy output IDs. BF16 remains
 limited to an optional elementary sanity check. Runs can be sequential, and
 cached evidence may be reused only with all identities matching. Slow execution
 does not permit silently reducing cases or caps.
 
-TASK-022 reruns the core suite through production prefill followed by decode
-and runs R at 32768. Compare the same artifact under repeated decode and
+TASK-026 runs the accepted candidate core through production prefill followed
+by decode and runs R at 32768. Compare the same artifact under repeated decode and
 prefill at the checkpoints above with partitions of 1, 63, 64, 65, 255, 256,
 and an alternating 63/65 pattern, with tail lengths preserved. Across different
 schedules, require correct state positions, the same NLL budgets, capability
@@ -443,9 +473,10 @@ equality is required only for replay of one fixed schedule. Reuse the relevant
 component numerical tolerances for component-level boundary checks.
 
 The 32768 reference can be precomputed slowly; absence of either llama.cpp or
-V0 evidence is not a passing paired comparison. TASK-023 and subsequent experiments must reference
-the accepted core plus 32768 extension. If resources prevent a mandatory case,
-report missing coverage and BLOCKED. The maximum-capacity probe alone is optional.
+candidate evidence is not a passing paired comparison. TASK-027 and subsequent
+performance work must reference the accepted core plus 32768 extension. If
+resources prevent a mandatory case, report missing coverage and BLOCKED to the
+acceptance owner. The maximum-capacity probe alone is optional.
 No claim covers MTP, vision, sampling, batching, other backends, unrestricted
 multilingual behavior, executed code synthesis, or maximum context without
 separate evidence.
@@ -456,8 +487,8 @@ Emit a machine-readable manifest, per-case JSONL, summary JSON, and readable
 Markdown with links to raw generated text. The aggregate result is PASS only
 when every mandatory gate passes. Use FAIL for observed correctness/quality
 failure, INCONCLUSIVE for insufficient or unadjudicated evidence, and INVALID
-for identity/fixture/scorer failures. All three prevent task completion; map
-them to TASK-018 BLOCKED with their distinct reasons. A partial smoke run is
+for identity/fixture/scorer failures. All three prevent acceptance; report them
+under TASK-022 or TASK-026, as applicable, with their distinct reasons. A partial smoke run is
 explicitly `coverage=partial` and cannot produce an accepted baseline.
 
 Required report fields:
@@ -477,10 +508,11 @@ Required report fields:
   throughput benchmark), failures and paths to replay them. Missing values are
   `null` with a reason, never zero. Retain failed cases and both model outputs.
 
-Fix implementation bugs under the current architecture and rerun affected
-checks plus the unchanged acceptance suite. A selected-hypothesis failure
-requires TASK-018's architecture amendment procedure; it cannot authorize early
-EXP-A/B/C/E or an opportunistic precision change.
+Fix implementation bugs under the current candidate contract and rerun
+affected checks plus the unchanged acceptance suite. A conflict outside the
+decisions reopened by OVERALL-01 follows the architecture-blocker procedure in
+the implementation ledger; a failed hypothesis cannot relax EVAL-01 or
+authorize an unmeasured precision change.
 
 ## PERF-01: matching the local llama.cpp benchmark
 
@@ -489,7 +521,7 @@ comparator**. The local file exists and is 18,973,870,432 bytes; availability
 does not establish that its tokenizer/checkpoint matches or that a usable CUDA
 binary is installed. The inspected local llama.cpp checkout is revision
 `1945e092030f8668ff93382799502d01490e564d`. Pin the actual supported revision,
-build options, binary digest and effective runtime settings when TASK-023
+build options, binary digest and effective runtime settings when TASK-027
 freezes its measurement manifest; report any revision change from this inspection.
 Record GGUF metadata/provenance, architecture, layer dimensions, tokenizer
 metadata, quantization labels, file size and path. Confirm the claimed checkpoint
@@ -500,10 +532,11 @@ same-model comparator. No new checkpoint or `.qw38` tensor-payload hash is neede
 "Match the benchmark" has two concrete requirements: run comparable workloads,
 and report whether QW38 meets a **performance parity target**. This supersedes
 the earlier optional/future status of the llama.cpp performance point. It does
-not make GGUF the compiler input. TASK-018 independently selects Q4_K_M
-llama.cpp and V0 as its behavioral comparison pair; BF16 remains limited to
-TASK-017 semantic evidence and optional elementary sanity. Different
-quantization recipes and model sizes must be visible next to speed results.
+not make GGUF the compiler input. EVAL-01 compares Q4_K_M llama.cpp with the
+selected QW38 candidate; historical V0 records remain development controls.
+BF16 remains limited to TASK-017 semantic evidence and optional elementary
+sanity. Different quantization recipes and model sizes must be visible next to
+speed results.
 
 ### Workloads and measurement boundaries
 
@@ -586,11 +619,11 @@ Also publish p99 and memory ratios; they are required evidence, with no new
 tail-latency or memory parity threshold. Do not hide individual losses behind
 one geometric mean.
 
-TASK-023 must deliver the complete matched baseline and gap report even if V0
-is slower. **Missing comparison evidence blocks TASK-023; missing speed parity
+TASK-027 must deliver the complete matched baseline and gap report even if the
+candidate is slower. **Missing comparison evidence blocks TASK-027; missing speed parity
 does not block the subsequent authorized optimization experiments.** Otherwise
 requiring a faster baseline would prevent the work intended to improve it.
-Carry the measured gaps through TASK-024–031 and reassess after the final
+Carry the measured gaps through TASK-028–031 and reassess after the final
 experiment. Experiment completion and achievement of the performance target
 are separate statuses; an unmet target stays explicitly unmet. A speed gap
 never authorizes a quality relaxation or an experiment out of order.
@@ -599,7 +632,7 @@ Run the frozen L12, C92, P100 generation and R quality inputs through the GGUF
 adapter as contextual evidence before claiming a quality/speed Pareto comparison.
 Use the same grading and rendering; record unsupported lengths or identity
 mismatches. These scores are informative about the chosen llama quant and do
-not replace TASK-018's llama.cpp/V0 gates or require V0 to copy llama's errors.
+not replace EVAL-01 quality gates or require the candidate to copy llama's errors.
 Teacher-forced GGUF metrics are optional and comparable only if the full token
 identity matches. The REST API's top-k output is never full-vocabulary KL.
 If only timing evidence exists, call it a speed comparison, not equal-quality
@@ -607,18 +640,19 @@ performance or a Pareto win.
 
 ## Required implementation steps
 
-**Yes: implement EVAL-01 in TASK-018 and PERF-01 in TASK-023. No new predecessor
-or architecture experiment is needed.** TASK-018 stays TODO until execution begins. The decision
-selects inputs/scoring now; materializing teacher continuations and their hashes
-is an implementation output, not a further normative decision.
+The implementation sequence below applies to the selected candidate under
+OVERALL-01. Existing TASK-018 harnesses and partial V0 evidence remain
+development controls. TASK-022/026 own quality acceptance and TASK-027 owns
+matched PERF-01 execution; the acceptance standards below remain unchanged.
 
 Deliver, in this order:
 
 1. Versioned local fixture importer/materializer for P100, C92, L12, R; attribution,
    validators, QW38 rendering, and Q4_K_M reference capture/freeze.
-2. Evaluation drivers for Q4_K_M llama.cpp and V0: aligned teacher-forced
-   target-token probabilities where the server exposes them, greedy generation,
-   fresh llama.cpp request replay, V0 reset/snapshot, bounded logit processing,
+2. Evaluation drivers for Q4_K_M llama.cpp and the candidate: aligned
+   teacher-forced target-token probabilities where the server exposes them,
+   greedy generation,
+   fresh llama.cpp request replay, candidate reset/snapshot, bounded logit processing,
    and identity-bound reports. BF16 is restricted to a small optional
    elementary sanity check, not full behavioral evaluation.
 3. Graders and comparison/reporting: paired target NLL where available,
@@ -629,13 +663,13 @@ Deliver, in this order:
 4. Focused tests for target alignment/masks, stable NLL, counting, tie-breaking,
    EOS/caps, identity mismatches, missing/duplicate IDs, score extraction and
    malformed answers, statistical fixtures, and same-schedule state replay.
-   Then run the required core on the authoritative model and preserve evidence.
-5. TASK-022 supplies production-prefill coverage and the frozen 32768 extension.
-6. TASK-023 adds the llama.cpp public-API benchmark adapter, frozen performance
+   Then run the required core on the selected candidate and preserve evidence.
+5. TASK-026 supplies production-prefill coverage and the frozen 32768 extension.
+6. TASK-027 adds the llama.cpp public-API benchmark adapter, frozen performance
    manifest, matching-workload checks, raw timings and parity-gap report, using
    the accepted quality identity. Test timing-window counts, tokenizer mismatch
    rejection, statistics and state restore with small fixtures before model runs.
 
 The existing two-token TASK-017 evidence is useful prerequisite evidence; it
 does not supply the frozen corpus, generation graders, long-context coverage,
-or the TASK-018 behavioral acceptance result.
+or candidate behavioral acceptance.

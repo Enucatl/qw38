@@ -2,7 +2,7 @@
 
 ## Status
 
-IN_PROGRESS
+BLOCKED
 
 ## Milestone
 
@@ -110,9 +110,9 @@ No new throughput benchmark. Preserve the recorded populated-decode profile and 
 
 - [x] TASK-018–031 titles, dependencies, scopes and acceptance criteria match OVERALL-01; prior TASK-018 evidence is retained.
 - [ ] Affected architecture and policy documents have consistent decision authority and remapped task references.
-- [ ] The evidence inventory identifies valid controls, incomplete/invalid attempts and regeneration owners without claiming an old-V0 quality pass.
-- [ ] Calibration/development/evaluation separation, shape/workload matrix, memory reserve and comparison protocol are frozen.
-- [ ] The 216-case core, P100 review and six 32768 cases retain unchanged gates and explicit downstream owners.
+- [x] The evidence inventory identifies valid controls, incomplete/invalid attempts and regeneration owners without claiming an old-V0 quality pass.
+- [ ] Calibration/development/evaluation separation, shape/workload matrix, memory reserve and comparison protocol are frozen; TASK-020 must materialize the frozen non-evaluation token manifests before fitting/screening.
+- [x] The 216-case core, P100 review and six 32768 cases retain unchanged gates and explicit downstream owners.
 
 ## Architecture blocker rule
 
@@ -122,29 +122,188 @@ A rejected candidate is a recorded result; use the eligible fallback within OVER
 
 ### Result
 
-IN_PROGRESS — task specifications synchronized with OVERALL-01. Architecture-document reconciliation, evidence inventory and protocol freeze remain open.
+BLOCKED — pending fresh review of the documentation repairs requested after Sol re-review. Architecture V0 now applies EVAL-01 to the selected candidate versus Q4_K_M, limits BF16 to optional sanity checks, reports full-vocabulary teacher KL as unavailable, and defers performance targets to PERF-01. The calibration protocol now names the full dataset repository and exact hash-preimage bytes; the blocker and follow-up sections record concrete remaining obligations. Prior document-check passes did not resolve the review findings, and these repairs do not establish a fresh review pass. Do not advance TASK-019/020 until fresh review passes.
 
 ### Changes made
 
-Replaced TASK-018–031 specifications and synchronized the ledger's reconciliation notice. Prior TASK-018 evidence is preserved below.
+Replaced TASK-018–031 specifications and synchronized the ledger's reconciliation notice. Reconciled the architecture decision register, evaluation ownership, quantization/layout/prefill authority and dependency rationale. Added the evidence inventory, downstream owners, protocol rules and current evidence gaps. Follow-up repairs align Architecture V0's operative validation instructions with EVAL-01/PERF-01 and specify the calibration sampler's repository, byte encoding and ordering. Prior TASK-018 evidence is preserved below.
 
 ### Tests run
 
-Record exact commands, outcomes, reference tolerances, covered boundaries and
-limits. Do not infer runtime correctness from documentation checks.
+Documentation/contract checks run after reconciliation (separate from runtime
+and timing evidence):
+
+- `python3 scripts/check_quantization_design_space.py --config .cache/authorities/qwen3.8-27b-transformers/config.json` — PASS, exit 0; research-space identities/counts and local authority inputs consistent.
+- `python3 scripts/check_quantization_validation.py --config .cache/authorities/qwen3.8-27b-transformers/config.json` — PASS, exit 0; historical methodology/JSON identities consistent. Its unselected flags remain historical and are explicitly subordinated by the OVERALL-01 note.
+- `python3 scripts/check_layout_strategy.py --config .cache/authorities/qwen3.8-27b-transformers/config.json` — PASS, exit 0; layout dimensions and machine summary consistent.
+- `python3 scripts/check_prefill_plan.py --config .cache/authorities/qwen3.8-27b-transformers/config.json` — PASS, exit 0; semantic schedule and machine summary consistent.
+- `git diff --check` — PASS, exit 0.
+
+Follow-up repair validation: manually compared the operative Architecture V0
+instructions with EVAL-01/PERF-01 and checked the sampler's byte specification
+and report/ledger consistency. `git diff --check` passed again. The four
+document checkers above were not rerun for these prose edits; fresh independent
+review remains pending.
+
+These checks establish document/model-config consistency only. They do not
+establish model runtime correctness, evaluation acceptance, corpus provenance,
+or a benchmark result. Existing runtime/reference checks and exact identities
+are preserved in the historical evidence section and inventory below.
 
 ### Benchmark results
 
-Record raw evidence paths, timing boundaries, quality context, memory and
-uncertainty, or the reason a benchmark is not required by this task.
+No new throughput benchmark is required or was run for TASK-018. Retained
+benchmark context is development-only: the profile at populated lengths
+507–514 measured 33.17 ms traced, 28.61 ms after the documented Q4 projection
+changes, and 27.17 ms in the final untraced run; see
+[`immediate-decode-profile.md`](../immediate-decode-profile.md) and its SQLite/
+Nsight files. Prompt ingestion for that system remained repeated decode.
+Selected P10 and one long-C92 timing records in the preserved historical
+report used different timing boundaries and are diagnostic, not parity
+evidence. No uncertainty interval or paired performance report exists. The
+matched whole-request benchmark owner is TASK-027 after TASK-026 quality
+acceptance.
 
 ### Architecture blocker
 
-Record none or the complete ledger-defined blocker report.
+No Architecture V0 decision blocker was identified. The reported conflicts
+are resolved by the existing OVERALL-01 and EVAL-01/PERF-01 authority; no new
+architecture decision or threshold change is required. TASK-018 remains
+blocked pending fresh review of the documentation and reproducibility repairs
+recorded here and in the implementation ledger.
 
 ### Follow-up observations
 
-Record remaining coverage and performance gaps and their downstream owners.
+Obtain fresh review of the repaired candidate gates, sampler specification and
+completion report before closing TASK-018 or advancing TASK-019/020.
+TASK-020 must materialize the exact calibration/development token manifests
+before fitting/screening. TASK-022/026 must rebind preserved evaluation inputs
+to the reconciled policy identity before acceptance. These downstream gaps are
+separate from TASK-018's pending review.
+
+### OVERALL-01 reconciliation, evidence inventory, and protocol freeze — 2026-09-24
+
+#### Reconciliation result
+
+OVERALL-01 now governs reopened candidate decisions and task ownership. The
+architecture register labels the old Q4/Q8, packed-layout and geometry choices
+as V0 controls; architecture V0, the quantization/layout/prefill/compiler plans, the
+technology baseline, code standards and EVAL-01/PERF-01 identify which
+historical statements remain controls and which are superseded for
+TASK-018–031. Quality criteria and PERF-01 measurement semantics are
+unchanged. The old task sequence and requirements to complete old-V0 quality
+before feasibility are historical. No architecture blocker is identified.
+
+#### Evidence inventory
+
+| Evidence | Identity and provenance | Valid coverage and limit | Status / regeneration owner |
+| --- | --- | --- | --- |
+| Source model metadata | HF authority `.cache/authorities/qwen3.8-27b-transformers`; config SHA-256 `191e0af232104ed8b65258cf3fb2b842e288008baca7633c11b82a1ac7203aab`; safetensors index SHA-256 `77042094076611b69791a610065f28b7013b8c621795fa86ddccc8bac7d1b9df`; tokenizer SHA-256 `0997f410c57a1f4e53b09e4be8f4a172d90edd9564368fb0847030937229b9f3` | Metadata/tokenizer identities are authenticated; source tensor payload bytes are not hashed under code standards | Reuse metadata identities; candidate compiler inputs are owned by TASK-021 |
+| Historical V0 artifact | `.qw38` manifest identity `ef59127793383c40e0887315c084180eef12907627ebf6bd1a0956cc7b8a0044`, compiler `qw38-v0:0.1.1`, 17,095,659,090 bytes; 408 Q4G64 tensors, 2 Q8G32, 458 BF16, 1 FP32; no payload digest | Valid V0 control identity, not a selected candidate or a quality pass | Preserve; new candidate artifact identity belongs to TASK-021 |
+| Evaluation fixture inventory | `.cache/evaluation/qw38-language-v1/manifest.json`; fixture manifest SHA-256 `f08823bc1b7f50646b0daaf6eea801452c03b0a42d32d60ddc43d69365764b1e`; DS4 revision `c238077a87186381bf626cc531bccffe1fef79e7`; prompts SHA-256 `479616b2aefae98b88ec944843a64e1f44a2659c58d2fda241256a53fac56569` | 222/222 unique prompts: P100 100, C92 92, L12 12, R 18; six each at 512, 4096, 32768. Core is 216 cases, with R512/R4096 12. Inputs/keys/masks remain frozen | Bytes and original manifests are preserved. Manifest policy SHA-256 `a6e405af57cb732ea3061ff9ac7d747fec439ba0435f19c57eab2d7ad0cf019b` refers to the pre-reconciliation policy text; rebind the unchanged input identities to the reconciled policy in TASK-022 before acceptance |
+| Q4_K_M reference targets | Capture attempt `llama-20260923T153025Z-1465265`; teacher manifest SHA-256 `e4a56d51a77597cffbd27fbbb4851c169afe3b384abb3245c6eb7c46b6259575`; source refs SHA-256 `57faf60a5fb77a5d91b048e1f8becae0b548c5030bc76cafdc13cc798e4c1d76`; container `ghcr.io/ggml-org/llama.cpp@sha256:93e004aeaddfcab61c219c65159e28557142054f63d27d4427daf178ec663cc6`; server binary SHA-256 `ca7289d8434a76b514699eb39258779d0c0e556b1d270d356690e9a7dd16d501`; GGUF 18,973,870,432 bytes, no payload hash; Q4_K_M, CUDA, 65/65 layers offloaded | 192/192 P100/C92 teacher references (24-token cap); exact IDs/masks validate. Six R32768 cases are immutable retrieval inputs, not teacher-generated answer refs | Capture lineage is preserved; rerun/revalidate for acceptance under TASK-022/026 if reconciled-policy binding or comparator identity validation fails |
+| Q4_K_M top-20 probabilities | Attempt `probabilities-20260923T155850Z-1474314`; sidecar SHA-256 `1781535511d82d66642cacd0d4386d75d5d6d8039c44827b7f094ec705a0627c`; input teacher manifest above | 192/192 cases and 4,467 aligned teacher targets; top-20 rows only. Full-vocabulary KL is unavailable | Diagnostic/control only; regenerate only if input identity changes. Never claim full-vocabulary KL |
+| Interrupted Q4_K_M generated arm | `.cache/evaluation/qw38-language-v1/runs/llama-20260923T160709Z-1476101/`; 216 outputs logged; exit 1 in fresh-request replay | Output completion is not authenticated complete-arm evidence; per-case provenance gap remains | Retain failed attempt; TASK-022/026 regenerate any required comparator run and do not promote the outputs |
+| Interrupted V0 full arm | `.cache/evaluation/qw38-language-v1/runs/v0-20260923T170423Z-1492403/`; source revision `3d6601b9ffb48c50af700194ab53d853393b82ee`, dirty tree recorded; artifact above; evaluator SHA-256 `dea24d9609d644f5309334823ab5112a0c6e7fe8f29dcb96728a2746059a426c`; dev image `sha256:3844dc9c37087cecd40f96e62bd4f305ad405408f0d63312bda8aff8651f2b49`; GPU RTX 5090, driver 590.48.01, 32607 MiB; case TSV SHA-256 `a618c0d9b02653a60c2746393437a4fb5de2fa301630956fe408f99d2fd5b028` | Interrupted at 124/216 after 2,796 s, exit 137; 124 output/logit files but only 66 intact case JSONL rows. Not a pass and not a candidate failure | Retain as diagnostic. No old-V0 rerun required. Candidate core evidence belongs to TASK-022 and full-prefill evidence to TASK-026 |
+| State continuation control | Reset/snapshot report SHA-256 `ff1033ca1899f9b7cb6df5b040c9940a642e457f84baaf64881892c0b49dd22f`; replay binary SHA-256 `e8041669eea015e83efe3ee47dd16530dc292c063a8f1a25bea3aae9b64e8381` | PASS at lengths 1, 3, 4, 63, 64, 65, 255, 256, 257 and A/reset/B/reset/A interleave | Retained semantic control; rerun on schedule/state changes under affected downstream task |
+| Bounded decode and timing controls | `scripts/run_task018_dev_smoke.sh` (two prompts, eight tokens, 25.9 s including load); [`immediate-decode-profile.md`](../immediate-decode-profile.md) and `.cache/decode-profile-20260923.sqlite` / `.nsys-rep` | Populated decode: traced 33.17 to 28.61 ms; untraced 27.17 ms at populated 507–514. P10 and one C92 comparison are speed diagnostics with non-matched timing boundaries. Prompt ingestion used repeated decode | Preserve as development controls only. No new throughput benchmark is required here; production-prefill and matched PERF-01 rows belong to TASK-027 after TASK-026 |
+| Human review and paired quality report | No complete pair report; no resolved P100 review artifact | 0/100 P100 adjudications; no candidate core result; old V0 gate is unpassed | TASK-022/026 own candidate reviews and report; do not infer a pass from generated outputs |
+
+The immutable fixture, capture, probability and run files remain unmodified.
+The reconciled `evaluation-policy-v0.md` SHA-256 is
+`c6e38ae56b7ad180381ddb44d45e4d804fbba007a535a6fb49e9900b11a0b716`.
+Because report identity includes the policy hash, the policy-hash change caused
+by this reconciliation is a known manifest identity gap. TASK-022/026 must
+rebind or regenerate manifests before using the preserved inputs as acceptance
+evidence. No source tensor payload digest is introduced.
+
+#### Frozen comparison protocol
+
+- **Final evaluation:** `qw38-language-v1`, 216 core cases: P100 100, C92 92,
+  L12 12, and R512/R4096 12. Keep all 100 P100 qualitative adjudications,
+  existing answer/NLL gates, uncertainty method, masks and scoring unchanged.
+  Freeze all six R32768 cases now; TASK-026 evaluates them with production
+  prefill. Candidate core decode acceptance is TASK-022; complete prefill and
+  long-context acceptance is TASK-026.
+- **Calibration:** use Hub repository `Salesforce/wikitext`, configuration
+  `wikitext-103-raw-v1`, split `train`, at
+  revision `b08601e04326c79dfdd32d625aee71d232d685c3`. **Development
+  screening:** use that same dataset revision's `validation` split. The DS4
+  `qw38-language-v1` inputs remain final evaluation and are disjoint from both.
+  Join each split's raw `text` rows in source order with one LF (U+000A),
+  retaining empty rows and adding no trailing separator or text normalization.
+  Tokenize the joined text without special tokens or a chat template, using
+  the frozen Qwen3.8 tokenizer (`tokenizer.json`
+  SHA-256 `0997f410c57a1f4e53b09e4be8f4a172d90edd9564368fb0847030937229b9f3`).
+  TASK-020 records the tokenizer implementation and exact version in each
+  materialization manifest.
+  Form non-overlapping 512-token windows over each split's concatenated token
+  stream, dropping a final incomplete window. For each window, hash the UTF-8
+  bytes (without a BOM) of
+  `qw38-task020-<split>-v1\n<dataset-revision>\n<window-start-token>`.
+  Substitute `train` or `validation` for `<split>`, the exact lowercase
+  revision `b08601e04326c79dfdd32d625aee71d232d685c3` for
+  `<dataset-revision>`, and the zero-based token offset (0, 512, 1024, ...) in
+  unsigned base-10 ASCII with no leading zeros except `0` for
+  `<window-start-token>`. Each `\n` denotes one LF byte (`0x0a`), not literal
+  backslash/`n` characters. Include no angle brackets, quotes, spaces or final
+  newline. Rank windows by ascending lexicographic SHA-256 digest bytes,
+  breaking any digest tie by ascending numeric token offset. Take the first
+  128 `train` windows (65,536 tokens) for calibration and
+  first 32 `validation` windows (16,384 tokens) for development. TASK-020 must
+  emit and bind the exact raw-row/window/token manifests, sampler source hash,
+  tokenizer identity and calibration outputs before fitting or screening.
+- **Calibration coverage:** run the BF16 source control on all sampled tokens
+  and record input activations for every one of the 64 language layers: all 48
+  GDN and 16 attention layers, MLP down projections, GDN projection inputs,
+  and attention Q/G/K/V/O projection inputs. For populated-decode samples,
+  prefill tokens 0–383 from each 512-token window, then teacher-force tokens
+  384–511 one at a time and record the same inputs at populated lengths 384–511.
+  Calibration fitting may use only the `train` samples. The `validation`
+  samples are reserved for development screening, never calibration fitting.
+  EVAL-01 prompts, targets, answers, masks, keys and teacher outputs are
+  forbidden to both.
+- **Development screening:** use only the 32 frozen validation windows for
+  reconstruction, activation-scale sensitivity and early candidate rejection.
+  This screen cannot establish any EVAL-01 pass. TASK-020 must materialize and
+  authenticate the exact selected rows/windows/token IDs before candidate
+  outputs are inspected; no P100/R evaluation case may be substituted.
+- **Feasibility/performance workload:** use actual contraction shapes named by
+  TASK-019: hidden 5120, MLP 17408, vocabulary 248320, GDN and attention
+  projection families; M values 1, 2, 8, 32, 64, 128, 256, 512 and 1024 where
+  workspace allows, plus representative tails. Report logical/padded work and
+  kernel-only plus complete quantize/pack/GEMM/epilogue costs. This is distinct
+  from full-model PERF-01, which keeps prefill and request T=256/4096/32768 and
+  populated decode T=512/4096/32768 with the fixed 128-token continuation.
+- **Memory:** on RTX 5090, leave at least 2 GiB of allocatable VRAM uncommitted
+  at peak after all resident weights, scales/padding, active state/KV,
+  workspace, graphs, conversions and second views. Record free VRAM before
+  launch and peak used/free memory for each candidate and comparator. If the
+  device exposes less than required, reduce workload or candidate residency
+  and report it; do not consume the reserve silently.
+- **Comparison and budgets:** keep Q4_K_M llama.cpp and historical V0 as
+  explicitly identified controls; compare candidate vs frozen EVAL-01
+  references under unchanged +0.03 aggregate / +0.06 slice NLL limits, 2
+  percentage-point capability regression limit, P100 adjudication, and paired
+  uncertainty. PERF-01's ratio target remains >=1.00 for every row's median,
+  with paired 95% interval classification as defined in policy. No additional
+  numerical quality, speed, tail-latency, or memory threshold is introduced;
+  report all rows and individual losses without weighted averaging.
+- **Identity/reporting:** correctness/contract checks and benchmarks have
+  separate reports. Every result records exact command, source revision and
+  dirty state, compiler/build flags, binary digest, artifact manifest and
+  quantization identity, input/policy/grader/tokenizer/mask identities, tool
+  versions, image digest, GPU/driver/clocks, memory, timing boundaries,
+  repetitions, raw output paths, coverage and invalid/interrupted cases.
+  Preserve raw failed attempts. Performance report manifests bind the accepted
+  TASK-026 quality identity; TASK-027 owns the matched report.
+
+This protocol freezes dataset revision, split ownership, tokenizer, deterministic
+sampling, sequence lengths, coverage, required shapes, reserve, unchanged gates
+and report identities. Exact calibration/development token manifests are a
+TASK-020 precondition; the evaluation-manifest policy-hash rebind is required
+before TASK-022/026 acceptance. Neither gap permits a candidate result to be
+called a pass.
 
 ## Historical evidence — former TASK-018
 

@@ -22,10 +22,11 @@ for TASK-018–031.** The corresponding `tasks/TASK-018.md` through `TASK-031.md
 now expand these contracts with matching titles, dependencies, scopes and
 acceptance criteria. Their former specifications are superseded; the earlier
 TASK-018 report is explicitly preserved as historical evidence, valid only
-within its recorded identities and coverage. TASK-018 still owns reconciliation
-of affected architecture documents, the evidence inventory and protocol freeze
-before implementation resumes. Updating the ledger and task specifications
-does not complete those remaining obligations or any new implementation.
+within its recorded identities and coverage. TASK-018 owns reconciliation
+of affected architecture documents, the evidence inventory and protocol freeze.
+Its current candidate is `BLOCKED` on the review findings recorded in the task
+execution blockers table. Updating the task specifications does not complete
+any downstream implementation or acceptance gate.
 
 The amendment reopens Q-01/Q-02 (projection/head precision), the projection
 operand part of P-02 (activation quantization), A-01/L-01 (weight views/packing),
@@ -65,8 +66,8 @@ screening may precede full quality acceptance; production promotion may not.
   promotion. Keep unrelated variables fixed in comparisons. Joint format/kernel
   choices are allowed, with weight-only and activation-only error ablations.
 - Keep benchmarks separate from correctness tests. Preserve exact commands, results, artifact/binary identities, and hardware context in each completion report.
-- Status values are `TODO`, `IN_PROGRESS`, `BLOCKED`, and `DONE`. TASK-018 remains
-  `IN_PROGRESS` after rescoping; all new downstream contracts are `TODO`.
+- Status values are `TODO`, `IN_PROGRESS`, `BLOCKED`, and `DONE`. TASK-018 is
+  `BLOCKED` on unresolved review findings; downstream contracts remain `TODO`.
 - A rejected candidate is a useful experiment result. Record the reason and
   select the next eligible candidate without weakening acceptance criteria.
   Missing required evidence cannot be described as a pass.
@@ -223,7 +224,7 @@ an achieved performance target.
 | TASK-015 | Segmented online decode attention | M5 | TASK-014 | Causal GQA segment scan, fixed-order merge, gating, output residual | DONE |
 | TASK-016 | One-layer integration checkpoint | M6 | TASK-013, TASK-015 | One GDN-style and one attention-style layer through common runtime | DONE |
 | TASK-017 | Complete primary-language decode | M6 | TASK-016 | Embedding, 64 layers, persistent state, final norm, Q8 head, logits | DONE |
-| TASK-018 | Replan contracts and preserve evaluation controls | M7 | TASK-017 | Reconciled task/architecture authority, evidence inventory, frozen screening/calibration/acceptance protocol | IN_PROGRESS |
+| TASK-018 | Replan contracts and preserve evaluation controls | M7 | TASK-017 | Reconciled task/architecture authority, evidence inventory, frozen screening/calibration/acceptance protocol | BLOCKED |
 | TASK-019 | SM120 quantization and kernel feasibility | M7 | TASK-018 | Real-shape NVFP4/MXFP4/Q4 comparison, native instruction evidence, conversion costs and memory budget | TODO |
 | TASK-020 | Calibrated precision policy and candidate selection | M7 | TASK-019 | Weight/activation error ablations, family policy, quality screening and provisional format/layout decision | TODO |
 | TASK-021 | Native quantized artifact and compiler | M8 | TASK-020 | Versioned quantizer/scales/layout, calibrated source-to-artifact path and independent reconstruction | TODO |
@@ -519,10 +520,12 @@ TASK-001 → 002 → 003 → 004 → 005 → 006
 | Task | Blocker | Evidence | Required follow-up |
 | ---- | ------- | -------- | ------------------ |
 | TASK-017 | Resolved: stale compiler executable reported a graph-binding failure. | Current compiler source already assigns retained MTP layer bindings index 0; rebuilding produced both production and BF16 identity artifacts. | Completed primary-language decode and independent BF16/source validation; see [`TASK-017`](tasks/TASK-017.md). |
+| TASK-018 | Fresh review of the requested documentation/reproducibility repairs is pending. | Sol re-review identified conflicting candidate gates, an underspecified sampler and incomplete report fields. Follow-up edits apply EVAL-01/PERF-01 directly in Architecture V0, specify `Salesforce/wikitext` with config/revision and exact hash preimage bytes/order, and record concrete blocker/follow-up obligations in TASK-018. Prior document-check passes did not resolve the review findings; no fresh review pass is recorded. | Obtain fresh review of the repairs before closing TASK-018 or advancing TASK-019/020. |
 
 ## Preserved evidence from the former TASK-018
 
-TASK-018 remains `IN_PROGRESS` under the revised contract. The former V0
+TASK-018 is `BLOCKED` under the revised contract pending the follow-up listed
+in the task execution blockers table. The former V0
 216-case paired quality gate has no result and is not marked complete by this
 replan. The following records describe historical development work; acceptance
 of the selected candidate belongs to TASK-022/026.
@@ -558,7 +561,7 @@ and gate required fixed-key answers. See
 
 | Amendment | Date | Decisions affected | Summary |
 | --------- | ---- | ------------------ | ------- |
-| EVAL-01 / PERF-01 | 2026-09-23 | V0 validation policy; TASK-018, TASK-022, TASK-023 and downstream experiments | User-requested decision selects DS4-derived language fixtures/scoring, staged context coverage, and llama.cpp Q4_K_M versus V0 as the TASK-018 behavior pair. PERF-01 separately defines its matched llama.cpp performance baseline for later performance tasks. Supersedes historical unselected-suite restrictions; task execution statuses remain unchanged. See [evaluation policy](../architecture/evaluation-policy-v0.md). |
+| EVAL-01 / PERF-01 | 2026-09-23 | Historical V0 validation policy and task ownership | The original decision selected DS4-derived language fixtures/scoring, staged context coverage, and llama.cpp Q4_K_M versus V0 as the former TASK-018 behavior pair. OVERALL-01 preserves the quality criteria, remaps candidate acceptance to TASK-022/026, and matched performance to TASK-027. See [evaluation policy](../architecture/evaluation-policy-v0.md). |
 | OVERALL-01 | 2026-09-24 | Q-01/Q-02, projection operands in P-02, A-01/L-01, related M-01/T-01–03, GDN prefill algorithm under G-02; S-01/S-02 only in TASK-030 | User-directed replan replaces TASK-018–031 with compute-compatible quantization selection before production commitment, native NVFP4/MXFP4 feasibility, calibration and family policy, both execution phases, full quality gates and whole-request measurement. This ledger supersedes conflicting old task scopes/order; TASK-018 reconciles the other documents. Evidence and quality/performance standards are retained under the migration table. No candidate is yet accepted. |
 
 ## Repair index

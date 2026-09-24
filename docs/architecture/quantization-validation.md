@@ -1,11 +1,15 @@
 # Qwen3.8-27B quantization evaluation methodology (TASK-18)
 
 > **V0 implementation authority:** [EVAL-01 / PERF-01](evaluation-policy-v0.md)
-> now selects the language evaluation inputs, scoring rules and acceptance policy.
-> Its selection supersedes this historical document's prohibitions on naming
-> suites/thresholds and its unselected evaluation flags for V0. The prose and
-> generated JSON below retain the Phase 1 methodology's historical scope;
-> language+MTP, calibration and Pareto research questions are not closed by it.
+> selects the unchanged language evaluation inputs, scoring rules and acceptance
+> policy. OVERALL-01 remaps candidate core acceptance to TASK-022, production
+> prefill and 32768 acceptance to TASK-026, and matched performance to TASK-027.
+> This Phase 1 methodology and its generated JSON remain historical research
+> context; their obsolete task order and unselected-corpus flags do not override
+> the implementation ledger or the EVAL-01 protocol freeze recorded by TASK-018.
+> TASK-018 freezes disjoint calibration/development sources and sampling;
+> TASK-020 materializes their exact token identities before any fitting or
+> screening. Both remain disjoint from final EVAL-01 inputs.
 
 > **Draft status:** conclusions in this document are **unverified** until the verification stage completes.
 

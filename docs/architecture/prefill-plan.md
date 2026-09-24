@@ -1,5 +1,13 @@
 # Qwen3.8-27B prefill execution plan (TASK-14)
 
+> **OVERALL-01 authority:** This Phase 1 hardware-independent serial schedule
+> is a semantic control and comparison reference, not a production schedule or
+> fixed chunk/tile commitment. TASK-019 measures candidate projection paths;
+> TASK-023–026 select, implement, and validate production prefill and handoff.
+> The ledger permits an early measured GDN recurrence comparison under G-02.
+> Former TASK-15/17/18 sequencing below is historical provenance and does not
+> constrain the revised sequence.
+
 > **Draft status:** conclusions in this document are **unverified** until the verification stage completes.
 
 Phase 1 **hardware-independent** prefill semantic schedule for many-token

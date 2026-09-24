@@ -1,5 +1,14 @@
 # Qwen3.8-27B quantization design space (TASK-08)
 
+> **OVERALL-01 authority:** This Phase 1 document records historical recipe
+> hypotheses and storage estimates. Its recipe list is not the candidate set
+> or a restriction on TASK-019/020. Those tasks compare native NVFP4/MXFP4,
+> existing Q4 controls, and measured higher-precision fallbacks under the
+> implementation ledger. Existing Q4/Q8 choices remain controls, not accepted
+> winners. Candidate quality is decided with unchanged EVAL-01 gates in
+> TASK-022/026. The legacy TASK-18 Pareto references below are historical
+> labels, not current task ownership.
+
 > **Draft status:** conclusions in this document are **unverified** until the verification stage completes.
 
 Phase 1 tensor-specific custom quantization **research space** for Qwen3.8-27B

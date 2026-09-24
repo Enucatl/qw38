@@ -1,5 +1,15 @@
 # Qwen3.8-27B model compiler plan (TASK-10)
 
+> **OVERALL-01 authority:** This Phase 1 plan records compiler boundaries and
+> ownership classes, not the reopened TASK-018–031 candidate schedule. TASK-020
+> owns the calibrated family policy and must materialize authenticated,
+> disjoint calibration and development inputs before fitting/screening.
+> TASK-021 owns the candidate artifact/compiler path. EVAL-01 quality
+> acceptance remains in TASK-022/026; PERF-01 is TASK-027. Historical
+> `calibration_corpus_selected: false` and TASK-18 references in the body/JSON
+> describe the state of this Phase 1 plan and are not a current prohibition or
+> task-owner assignment. No compiler profile or corpus is accepted by this note.
+
 > **Draft status:** conclusions in this document are **unverified** until the verification stage completes.
 
 Phase 1 **conceptual offline compiler pipeline** from the BF16 Transformers

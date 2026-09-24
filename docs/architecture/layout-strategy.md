@@ -1,5 +1,14 @@
 # Physical tensor layouts from consumers
 
+> **OVERALL-01 authority:** This TASK-15 Phase 1 document is a hardware-
+> independent record of logical layout candidates, not an artifact/view
+> commitment. TASK-019 measures the real SM120 consumer shapes; TASK-020/021
+> select a candidate policy and artifact layout from that evidence. The V0
+> Q4/Q8 packed layout remains a control. OVERALL-01 permits measured bounded
+> conversion or selected second views when their complete memory and timing
+> costs are included. The former TASK-17 mapping and TASK-18 ordering labels
+> below are historical provenance, not current ownership.
+
 > **Draft status:** conclusions in this document are **unverified** until the verification stage completes.
 
 Phase 1 **hardware-independent candidate layout space** for Qwen3.8-27B

@@ -1,6 +1,6 @@
 # Technology baseline
 
-This document is the normative V0 reference development, build, and runtime environment. [Architecture V0](../architecture/architecture-v0.md) defines what the engine builds and its model/runtime architecture. [Code standards](code-standards.md) define how its C++ and CUDA implementation is written. The [task ledger](task_ledger.md) defines implementation order.
+This document is the normative V0 reference development, build, and runtime environment. [Architecture V0](../architecture/architecture-v0.md) defines retained semantics and controls; OVERALL-01 and [the task ledger](task_ledger.md) govern candidate selection and implementation order for TASK-018–031. [Code standards](code-standards.md) define how its C++ and CUDA implementation is written.
 
 # Reference platform
 
@@ -43,7 +43,7 @@ The host owns the NVIDIA GPU, a compatible NVIDIA driver, Docker, and NVIDIA Con
 
 The engine must not require the CUDA Toolkit to be installed directly on the host. The host driver must be compatible with the selected CUDA container/toolkit. The compatible driver range is an environment prerequisite to validate when the image is selected; V0 does not hard-code a host driver version without a demonstrated deployment requirement.
 
-Containerization supplies a reproducible build environment, reproducible CUDA/userspace stack, and deployment isolation. It does not alter Q4G64, GDN state layout, model precision, semantic graph, or execution schedule; those remain architecture concerns.
+Containerization supplies a reproducible build environment, reproducible CUDA/userspace stack, and deployment isolation. It does not alter the retained model semantics or state contracts. OVERALL-01 reopens the V0 weight/activation formats, physical weight views, and schedules for measured candidate selection; platform/toolchain requirements in this document remain binding.
 
 # Reproducibility policy
 
@@ -109,4 +109,4 @@ Future implementation task specifications must treat:
 - this technology baseline as authority for platform, toolchain, build, and container assumptions;
 - [Code standards](code-standards.md) as authority for C++/CUDA implementation conventions.
 
-If task instructions conflict with these documents, report the conflict rather than silently resolving it.
+If a task conflicts with the platform or toolchain requirements here, report the conflict. For candidate architecture and task ordering in TASK-018–031, follow OVERALL-01 and its revised ledger contracts; this baseline does not require the historical Q4/Q8 implementation to be completed as a quality/performance gate first.

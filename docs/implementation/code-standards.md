@@ -1,6 +1,6 @@
 # Code standards
 
-This document is normative for V0 implementation work. [Architecture V0](../architecture/architecture-v0.md) defines the model/runtime architecture, while the [technology baseline](technology-baseline.md) defines the reference platform, toolchain, build, and container environment. The [task ledger](task_ledger.md) defines implementation order.
+This document is normative for implementation work. [Architecture V0](../architecture/architecture-v0.md) defines retained model semantics and controls, while the [technology baseline](technology-baseline.md) defines the reference platform, toolchain, build, and container environment. OVERALL-01 and [the task ledger](task_ledger.md) define candidate architecture authority and implementation order for TASK-018–031.
 
 # Design philosophy
 
@@ -90,6 +90,17 @@ Avoid uncontrolled allocation and free operations in per-token hot paths. Stable
 Keep the dependency surface small. The default foundation is the C++ standard library, CUDA Toolkit, CMake, and ordinary testing/build utilities. PyTorch, TensorFlow, generic tensor libraries, and large ML runtimes must not become inference-engine dependencies.
 
 A third-party dependency is acceptable when it supplies substantial capability that is risky or wasteful to reproduce. Any significant dependency added later requires explicit rationale.
+
+For TASK-019–023, CUTLASS/CuTe is an eligible conditional CUDA dependency for
+SM120 block-scaled GEMM and related real-shape feasibility work. Its rationale
+is access to native instruction mappings and operand layouts that would be
+risky to recreate; its presence in the candidate toolchain is not itself a
+production dependency decision. TASK-019 must establish the pinned revision,
+supported kernel/operand path and conversion-inclusive benefit. Candidate
+implementation tasks may keep it only if that evidence justifies the code,
+build and distribution cost. cuBLASLt remains a supported comparison/control
+when it exposes the needed operation. PyTorch, TensorFlow and general ML
+runtimes remain outside inference dependencies.
 
 # Binary artifact implementation
 
@@ -195,7 +206,7 @@ Future implementation task specifications must treat:
 - [Technology baseline](technology-baseline.md) as authority for platform, toolchain, build, and container assumptions;
 - this code standard as authority for C++/CUDA implementation conventions.
 
-If task instructions conflict with these documents, report the conflict rather than silently resolving it.
+If task instructions conflict with platform, toolchain, or code-boundary requirements in these documents, report the conflict. For candidate architecture and task ownership in TASK-018–031, follow OVERALL-01 and its revised ledger contracts; historical implementation choices do not override them.
 # Boundary, lifetime, and evidence contracts
 
 - Validate at the public bind/launch boundary: device and memory space,
