@@ -2,7 +2,18 @@
 
 ## Status
 
-IN_PROGRESS
+BLOCKED
+
+## Blocked reason
+
+After one Sol repair pass and one supplemental evidence pass, independent GPU
+operand-reconstruction validation, real-weight/activation measurements,
+conversion-inclusive timing, Q4/BF16 and GEMV controls, complete memory budgets,
+and a justified candidate shortlist remain absent. The final review also found
+that the support replay prints no CUTLASS revision inside the container and
+does not capture resource output because `cuobjdump` is invoked with an invalid
+option combination. The permitted repair and supplemental-evidence rounds are
+exhausted; do not promote or select an FP4 candidate from this evidence.
 
 ## Milestone
 
@@ -128,7 +139,7 @@ IN PROGRESS — selected the immutable CUTLASS v4.8.0 candidate pin and confirme
 
 ### Changes made
 
-Pinned CUTLASS `v4.8.0` / `098de2a652cf8f00fd70b2df54051c7eccbb855a` in a separate detached worktree at `.cache/task019/cutlass-v4.8.0`. Preserved `.cache/task019/cutlass` at `v4.6.1` / `e05f953a5b3d38adc240df2ff928e0421c2abba3`. Added `scripts/task019_cutlass_sm120.sh`, which configures only the official SM120 NVFP4 example and prepares an MXFP4 × MXFP4 variant by changing the operand wrapper types in the same pinned example. After the interrupted sweep, the script was revised to run CUTLASS's host block-scaled reference only at bounded M=32, N=128, K=128 for each format, then use explicitly labeled benchmark-only copies with that host check disabled for the real-shape timing loop. It captures SASS before the timing loop and uses `grep` instead of an unverified `rg` dependency. The revised harness has not been built or run. Its timing path uses generated FP4 inputs and times initialized GEMM iterations, so it does not yet satisfy real-weight, conversion-inclusive, Q4/BF16-control, independent-reference, or full-envelope requirements. The earlier revision choice had no recorded comparison or compatibility rationale. No payload or scale-content digest was computed.
+Pinned CUTLASS `v4.8.0` / `098de2a652cf8f00fd70b2df54051c7eccbb855a` in a separate detached worktree at `.cache/task019/cutlass-v4.8.0`. Preserved `.cache/task019/cutlass` at `v4.6.1` / `e05f953a5b3d38adc240df2ff928e0421c2abba3`. Added `scripts/task019_cutlass_sm120.sh`, which configures only the official SM120 NVFP4 example and prepares an MXFP4 × MXFP4 variant by changing the operand wrapper types in the same pinned example. After the interrupted sweep, the script was revised to run CUTLASS's host block-scaled reference only at bounded M=32, N=128, K=128 for each format, then use explicitly labeled benchmark-only copies with that host check disabled for the real-shape timing loop. It captures SASS before the timing loop and uses `grep` instead of an unverified `rg` dependency. At that stage the revised harness had not been built or run; the later pinned GPU bring-up section records its subsequent run. Its timing path uses generated FP4 inputs and times initialized GEMM iterations, so it does not yet satisfy real-weight, conversion-inclusive, Q4/BF16-control, independent-reference, or full-envelope requirements. The earlier revision choice had no recorded comparison or compatibility rationale. No payload or scale-content digest was computed.
 
 The pinned CUDA image lacks Python, which CUTLASS v4.8.0 requires during CMake configuration. The script read-only bind-mounts the host `/usr/bin/python3.12` interpreter and `/usr/lib/python3.12` standard library, and passes `-DPython3_EXECUTABLE=/usr/bin/python3.12`. The host interpreter is Python 3.12.3. This supplies Python only to the CMake configuration step; it does not change the Dockerfile/image or add a Python runtime dependency to the candidate binaries. The script fails with a clear message if either host path is unavailable.
 
@@ -140,7 +151,7 @@ Environment probe, PASS: `docker run --rm --gpus all qw38-dev:cuda13.4.1-pinned 
 
 ### Benchmark results
 
-The exact interrupted command was `./scripts/task019_cutlass_sm120.sh`; its captured log is `.codex-wake-run/c965b940b139.log`. The log records 52 completed synthetic CUTLASS example points: all four listed N values at M=1, 2, 8, 32, 64 and 128 for both formats, then N=5120 and 17408 at M=256 for both. Each completed point says `Disposition: Passed` against CUTLASS's own host reference and reports one 20-iteration average initialized-GEMM time, not raw samples or conversion-inclusive cost. The next line is `NVFP4 m=256 n=248320 k=5120`, with no disposition or timing. The main thread stopped the harness container using `docker stop --time 1` after observing the example at roughly 100% host CPU, 0% GPU utilization, and about 1.5 GiB GPU allocation while it computed the full-vocabulary host reference. The remaining 19 points were not reached. Neither a complete benchmark nor native-MMA instruction, resource, memory-budget, or quality evidence is available. The revised bounded-reference/benchmark-only harness is pending a GPU run.
+The exact interrupted command was `./scripts/task019_cutlass_sm120.sh`; its captured log is `.codex-wake-run/c965b940b139.log`. The log records 52 completed synthetic CUTLASS example points: all four listed N values at M=1, 2, 8, 32, 64 and 128 for both formats, then N=5120 and 17408 at M=256 for both. Each completed point says `Disposition: Passed` against CUTLASS's own host reference and reports one 20-iteration average initialized-GEMM time, not raw samples or conversion-inclusive cost. The next line is `NVFP4 m=256 n=248320 k=5120`, with no disposition or timing. The main thread stopped the harness container using `docker stop --time 1` after observing the example at roughly 100% host CPU, 0% GPU utilization, and about 1.5 GiB GPU allocation while it computed the full-vocabulary host reference. The remaining 19 points were not reached. Neither a complete benchmark nor native-MMA instruction, resource, memory-budget, or quality evidence was then available. The later pinned GPU bring-up section records the revised harness run.
 
 ### Architecture blocker
 
@@ -148,7 +159,7 @@ Record none or the complete ledger-defined blocker report.
 
 ### Follow-up observations
 
-Remaining for TASK-019: run the revised bounded-reference/benchmark-only harness; validate kernels against an independent contraction of reconstructed operands (including tails/scales/zero blocks and the BF16 output epilogue); use actual representative BF16 model weights and activations; measure quantization/packing plus dispatch/GEMM/output work; add feasible Q4-to-BF16 and BF16 library controls plus same-weight GEMV probes; establish profiler/instruction support; and complete the full memory budget. The script's command loop covers listed major projection dimensions and M values, but not unaligned tails or conversion costs. Its synthetic CUTLASS example operands are useful kernel bring-up only. This task remains IN_PROGRESS and no kernel, correctness, or performance acceptance criterion is yet claimed.
+Remaining after this historical slice: validate kernels against an independent contraction of reconstructed operands (including tails/scales/zero blocks and the BF16 output epilogue); use actual representative BF16 model weights and activations; measure quantization/packing plus dispatch/GEMM/output work; add feasible Q4-to-BF16 and BF16 library controls plus same-weight GEMV probes; establish profiler/instruction support; and complete the full memory budget. The original script's command loop covered listed major projection dimensions and M values, but not unaligned tails or conversion costs. Its synthetic CUTLASS example operands are useful kernel bring-up only. This task remains IN_PROGRESS and no kernel, correctness, or performance acceptance criterion is yet claimed.
 
 ### CPU logical FP4 reference slice (2026-09-24)
 
@@ -180,8 +191,8 @@ Exact focused command after scale repairs, PASS (6 tests, 0.004 s):
 Shell syntax check, PASS: `bash -n scripts/task019_cutlass_sm120.sh`.
 Whitespace check, PASS: `git diff --check`. The new edge tests cover nonzero
 NVFP4 underflow and MXFP4 rounding just above a power of two. The revised
-harness has had shell syntax and source-transform checks only; it has not
-been compiled or executed in the container.
+harness had shell syntax and source-transform checks only at this stage; the
+later pinned GPU bring-up section records its first container execution.
 
 Scope limit: the inspected CUTLASS v4.8.0 SM120 examples initialize packed
 inputs and scales for host reference GEMM, but do not define a BF16-to-FP4
@@ -190,3 +201,166 @@ records a clear logical scaling convention and does not validate a GPU
 candidate, CUTLASS physical scale-factor placement, full edge encodings, or
 conversion costs. TASK-019 remains `IN_PROGRESS`; this slice satisfies no
 kernel acceptance criterion.
+
+### Pinned GPU bring-up evidence (2026-09-24)
+
+The revised harness was run with `./scripts/task019_cutlass_sm120.sh` on the
+actual GPU. The pinned checkout is clean at
+`098de2a652cf8f00fd70b2df54051c7eccbb855a`; CMake configured
+`CUTLASS_NVCC_ARCHS=120a`, enabled examples and tools, and disabled the CUTLASS
+library, tests, and profiler. The project image is
+`qw38-dev:cuda13.4.1-pinned`, image ID
+`sha256:3844dc9c37087cecd40f96e62bd4f305ad405408f0d63312bda8aff8651f2b49`.
+The toolchain reported CUDA 13.4.59, CMake 3.28.3, and GCC 14.2.0. The GPU was
+an NVIDIA GeForce RTX 5090, compute capability 12.0, driver 590.48.01,
+32,607 MiB total VRAM. The saved post-run idle reading was 34 MiB used; it is
+not a candidate peak measurement. TASK-018 froze a 2 GiB free-VRAM reserve.
+
+Both pinned candidates compiled for `sm_120a`. The official NVFP4×NVFP4 example
+uses FP32 accumulation and writes BF16 output. The MXFP4×MXFP4 source was
+produced by changing the example's operand wrapper types. `cuobjdump` found
+`OMMA.SF.16864.F32.E2M1.E2M1.UE4M3.4X` in the NVFP4 binary and
+`OMMA.SF.16864.F32.E2M1.E2M1.E8` in the MXFP4 binary. Static resource output
+reports 168 registers, zero stack, and 1,024 bytes shared memory for the
+reported kernel. This establishes generated native block-scaled MMA in these
+two example binaries; it does not validate a project kernel or a mixed-format
+path.
+
+Exact bounded CUTLASS example checks were rerun with
+`--m=32 --n=128 --k=128 --iterations=0`; both printed `Disposition: Passed`.
+These are CUTLASS's own host-reference comparisons over its initialized
+operands, not independent contractions of reconstructed project-packed
+operands. The output is preserved at
+`.cache/task019/bounded-host-reference.log`.
+
+The benchmark-only binaries explicitly print `Verification: Skipped` and were
+timed with `--iterations=20`. The selected re-run log is
+`.cache/task019/representative-kernel-timings.log`; reported values are one
+20-iteration GPU-event average per shape, not raw samples or conversion-
+inclusive times:
+
+| M | N | K | NVFP4 average (ms) | MXFP4 average (ms) |
+| -: | -: | -: | -: | -: |
+| 1 | 5,120 | 5,120 | 0.0345856 | 0.0324032 |
+| 1 | 17,408 | 5,120 | 0.0645456 | 0.0668016 |
+| 8 | 5,120 | 5,120 | 0.0398512 | 0.0321376 |
+| 8 | 17,408 | 5,120 | 0.0670560 | 0.0610416 |
+
+The broader harness sweep was stopped after 36 completed synthetic points:
+both formats for all four scripted N values at M=1, 2, 8 and 32, and N=5,120
+and 17,408 at M=64. The next point was NVFP4 M=64, N=248,320, K=5,120. At
+that point the generated example was consuming one host CPU core to initialize
+large synthetic host buffers while the GPU reported 0% utilization. The
+container was stopped with `docker stop --time 1 ff583911fd87`; the harness
+exited 137. The broad sweep's terminal output was not saved as a file, so only
+the selected rerun above has durable timing logs. The revised script therefore
+demonstrates bounded build, support, and instruction evidence, but the broad
+matrix remains incomplete.
+
+Candidate binary SHA-256 identities (binary files only):
+
+| Candidate binary | SHA-256 |
+| ---------------- | ------- |
+| Official NVFP4 correctness | `6b0e3b1b3ddc457992dfdf090a451c302bc88c7535a8ef9336c6b15a4f8eeb9e` |
+| Transformed MXFP4 correctness | `20437cbcf30985caf25051ccffec86484bb45c430a15e4539ee32a56affc56bc` |
+| NVFP4 benchmark-only | `d5de5df4b1e29fff5a41ea501d3712ef108e126a803dde59771889e815fb55eb` |
+| MXFP4 benchmark-only | `35a590f16f3b9c3c11851893834f6a3eefd82bc974228115d72cc96792837501` |
+
+No BF16 checkpoint tensor, `.qw38` payload, or scale contents were hashed.
+There is no TASK-019 artifact/policy identity yet: these runs use CUTLASS's
+generated operands and seed, not model weights or activations. Existing
+checkpoint metadata and the CPU logical reference are not substitutes for
+real candidate inputs.
+
+### Remaining acceptance gaps
+
+The pinned binaries and native instruction evidence establish bounded CUTLASS
+bring-up. The repaired support command and focused tests were run in the
+supplemental evidence pass, but all five acceptance criteria remain open
+pending complete evidence. Substantive gaps remain:
+
+- independent device-kernel comparisons against FP32 contractions of
+  reconstructed operands, including scale orientation, tails, zero blocks,
+  padding masks, output conversion, and unsupported-shape behavior;
+- the real projection-family matrix and representative BF16 model weights and
+  activations; the repaired script now describes additional N/K pairs and an
+  unaligned diagnostic, but its matrix mode has not run and all current timing
+  points use generated operands;
+- raw timing samples, quantize/scale/pack/dispatch and output costs, a bounded
+  Q4-to-BF16 control, a feasible BF16 library control, same-weight FP4 GEMV
+  probes, and measured workspace/peak memory;
+- complete resident/transient candidate budgets including weights, scales,
+  embeddings/head, state/KV, scratch, optional views, and the frozen 2 GiB
+  reserve; and
+- a justified candidate shortlist. Until comparative quality, conversion,
+  memory, and workload costs exist, retain Q4G64 with BF16 activations only as
+  the ledger's eligible fallback control; no FP4 winner is selected.
+
+The original demonstration logs are
+`.cache/task019/bounded-host-reference.log`,
+`.cache/task019/instruction-evidence.log`, and
+`.cache/task019/representative-kernel-timings.log`. These are diagnostic
+bring-up results, not acceptance evidence for the missing criteria. No
+architecture conflict was found.
+
+### Review repair and supplemental evidence (2026-09-24)
+
+The current `scripts/task019_cutlass_sm120.sh` has two modes. Its default
+`support` mode builds the official NVFP4 example and direct MXFP4
+operand-wrapper variant, runs only bounded CUTLASS host-reference checks at
+M=32, N=128, K=128, prints the exact commands and correctness-binary hashes,
+and checks for the format-specific `OMMA.SF` instruction in each correctness
+binary. It checks the recorded local Docker image ID before launching. The
+optional `matrix` mode additionally builds clearly labeled benchmark-only
+copies and attempts the projection inventory at M=1, 2, 8, 32, 64, 128, 256,
+512 and 1024. Its N/K pairs are 5120/5120, 17408/5120, 5120/17408,
+10240/5120, 6144/5120, 5120/6144, 12288/5120, 1024/5120, 48/5120 and
+248320/5120, plus unaligned diagnostic 129/513. Points above its conservative
+256 MiB estimated host-buffer cap print `SKIPPED_BY_HARNESS`; example failures
+print `UNSUPPORTED_BY_EXAMPLE`. Neither label proves a GPU hardware limit. The
+full-vocabulary shape is included in the descriptor but is expected to hit
+the harness cap; a bounded real-input consumer remains necessary. Matrix mode
+still supplies synthetic kernel diagnostics only.
+
+`scripts/task019_fp4_reference.py` now validates logical and padded geometry
+before reconstruction and exposes BF16 output rounding after its FP32
+contraction. Focused tests add known E2M1/scale-code bytes for both formats,
+zero/tail and malformed-descriptor cases, and nearest-even BF16 store cases.
+This remains a logical reference: no device payload/scale-layout adapter or
+independent GPU comparison has been added.
+
+The prior `.cache/task019/bounded-host-reference.log` and
+`.cache/task019/instruction-evidence.log` came from the earlier full-sweep
+harness, and `.cache/task019/representative-kernel-timings.log` came from a
+selected manual rerun of its benchmark-only binaries. The instruction log was
+dumped from the benchmark-only binaries, while the two bounded `Passed` lines
+came from the correctness binaries. The four binary hashes above identify
+those existing files; the three logs do not by themselves record the exact
+binary path or hash for each command.
+
+Supplemental checks passed:
+
+- `PYTHONPATH=. python3 tests/test_task019_fp4_reference.py -v` — 9/9 passed.
+- `python3 -m py_compile scripts/task019_fp4_reference.py tests/test_task019_fp4_reference.py` — passed.
+- `bash -n scripts/task019_cutlass_sm120.sh` — passed.
+- `./scripts/task019_cutlass_sm120.sh support` — exit 0; full output is
+  `.cache/task019/support-evidence-20260924.log`.
+
+The support log records bounded CUTLASS host-reference `Passed` results for
+both formats at M=32, N=128, K=128, binary hashes matching the earlier report,
+and the NVFP4 and MXFP4 `OMMA.SF` instructions. The container lacks `git`, so
+its printed CUTLASS revision is empty; the harness checked the host checkout
+against `098de2a652cf8f00fd70b2df54051c7eccbb855a` before launch. The replay's
+`cuobjdump -res-usage` call with two binaries printed usage text instead of
+resource output while returning success. Separate `cuobjdump
+--dump-resource-usage` queries reported, for both kernels, 168 registers, zero
+stack, 1,024 bytes shared, and zero local memory; NVFP4 common GLOBAL was 12
+bytes and MXFP4 was 1,070 bytes. The corrected diagnostic was not captured in
+the replay log, so replay resource reporting remains defective.
+
+Final independent review: `REVIEW: CHANGES_REQUIRED`. It confirmed the
+supplemental test and bounded support results, but required evidence remains
+incomplete and identified the revision/resource logging defects above. Since
+one code-repair round and one supplemental evidence round have been used,
+TASK-019 is `BLOCKED`. No candidate is selected, no architecture conflict was
+found, and TASK-020 remains ineligible.

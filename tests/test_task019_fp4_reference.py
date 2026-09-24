@@ -5,8 +5,15 @@ from __future__ import annotations
 import math
 import struct
 import unittest
+from dataclasses import replace
 
-from scripts.task019_fp4_reference import contract_fp32, quantize_pack, reconstruct
+from scripts.task019_fp4_reference import (
+    contract_bf16,
+    contract_fp32,
+    quantize_pack,
+    reconstruct,
+    round_bf16,
+)
 
 
 def _bf16(value: float) -> float:
@@ -24,6 +31,43 @@ def _packed_code(payload: bytes, index: int) -> int:
 
 class Task019Fp4ReferenceTest(unittest.TestCase):
     """Check the logical FP4 reference using only the Python standard library."""
+
+    def test_known_scale_and_code_bytes_for_both_formats(self) -> None:
+        """Known E2M1 and scale encodings stay independent of reconstruction."""
+        cases = (
+            ("nvfp4", [6.0, -3.0, 0.0], 0.5, 64, 16),
+            ("mxfp4", [12.0, -6.0, 0.0], 1.0, 128, 32),
+        )
+        for format_name, row, tensor_scale, scale_code, block_size in cases:
+            with self.subTest(format=format_name):
+                packed = quantize_pack([row, [0.0] * 3], format_name, tensor_scale=tensor_scale)
+                self.assertEqual(packed.padded_columns, block_size)
+                self.assertEqual(packed.scale_codes, (scale_code, 0))
+                self.assertEqual(packed.payload[0], 0xD7)  # +6, -3, low nibble first
+                self.assertEqual(packed.payload[1:], bytes(len(packed.payload) - 1))
+                self.assertEqual(reconstruct(packed), [row, [0.0] * 3])
+
+    def test_reconstruct_rejects_malformed_geometry(self) -> None:
+        """A corrupted descriptor cannot imply a shorter physical K extent."""
+        packed = quantize_pack([[1.0]], "nvfp4")
+        for invalid in (
+            replace(packed, rows=0),
+            replace(packed, columns=0),
+            replace(packed, columns=17),
+            replace(packed, padded_columns=32),
+        ):
+            with self.subTest(invalid=invalid):
+                with self.assertRaises(ValueError):
+                    reconstruct(invalid)
+
+    def test_bf16_output_rounds_after_fp32_contraction(self) -> None:
+        """The example's BF16 D store uses nearest-even output rounding."""
+        self.assertEqual(round_bf16(1.0 + 1.0 / 256.0), 1.0)
+        self.assertEqual(round_bf16(1.0 + 3.0 / 256.0), 1.0 + 1.0 / 64.0)
+        self.assertEqual(
+            contract_bf16([[1.0, 0.0]], [[1.0 + 3.0 / 256.0, 9.0]]),
+            [[1.0 + 1.0 / 64.0]],
+        )
 
     def test_fp4_formats_keep_row_scale_orientation_and_zero_blocks(self) -> None:
         """Per-row scales stay attached to their own blocks; zero rows stay zero."""
@@ -114,16 +158,17 @@ class Task019Fp4ReferenceTest(unittest.TestCase):
         """Quantization changes operands; arithmetic is checked after decoding."""
         bf16_a = [[_bf16(v) for v in [0.3, -1.2, 2.7, 0.8]]]
         bf16_b = [[_bf16(v) for v in [1.7, 0.2, -0.9, 2.1]]]
-        decoded_a = reconstruct(quantize_pack(bf16_a, "mxfp4"))
-        decoded_b = reconstruct(quantize_pack(bf16_b, "mxfp4"))
-        ref = contract_fp32(decoded_a, decoded_b)
-        arithmetic_from_decoded = sum(
-            x * y for x, y in zip(decoded_a[0], decoded_b[0], strict=True)
-        )
         bf16_baseline = sum(x * y for x, y in zip(bf16_a[0], bf16_b[0], strict=True))
-
-        self.assertEqual(ref[0][0], arithmetic_from_decoded)
-        self.assertNotEqual(ref[0][0], bf16_baseline)
+        for format_name in ("nvfp4", "mxfp4"):
+            with self.subTest(format=format_name):
+                decoded_a = reconstruct(quantize_pack(bf16_a, format_name))
+                decoded_b = reconstruct(quantize_pack(bf16_b, format_name))
+                ref = contract_fp32(decoded_a, decoded_b)
+                arithmetic_from_decoded = sum(
+                    x * y for x, y in zip(decoded_a[0], decoded_b[0], strict=True)
+                )
+                self.assertTrue(math.isclose(ref[0][0], arithmetic_from_decoded, rel_tol=1e-6))
+                self.assertNotEqual(ref[0][0], bf16_baseline)
 
 
 if __name__ == "__main__":

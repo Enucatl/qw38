@@ -225,7 +225,7 @@ an achieved performance target.
 | TASK-016 | One-layer integration checkpoint | M6 | TASK-013, TASK-015 | One GDN-style and one attention-style layer through common runtime | DONE |
 | TASK-017 | Complete primary-language decode | M6 | TASK-016 | Embedding, 64 layers, persistent state, final norm, Q8 head, logits | DONE |
 | TASK-018 | Replan contracts and preserve evaluation controls | M7 | TASK-017 | Reconciled task/architecture authority, evidence inventory, frozen screening/calibration/acceptance protocol | DONE |
-| TASK-019 | SM120 quantization and kernel feasibility | M7 | TASK-018 | Real-shape NVFP4/MXFP4/Q4 comparison, native instruction evidence, conversion costs and memory budget | IN_PROGRESS |
+| TASK-019 | SM120 quantization and kernel feasibility | M7 | TASK-018 | Real-shape NVFP4/MXFP4/Q4 comparison, native instruction evidence, conversion costs and memory budget | BLOCKED |
 | TASK-020 | Calibrated precision policy and candidate selection | M7 | TASK-019 | Weight/activation error ablations, family policy, quality screening and provisional format/layout decision | TODO |
 | TASK-021 | Native quantized artifact and compiler | M8 | TASK-020 | Versioned quantizer/scales/layout, calibrated source-to-artifact path and independent reconstruction | TODO |
 | TASK-022 | Candidate decode and core quality gate | M8 | TASK-021 | Same-weight native/GEMV dispatch, full-model decode, continuation and complete EVAL-01 core evidence | TODO |
@@ -238,6 +238,16 @@ an achieved performance target.
 | TASK-029 | Scheduling, dispatch and fusion refinement | M10 | TASK-028 | Measured chunk/crossover, normalization/quantization/epilogue and launch-overhead decisions | TODO |
 | TASK-030 | State and long-context bottleneck refinement | M10 | TASK-029 | Evidence-led GDN ownership/state-precision and attention-traffic decisions | TODO |
 | TASK-031 | Consolidated validation and architecture promotion | M10 | TASK-030 | Final reproducible artifact/runtime, quality/performance decision, reconciled docs and remaining gaps | TODO |
+
+### TASK-019 blocker
+
+TASK-019 is `BLOCKED` after its one repair and one supplemental-evidence round.
+Independent GPU operand validation, real-input shape coverage and conversion
+costs, Q4/BF16 and GEMV controls, complete resident/transient memory budgets,
+and a justified candidate shortlist remain absent. The support replay also
+fails to record the CUTLASS revision inside the container and invokes
+`cuobjdump` with an invalid multi-binary resource option. See the task
+[completion report](tasks/TASK-019.md#final-review-outcome-2026-09-24).
 
 ## Revised task contracts (TASK-018 onward)
 

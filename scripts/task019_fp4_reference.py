@@ -188,7 +188,16 @@ def quantize_pack(
 
 def reconstruct(packed: PackedFp4) -> list[list[float]]:
     """Unpack and reconstruct only the logical matrix extent."""
+    if packed.format not in _BLOCK_SIZE:
+        raise ValueError("unsupported FP4 format")
     block_size = _BLOCK_SIZE[packed.format]
+    if (
+        packed.rows <= 0
+        or packed.columns <= 0
+        or packed.padded_columns
+        != math.ceil(packed.columns / block_size) * block_size
+    ):
+        raise ValueError("invalid logical or padded geometry")
     expected_codes = packed.rows * packed.padded_columns
     if len(packed.payload) * 2 != expected_codes or expected_codes % 2:
         raise ValueError("packed payload length does not match padded geometry")
@@ -216,6 +225,15 @@ def reconstruct(packed: PackedFp4) -> list[list[float]]:
     return result
 
 
+def round_bf16(value: float) -> float:
+    """Round one FP32 value to BF16, nearest with ties to even."""
+    bits = struct.unpack("<I", struct.pack("<f", value))[0]
+    if bits & 0x7F800000 == 0x7F800000:
+        return _f32(value)
+    rounded = (bits + 0x7FFF + ((bits >> 16) & 1)) & 0xFFFF0000
+    return struct.unpack("<f", struct.pack("<I", rounded))[0]
+
+
 def contract_fp32(
     a: Sequence[Sequence[float]], b_rows: Sequence[Sequence[float]]
 ) -> list[list[float]]:
@@ -235,3 +253,10 @@ def contract_fp32(
             row_out.append(acc)
         out.append(row_out)
     return out
+
+
+def contract_bf16(
+    a: Sequence[Sequence[float]], b_rows: Sequence[Sequence[float]]
+) -> list[list[float]]:
+    """Contract reconstructed operands in FP32, then store BF16 output."""
+    return [[round_bf16(value) for value in row] for row in contract_fp32(a, b_rows)]
