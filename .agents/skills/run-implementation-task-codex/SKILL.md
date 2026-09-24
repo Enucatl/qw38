@@ -1,6 +1,6 @@
 ---
 name: run-implementation-task-codex
-description: Execute and safely deliver exactly one eligible QW38 implementation task from docs/implementation/task_ledger.md using fresh Codex subagents. Use when advancing the sequential implementation ledger; do not use for ad hoc changes or architecture redesign.
+description: Execute and deliver exactly one eligible QW38 implementation task from docs/implementation/task_ledger.md, with main-thread implementation, independent Astra verification, and final Luna delivery. Use when advancing the sequential implementation ledger; do not use for ad hoc changes or architecture redesign.
 ---
 
 # Run Implementation Task (Codex)
@@ -19,16 +19,16 @@ Use these sources, in descending task relevance:
   container requirements;
 - `docs/implementation/code-standards.md` for C++ and CUDA rules.
 
-The coordinator handles admission and delivery. Use fresh subagents with
-`fork_turns: "none"` for implementation, code review, repair, and any requested
-evidence collection. Pass only the task ID and path, relevant normative paths,
-role, findings when applicable, and required output. Run agents sequentially
-because they share the working tree.
-
-Use `gpt-6-luna` at high reasoning for implementation and repair, and at
-medium reasoning for separately requested command collection. Use
-`gpt-6-sol` at high reasoning for independent code review and difficult
-diagnosis.
+The main thread handles admission, implementation, repairs, evidence
+collection, and any blocked-task records. During that work, spawn only one
+separate verification agent:
+`gpt-6-astra` at high reasoning, with `fork_turns: "none"`. Give it the task ID
+and path, relevant normative paths, all changed and new files, and evidence
+locations, and the review output required below. Reuse that Astra agent for the
+second review pass if needed. After verification passes, spawn a fresh
+`gpt-6-luna` agent at medium reasoning, with `fork_turns: "none"`, for
+documentation, bookkeeping, commit, and push. Do not delegate implementation,
+repair, or evidence commands.
 
 ## Admission
 
@@ -82,7 +82,7 @@ unfinished work in place. Do not activate downstream tasks.
 
 ## Implementation
 
-Spawn a fresh Luna implementation subagent. Require it to:
+In the main thread:
 
 1. read the complete task file and only the relevant sections of the normative
    documents;
@@ -91,9 +91,11 @@ Spawn a fresh Luna implementation subagent. Require it to:
 3. run focused commands on the final candidate that establish every acceptance
    criterion and each required test, benchmark, or diagnostic, keeping
    correctness tests separate from benchmarks;
-4. record exact commands, results, logs, artifact/binary identities, and
-   hardware context in the task's Completion Report; and
-5. leave commits and pushes to the coordinator.
+4. preserve exact commands, results, logs, artifact/binary identities, and
+   hardware context for Astra to review and Luna to record in the task's
+   Completion Report; and
+5. leave the final Completion Report, `DONE` status changes, commit, and push
+   to the final Luna agent.
 
 Unrelated discoveries belong in the Completion Report as
 `FOLLOW_UP_REQUIRED`; do not expand scope, create roadmap tasks, or edit
@@ -101,7 +103,7 @@ downstream specifications. If missing work prevents acceptance, stop and
 block the task.
 
 If a locked decision is impossible, inconsistent, or incompatible with the
-required semantics, require this report and stop without repair:
+required semantics, report this and stop without repair:
 
 ```text
 ARCHITECTURE_BLOCKER
@@ -117,14 +119,17 @@ Affected downstream tasks:
 
 ## Evidence and independent review
 
-The implementation agent leaves complete command evidence for Sol. Missing
+The main thread makes complete command evidence available to Astra. Missing
 hardware or a skipped required check is incomplete evidence, not a pass. Apply
 the verification scope in `code-standards.md`; do not run unrelated suites or
 repeat unchanged commands merely for a second witness.
 
-A fresh Sol reviewer reads the task contract, relevant architecture and
-code standards, the complete diff, changed code and its production callers,
-tests, and the evidence. Review independently for:
+Spawn the Astra reviewer only when the candidate and its evidence are ready.
+Give it clear, self-contained context: the task ID and contract, relevant
+normative paths, the full candidate diff and all new untracked files, evidence
+and log locations, and this review brief. Ask it to read the contract, relevant
+architecture and code standards, the complete diff, changed code and its
+production callers, tests, and evidence. Review independently for:
 
 - correct behavior at numerical, state, lifetime, error, and CUDA boundaries
   relevant to the change, including failure and continuation paths;
@@ -135,10 +140,11 @@ tests, and the evidence. Review independently for:
 - discriminating tests and complete, current evidence for every acceptance
   criterion, including resource or schedule effects where relevant.
 
-Sol inspects code and evidence; Luna runs builds, tests, benchmarks, and any
-targeted commands Sol requests. Sol must not accept a passing test log as proof
-of code correctness. Return all material findings in one pass with file/line,
-the violated contract or failure scenario, and a concrete correction:
+Astra inspects code and evidence without editing files or running delivery
+steps. The main thread runs any targeted commands Astra requests. Astra must
+not accept a passing test log as proof of code correctness. Return all material
+findings in one pass with file/line, the violated contract or failure scenario,
+and a concrete correction:
 
 ```text
 REVIEW: PASS|CHANGES_REQUIRED|BLOCKED
@@ -148,20 +154,15 @@ Code findings (severity, file/line, contract, impact, correction):
 Targeted evidence requested:
 ```
 
-Handle `CHANGES_REQUIRED` first by sending the findings to the same Sol reviewer
-and asking it to make only the requested code or documentation corrections
-directly. It may not change architecture, expand scope, commit, or push. Luna
-continues to run builds, tests, benchmarks, and targeted evidence commands;
-after affected evidence is refreshed, the same Sol reviewer examines the
-complete revised candidate and reports whether the findings are resolved.
-
-When Sol requests evidence without a code change, batch its requests into one
-fresh Luna evidence subagent. It collects output without changing code; the same
-Sol reviewer then examines the unchanged candidate and new evidence. A failed
-check enters the repair path if unused. Allow one Sol repair round and one
-supplemental evidence round. If code findings remain after repair, or evidence
-remains incomplete after the supplemental round, mark the task `BLOCKED`.
-Unavailable required hardware also marks it `BLOCKED`.
+`PASS` requires no code findings, acceptance gaps, or evidence requests. Astra
+uses `CHANGES_REQUIRED` for remediable code or evidence gaps and `BLOCKED` for
+an architectural failure or unavailable required hardware. After the first
+`CHANGES_REQUIRED`, the main thread makes the necessary corrections and runs
+affected or targeted checks. Send the same Astra agent the findings, revised
+complete candidate, and refreshed evidence for one second review. If that
+review still reports any code issue, acceptance gap, or incomplete evidence,
+stop for human intervention and mark the task `BLOCKED`; do not start another
+repair or review round.
 
 An architectural failure, missing required dependency, or material contract
 ambiguity also marks the task `BLOCKED`. For every `BLOCKED` outcome, record the
@@ -170,26 +171,33 @@ a design.
 
 ## Delivery
 
-Only after Sol review passes, the coordinator:
+Only after Astra review passes, the main thread confirms that the reviewed
+implementation and evidence are unchanged. Then spawn the final Luna agent
+with the task ID and path, ledger path, review result, exact acceptance
+commands and evidence, and the intended delivery steps. Luna:
 
-1. confirm that the reviewed implementation and evidence are unchanged;
-2. record the review result in the Completion Report;
-3. change the task and ledger from `IN_PROGRESS` to `DONE`;
-4. create exactly one commit for the task; and
-5. push the current branch to its configured upstream.
+1. records the command evidence and review result in the Completion Report;
+2. changes the ledger row and any task-file status from `IN_PROGRESS` to `DONE`;
+3. pauses for the main thread to check those edits; then
+4. stages only task files, checks the staged diff, creates exactly one commit
+   for the task, and pushes the current branch to its configured upstream.
 
-If code or evidence changes after review, refresh affected evidence and obtain
-a new Sol review before committing. The coordinator makes only status and
-review-record edits after approval.
+Luna may edit only task documentation and ledger status; it must not change
+implementation code, tests, or underlying command results. The main thread
+checks the documentation for accuracy and confirms that the reviewed code and
+evidence stayed unchanged before directing Luna to commit and push. If a code or
+evidence change becomes necessary, the main thread handles it and obtains an
+Astra review within the two-pass limit before delivery continues. If both
+review passes have already been used, stop for human intervention.
 
-Use the git-commit skill to create a proper git commit message. Never
-force-push, rebase, merge, amend, or automatically resolve a non-fast-forward
-rejection. If push fails, preserve the local commit, report the failure, do not
-claim successful delivery, and do not start another task.
+Luna uses the `git-commit-message` skill to create a proper commit message.
+Never force-push, rebase, merge, amend, or automatically resolve a
+non-fast-forward rejection. If push fails, preserve the local commit, report the
+failure, do not claim successful delivery, and do not start another task.
 
 ## Final report
 
-Report the task ID and name, final status, implementation/review models,
-whether repair or separate evidence collection was used, exact acceptance
-commands and results, commit hash if created, push result, task-file path, and
-any blocker or follow-up.
+Report the task ID and name, final status, main-thread implementation model,
+Astra review result and number of passes, Luna delivery result, exact
+acceptance commands and results, commit hash if created, push result,
+task-file path, and any blocker or follow-up.
