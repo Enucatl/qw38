@@ -226,7 +226,7 @@ an achieved performance target.
 | TASK-017 | Complete primary-language decode | M6 | TASK-016 | Embedding, 64 layers, persistent state, final norm, Q8 head, logits | DONE |
 | TASK-018 | Replan contracts and preserve evaluation controls | M7 | TASK-017 | Reconciled task/architecture authority, evidence inventory, frozen screening/calibration/acceptance protocol | DONE |
 | TASK-019 | SM120 quantization and kernel feasibility | M7 | TASK-018 | Real-shape NVFP4/MXFP4/Q4 comparison, native instruction evidence, conversion costs and memory budget | DONE |
-| TASK-020 | Calibrated precision policy and candidate selection | M7 | TASK-019 | Weight/activation error ablations, family policy, quality screening and provisional format/layout decision | TODO |
+| TASK-020 | Calibrated precision policy and candidate selection | M7 | TASK-019 | Weight/activation error ablations, family policy, quality screening and provisional format/layout decision | DONE |
 | TASK-021 | Native quantized artifact and compiler | M8 | TASK-020 | Versioned quantizer/scales/layout, calibrated source-to-artifact path and independent reconstruction | TODO |
 | TASK-022 | Candidate decode and core quality gate | M8 | TASK-021 | Same-weight native/GEMV dispatch, full-model decode, continuation and complete EVAL-01 core evidence | TODO |
 | TASK-023 | Production prefill projections and workspace | M8 | TASK-022 | Native GEMMs, activation quantization/reuse, bounded chunks and precision-correct epilogues | TODO |
@@ -257,8 +257,9 @@ the host-verified pinned revision and valid per-binary resource output;
 independent GPU contractions, 117 real-shape cases, 14,040 raw timing samples,
 Q4/BF16 and same-weight GEMV controls, and full one-view memory estimates are
 recorded in the [completion evidence](tasks/TASK-019.md#completion-after-reopening-2026-09-24).
-No final precision policy or end-to-end speed claim is promoted; TASK-020
-owns quality screening and candidate selection.
+TASK-020 records a provisional policy from development screening; this is not
+full-model quality acceptance or an end-to-end speed claim. Those gates remain
+assigned to TASK-021/022/026.
 
 ## Revised task contracts (TASK-018 onward)
 
@@ -314,7 +315,7 @@ requires them. Specify E2M1 encoding/rounding/saturation, block scale encoding,
 second-level scale convention, zero/nonfinite behavior, group axis, activation
 scale granularity/lifetime, and packed padding. Test independent weight-only,
 activation-only and combined perturbations on representative full layers and
-bounded model continuations, including outliers and prefill/decode inputs.
+representative inputs, including outliers and prefill/decode inputs.
 
 Choose precision by family: MLP gate/up/down, GDN projections, attention
 projections and vocabulary head. Keep embeddings, norms, convolution and small
@@ -326,6 +327,20 @@ BF16 references diagnostically without replacing EVAL-01 with a new BF16 suite.
 by quality screening, kernel timings and memory accounting. Choose MXFP4,
 selective higher precision or Q4 fallback if NVFP4 is unsuitable. Full-model
 acceptance remains pending TASK-022/026.
+
+**User-directed TASK-020 method amendment (2026-09-24).** Do not run the
+corpus-wide 52 GB BF16 model for activation tracing. Follow the inspected DS4
+quantization workflow: collect calibration activation statistics with a
+GPU-resident quantized model, quantify component perturbations against BF16
+source tensors, and compare actual BF16-derived GGUF quantization variants by
+teacher-forced target NLL on the same frozen development continuations. Use
+llama.cpp to run NVFP4/MXFP4 where its quantizer and kernels support the
+selected tensors, with Q4_K_M as the GPU-resident behavioral reference. GGUF
+screening diagnoses the precision policy but does not establish QW38 artifact
+or runtime quality acceptance. This supersedes TASK-018's corpus-wide BF16
+source-control instruction for TASK-020 only; the frozen source, tokenizer,
+sampling split, final EVAL-01 inputs, thresholds, and downstream quality gates
+remain binding.
 
 ### TASK-021 — Native quantized artifact and compiler
 

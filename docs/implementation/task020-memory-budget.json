@@ -1,0 +1,24 @@
+{
+  "activation_output_and_scratch_bytes": 1073741824,
+  "basis": "TASK-019 inventory arithmetic; one resident projection view; Q8G32 sensitive projection exceptions",
+  "context_tokens": 32768,
+  "estimated_peak_bytes": 25242732544,
+  "family_bytes": {
+    "bf16_controls": 2595273728,
+    "q4g64_mlp": 9091153920,
+    "q8g32_attention_gdn": 7665090560,
+    "q8g32_head": 1350860800,
+    "retained_mtp": 225659904
+  },
+  "fits": true,
+  "free_before_alloc_bytes": 33099350016,
+  "graph_allowance_bytes": 268435456,
+  "headroom_after_reserve_bytes": 5709133824,
+  "library_workspace_bytes": 536870912,
+  "measured_integrated_peak": false,
+  "metadata_alignment_allowance_bytes": 134217728,
+  "persistent_state_bytes": 2301427712,
+  "reserve_bytes": 2147483648,
+  "resident_weights_scales_and_retained_payload_bytes": 20928038912,
+  "schema": "qw38-task020-selected-memory-budget-v1"
+}

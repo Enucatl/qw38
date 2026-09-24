@@ -1,0 +1,98 @@
+{
+  "schema": "qw38-task020-provisional-policy-v1",
+  "status": "PROVISIONAL_DEVELOPMENT_SELECTION",
+  "source": {
+    "checkpoint": ".cache/authorities/qwen3.8-27b-transformers",
+    "config_sha256": "191e0af232104ed8b65258cf3fb2b842e288008baca7633c11b82a1ac7203aab",
+    "safetensors_index_sha256": "77042094076611b69791a610065f28b7013b8c621795fa86ddccc8bac7d1b9df",
+    "tokenizer_json_sha256": "0997f410c57a1f4e53b09e4be8f4a172d90edd9564368fb0847030937229b9f3"
+  },
+  "calibration": {
+    "dataset": "Salesforce/wikitext",
+    "configuration": "wikitext-103-raw-v1",
+    "revision": "b08601e04326c79dfdd32d625aee71d232d685c3",
+    "split": "train",
+    "manifest": ".cache/task020/tokens/train.manifest.json",
+    "windows": 128,
+    "tokens_per_window": 512,
+    "activation_statistic": "llama.cpp quantized GPU model input-channel sum of squares; 65536 occurrences per recorded tensor",
+    "imatrix": ".cache/task020/calibration-imatrix.gguf",
+    "scale_fitting": "none"
+  },
+  "development_screen": {
+    "split": "validation",
+    "manifest": ".cache/task020/tokens/validation.manifest.json",
+    "cases": ".cache/task020/development-cases.tsv",
+    "windows": 32,
+    "prompt_tokens_per_case": 384,
+    "teacher_forced_target_tokens_per_case": 128,
+    "metric": "mean target negative log likelihood in nats per token, plus first-token agreement and greedy common-prefix length",
+    "comparison": ".cache/task020/full-gpu-comparisons.json",
+    "final_evaluation_used": false
+  },
+  "selected": {
+    "mlp_gate_up_down": "Q4G64V0",
+    "gdn_qkv_z_out": "Q8G32V0",
+    "attention_q_gate_k_v_o": "Q8G32V0",
+    "lm_head": "Q8G32V0",
+    "embedding_norm_convolution_small_gate_time": "BF16",
+    "retained_mtp": "preserve existing inactive representation",
+    "projection_activations": "BF16",
+    "residual_reduction_nonlinear_recurrent_and_dot_accumulation": "FP32",
+    "kv_and_convolution_history": "BF16",
+    "resident_weight_views": 1
+  },
+  "logical_quantizers": {
+    "Q4G64V0": {
+      "axis": "64 consecutive K values within each N row",
+      "code": "signed two's-complement nibble, -7..7; -8 unused",
+      "scale": "FP16 per group; smallest finite normal-or-larger value >= max(abs(weight))/7",
+      "rounding": "nearest even against stored scale",
+      "clipping": "none; signed-code saturation only",
+      "zero_group": "zero codes and zero scale",
+      "nonfinite_or_unrepresentable": "reject"
+    },
+    "Q8G32V0": {
+      "axis": "32 consecutive K values within each N row",
+      "code": "signed two's-complement byte, -127..127; -128 unused",
+      "scale": "FP16 per group; smallest finite normal-or-larger value >= max(abs(weight))/127",
+      "rounding": "nearest even against stored scale",
+      "clipping": "none; signed-code saturation only",
+      "zero_group": "zero codes and zero scale",
+      "nonfinite_or_unrepresentable": "reject"
+    }
+  },
+  "physical_layout": {
+    "Q4G64V0": "cuda_q4g64_v0",
+    "Q8G32V0": "cuda_q8g32_v0",
+    "BF16": "existing row-major, vector, convolution or cuda_bf16_dense_tile_v0 by family",
+    "dense_tile": "8 output rows by 256 input coordinates; separate scale array",
+    "padding": "pad N to 8 and K to 256 for quantized dense tiles; emit zero codes and scales for padded coordinates; exclude padding from outputs and statistics"
+  },
+  "activation_scale": {
+    "selected": "none",
+    "granularity": "not applicable",
+    "lifetime": "not applicable",
+    "rotation_or_smoothing": "none"
+  },
+  "proposed_dispatch": {
+    "decode": "one-view grouped Q4/Q8 GPU row decoder; BF16 small-family kernels",
+    "prefill": "decode bounded grouped Q4/Q8 tiles to BF16 staging for tensor-core contraction; BF16 small-family kernels",
+    "fallback": "Q4G64V0 for any attention/GDN projection whose Q8 integration fails resource or correctness checks; no second full projection view",
+    "integration_status": "Q8 attention/GDN family selection and grouped prefill consumer require TASK-021/022 implementation and testing"
+  },
+  "rejected_candidate_contracts": {
+    "NVFP4": "Rejected GGUF component probe: E2M1 nearest-even with saturation; per-row/per-16-K UE4M3 scale code = pinned gguf fp32_to_ue4m3(max(abs(block))/6), clamped to nonzero code for nonzero block; pinned encoder uses FP32 mantissa guard-bit increment (not ties-even), subnormal floor(x*512+0.5) clipped to 0..7, exponent >=15 maps to code 0x7e; decoded scale = 2*gguf ue4m3_to_fp32(code) with tensor scale 1. Zero block emits zero; reject nonfinite. Distinct from TASK-019 native-format nearest-even UE4M3 reference. CUTLASS reference pads N and K to 128; native MMA requires packed FP4 activations",
+    "MXFP4": "E2M1 nearest-even with saturation; UE8M0 scale per 32 K elements; zero block emits zero; reject nonfinite; CUTLASS reference pads N and K to 128; native MMA requires packed FP4 activations"
+  },
+  "diagnostics": {
+    "component_ablation": ".cache/task020/component-ablation.json",
+    "selected_logical_component_ablation": ".cache/task020/selected-ablation.json",
+    "head_ablation": ".cache/task020/head-ablation.json",
+    "selected_proxy_benchmark": ".cache/task020/bench-sensitive-q8.json",
+    "controlled_q4_benchmark": ".cache/task020/bench-q4-k-m.json",
+    "memory_budget": "docs/implementation/task020-memory-budget.json",
+    "selected_proxy": ".cache/task020/qwen-sensitive-q8.gguf",
+    "selected_proxy_note": "BF16-derived llama.cpp Q4_K and Q8_0 GGUF screening formats are not bit-identical to QW38 Q4G64V0 and Q8G32V0; GGUF retains 353 other small/control tensors as F32 versus QW38 BF16; no QW38 artifact or runtime quality pass is claimed"
+  }
+}
