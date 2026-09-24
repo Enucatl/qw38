@@ -3,6 +3,7 @@
 #include "cuda/activation.hpp"
 #include "cuda/copy.hpp"
 #include "format/constants.hpp"
+#include "runtime/profiling.hpp"
 
 #include <array>
 #include <cmath>
@@ -221,6 +222,7 @@ std::expected<LanguageModelPlan, Error> LanguageModelPlan::bind(
 
 std::expected<DecodeResult, Error> LanguageModelPlan::decode_token(
     std::uint32_t token_id, std::uint64_t position) {
+  profiling::ScopedRange token_range("decode_token");
   if (state_ == nullptr || state_->is_poisoned()) {
     return std::unexpected(make_error(ErrorCode::InvalidArgument, "session",
                                       "session is poisoned or closed"));
@@ -242,18 +244,23 @@ std::expected<DecodeResult, Error> LanguageModelPlan::decode_token(
     state_->poison();
     return std::unexpected(std::move(error));
   };
+  profiling::ScopedRange embedding_range("embedding");
   if (auto st = qw38::cuda::launch_embed_gather(
           embedding_, kVocab, token_id, residual_, *stream_); !st) {
     return fail(from_cuda(st.error()));
   }
+  embedding_range.close();
+  profiling::ScopedRange layers_range("language_layers");
   for (auto const& layer : layers_) {
     auto result = execute_decode_language_layer(layer, position);
     if (!result) return fail(result.error());
   }
+  layers_range.close();
   if (!state_->layers_at(position + 1u)) {
     return fail(make_error(ErrorCode::Internal, "position",
                            "a language layer did not advance its state"));
   }
+  profiling::ScopedRange readout_range("vocabulary_readout");
   if (auto st = qw38::cuda::launch_hidden_rms(
           residual_, final_gamma_, kMlpRmsEps, 1, normalized_, *stream_); !st) {
     return fail(from_cuda(st.error()));

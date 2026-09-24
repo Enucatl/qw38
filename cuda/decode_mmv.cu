@@ -145,7 +145,7 @@ __device__ void apply_epilogue(DecodeEpilogue epilogue, void* output,
   }
 }
 
-template <WeightKind Kind, bool Paired>
+template <WeightKind Kind, bool Paired, bool DirectInput = false>
 __global__ void decode_mmv_kernel(std::byte const* codes_a, std::byte const* scales_a,
                                  std::byte const* codes_b, std::byte const* scales_b,
                                  std::uint16_t const* input, void* output_a,
@@ -159,14 +159,17 @@ __global__ void decode_mmv_kernel(std::byte const* codes_a, std::byte const* sca
   std::uint32_t const row = tn * 8u + warp;
   std::uint32_t const tiles_k = padded_k / static_cast<std::uint32_t>(kDecodeTileK);
 
-  __shared__ alignas(16) std::uint16_t xs[kDecodeMaxK];
-  for (std::uint32_t i = threadIdx.x; i < k; i += blockDim.x) {
-    xs[i] = input[i];
+  // Most projections need far less input staging than the maximum K.
+  extern __shared__ std::uint16_t xs[];
+  if constexpr (!DirectInput) {
+    for (std::uint32_t i = threadIdx.x; i < k; i += blockDim.x) {
+      xs[i] = input[i];
+    }
+    for (std::uint32_t i = k + threadIdx.x; i < padded_k; i += blockDim.x) {
+      xs[i] = 0;
+    }
+    __syncthreads();
   }
-  for (std::uint32_t i = k + threadIdx.x; i < padded_k; i += blockDim.x) {
-    xs[i] = 0;
-  }
-  __syncthreads();
 
   float acc_a = 0.0f;
   float acc_b = 0.0f;
@@ -183,7 +186,9 @@ __global__ void decode_mmv_kernel(std::byte const* codes_a, std::byte const* sca
         tk * static_cast<std::uint32_t>(kDecodeTileK) + static_cast<std::uint32_t>(lane) * 8u;
 #pragma unroll
     for (int i = 0; i < 8; ++i) {
-      float const x = bf16_to_fp32(xs[k0 + static_cast<std::uint32_t>(i)]);
+      float const x = bf16_to_fp32(
+          DirectInput ? input[k0 + static_cast<std::uint32_t>(i)]
+                      : xs[k0 + static_cast<std::uint32_t>(i)]);
       acc_a = fmaf(da[i], x, acc_a);
       if constexpr (Paired) {
         acc_b = fmaf(db[i], x, acc_b);
@@ -473,15 +478,18 @@ std::expected<void, Error> validate_paired_side(DecodeMmvPairedDesc const& d,
   return {};
 }
 
-template <WeightKind Kind, bool Paired>
+template <WeightKind Kind, bool Paired, bool DirectInput = false>
 std::expected<void, Error> launch_kind(DecodeMmvDesc const& a,
                                        DecodeMmvDesc const* b,
                                        Stream const& stream,
                                        std::string_view op) {
   unsigned const blocks = a.padded_n / static_cast<unsigned>(kDecodeTileRows);
+  unsigned const shared_bytes =
+      DirectInput ? 0u : a.padded_k * sizeof(std::uint16_t);
   auto guard = stream.activate();
   if (!guard) return std::unexpected(guard.error());
-  decode_mmv_kernel<Kind, Paired><<<blocks, kDecodeThreads, 0, stream.native()>>>(
+  decode_mmv_kernel<Kind, Paired, DirectInput>
+      <<<blocks, kDecodeThreads, shared_bytes, stream.native()>>>(
       static_cast<std::byte const*>(a.codes.pointer),
       static_cast<std::byte const*>(a.scales.pointer),
       b == nullptr ? nullptr : static_cast<std::byte const*>(b->codes.pointer),
@@ -500,6 +508,12 @@ std::expected<void, Error> launch_layout(DecodeMmvDesc const& a,
                                          Stream const& stream,
                                          std::string_view op) {
   if (a.layout == kDecodeLayoutQ4G64V0) {
+    if constexpr (!Paired) {
+      // The full-width MLP down projection would reserve 34 KiB per block.
+      if (a.k == kDecodeMaxK) {
+        return launch_kind<WeightKind::Q4, false, true>(a, b, stream, op);
+      }
+    }
     return launch_kind<WeightKind::Q4, Paired>(a, b, stream, op);
   }
   if (a.layout == kDecodeLayoutQ8G32V0) {

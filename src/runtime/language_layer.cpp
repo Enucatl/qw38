@@ -1,4 +1,5 @@
 #include "runtime/language_layer.hpp"
+#include "runtime/profiling.hpp"
 
 namespace qw38::runtime {
 namespace {
@@ -38,11 +39,15 @@ std::expected<LanguageLayerPlan, Error> LanguageLayerPlan::bind(
 
 std::expected<TensorView, Error> execute_decode_language_layer(
     LanguageLayerPlan const& plan, std::uint64_t position) {
+  profiling::ScopedRange mixer_range(
+      plan.kind_ == LanguageMixerKind::Gdn ? "gdn_mixer" : "attention_mixer");
   std::expected<TensorView, Error> mixed =
       plan.kind_ == LanguageMixerKind::Gdn
           ? execute_decode_gdn(plan.gdn_, position)
           : execute_decode_attention(plan.attention_, position);
   if (!mixed) return std::unexpected(mixed.error());
+  mixer_range.close();
+  profiling::ScopedRange mlp_range("mlp");
   auto mlp = execute_decode_mlp(plan.mlp_);
   if (!mlp) {
     // The mixer has already committed persistent state. If the following MLP
