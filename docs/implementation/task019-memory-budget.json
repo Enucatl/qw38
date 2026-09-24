@@ -1,0 +1,436 @@
+{
+  "activation_output_and_scratch_bytes": 1073741824,
+  "basis": "active language execution; full embedding, Q8 head, projection weights/scales and retained inactive MTP payloads",
+  "candidate_views": {
+    "mxfp4": {
+      "fits": true,
+      "head_option_headroom_after_reserve_bytes": {
+        "bf16": 8349743104,
+        "fp8_estimate": 9621141500,
+        "mxfp4_estimate": 10217109504,
+        "nvfp4_estimate": 10177378300,
+        "q8g32_base": 9541679104
+      },
+      "headroom_after_reserve_bytes": 9541679104,
+      "resident_weights_scales_and_retained_payload_bytes": 17095493632,
+      "second_q4_projection_view_fits": false,
+      "second_q4_projection_view_peak_bytes": 34333886464,
+      "transient_and_state_peak_bytes": 21410187264
+    },
+    "nvfp4": {
+      "fits": true,
+      "head_option_headroom_after_reserve_bytes": {
+        "bf16": 7589523904,
+        "fp8_estimate": 8860922300,
+        "mxfp4_estimate": 9456890304,
+        "nvfp4_estimate": 9417159100,
+        "q8g32_base": 8781459904
+      },
+      "headroom_after_reserve_bytes": 8781459904,
+      "resident_weights_scales_and_retained_payload_bytes": 17855712832,
+      "second_q4_projection_view_fits": false,
+      "second_q4_projection_view_peak_bytes": 35094105664,
+      "transient_and_state_peak_bytes": 22170406464
+    },
+    "q4": {
+      "fits": true,
+      "head_option_headroom_after_reserve_bytes": {
+        "bf16": 8349743104,
+        "fp8_estimate": 9621141500,
+        "mxfp4_estimate": 10217109504,
+        "nvfp4_estimate": 10177378300,
+        "q8g32_base": 9541679104
+      },
+      "headroom_after_reserve_bytes": 9541679104,
+      "resident_weights_scales_and_retained_payload_bytes": 17095493632,
+      "second_q4_projection_view_fits": false,
+      "second_q4_projection_view_peak_bytes": 34333886464,
+      "transient_and_state_peak_bytes": 21410187264
+    }
+  },
+  "context_tokens": 32768,
+  "exception_deltas": {
+    "mxfp4": {
+      "linear_attn.in_proj_qkv": {
+        "bf16": {
+          "delta_bytes": 3696230400,
+          "single_family_fits": true,
+          "single_family_headroom_after_reserve_bytes": 5845448704
+        },
+        "fp8": {
+          "delta_bytes": 1179648192,
+          "single_family_fits": true,
+          "single_family_headroom_after_reserve_bytes": 8362030912
+        }
+      },
+      "linear_attn.in_proj_z": {
+        "bf16": {
+          "delta_bytes": 2217738240,
+          "single_family_fits": true,
+          "single_family_headroom_after_reserve_bytes": 7323940864
+        },
+        "fp8": {
+          "delta_bytes": 707788992,
+          "single_family_fits": true,
+          "single_family_headroom_after_reserve_bytes": 8833890112
+        }
+      },
+      "linear_attn.out_proj": {
+        "bf16": {
+          "delta_bytes": 2217738240,
+          "single_family_fits": true,
+          "single_family_headroom_after_reserve_bytes": 7323940864
+        },
+        "fp8": {
+          "delta_bytes": 707788992,
+          "single_family_fits": true,
+          "single_family_headroom_after_reserve_bytes": 8833890112
+        }
+      },
+      "mlp.down_proj": {
+        "bf16": {
+          "delta_bytes": 8378122240,
+          "single_family_fits": true,
+          "single_family_headroom_after_reserve_bytes": 1163556864
+        },
+        "fp8": {
+          "delta_bytes": 2673869056,
+          "single_family_fits": true,
+          "single_family_headroom_after_reserve_bytes": 6867810048
+        }
+      },
+      "mlp.gate_proj": {
+        "bf16": {
+          "delta_bytes": 8378122240,
+          "single_family_fits": true,
+          "single_family_headroom_after_reserve_bytes": 1163556864
+        },
+        "fp8": {
+          "delta_bytes": 2673869056,
+          "single_family_fits": true,
+          "single_family_headroom_after_reserve_bytes": 6867810048
+        }
+      },
+      "mlp.up_proj": {
+        "bf16": {
+          "delta_bytes": 8378122240,
+          "single_family_fits": true,
+          "single_family_headroom_after_reserve_bytes": 1163556864
+        },
+        "fp8": {
+          "delta_bytes": 2673869056,
+          "single_family_fits": true,
+          "single_family_headroom_after_reserve_bytes": 6867810048
+        }
+      },
+      "self_attn.k_proj": {
+        "bf16": {
+          "delta_bytes": 123207680,
+          "single_family_fits": true,
+          "single_family_headroom_after_reserve_bytes": 9418471424
+        },
+        "fp8": {
+          "delta_bytes": 39321664,
+          "single_family_fits": true,
+          "single_family_headroom_after_reserve_bytes": 9502357440
+        }
+      },
+      "self_attn.o_proj": {
+        "bf16": {
+          "delta_bytes": 739246080,
+          "single_family_fits": true,
+          "single_family_headroom_after_reserve_bytes": 8802433024
+        },
+        "fp8": {
+          "delta_bytes": 235929664,
+          "single_family_fits": true,
+          "single_family_headroom_after_reserve_bytes": 9305749440
+        }
+      },
+      "self_attn.q_proj": {
+        "bf16": {
+          "delta_bytes": 1478492160,
+          "single_family_fits": true,
+          "single_family_headroom_after_reserve_bytes": 8063186944
+        },
+        "fp8": {
+          "delta_bytes": 471859264,
+          "single_family_fits": true,
+          "single_family_headroom_after_reserve_bytes": 9069819840
+        }
+      },
+      "self_attn.v_proj": {
+        "bf16": {
+          "delta_bytes": 123207680,
+          "single_family_fits": true,
+          "single_family_headroom_after_reserve_bytes": 9418471424
+        },
+        "fp8": {
+          "delta_bytes": 39321664,
+          "single_family_fits": true,
+          "single_family_headroom_after_reserve_bytes": 9502357440
+        }
+      }
+    },
+    "nvfp4": {
+      "linear_attn.in_proj_qkv": {
+        "bf16": {
+          "delta_bytes": 3617587008,
+          "single_family_fits": true,
+          "single_family_headroom_after_reserve_bytes": 5163872896
+        },
+        "fp8": {
+          "delta_bytes": 1101004800,
+          "single_family_fits": true,
+          "single_family_headroom_after_reserve_bytes": 7680455104
+        }
+      },
+      "linear_attn.in_proj_z": {
+        "bf16": {
+          "delta_bytes": 2170552128,
+          "single_family_fits": true,
+          "single_family_headroom_after_reserve_bytes": 6610907776
+        },
+        "fp8": {
+          "delta_bytes": 660602880,
+          "single_family_fits": true,
+          "single_family_headroom_after_reserve_bytes": 8120857024
+        }
+      },
+      "linear_attn.out_proj": {
+        "bf16": {
+          "delta_bytes": 2170552128,
+          "single_family_fits": true,
+          "single_family_headroom_after_reserve_bytes": 6610907776
+        },
+        "fp8": {
+          "delta_bytes": 660602880,
+          "single_family_fits": true,
+          "single_family_headroom_after_reserve_bytes": 8120857024
+        }
+      },
+      "mlp.down_proj": {
+        "bf16": {
+          "delta_bytes": 8199864064,
+          "single_family_fits": true,
+          "single_family_headroom_after_reserve_bytes": 581595840
+        },
+        "fp8": {
+          "delta_bytes": 2495610880,
+          "single_family_fits": true,
+          "single_family_headroom_after_reserve_bytes": 6285849024
+        }
+      },
+      "mlp.gate_proj": {
+        "bf16": {
+          "delta_bytes": 8199864064,
+          "single_family_fits": true,
+          "single_family_headroom_after_reserve_bytes": 581595840
+        },
+        "fp8": {
+          "delta_bytes": 2495610880,
+          "single_family_fits": true,
+          "single_family_headroom_after_reserve_bytes": 6285849024
+        }
+      },
+      "mlp.up_proj": {
+        "bf16": {
+          "delta_bytes": 8199864064,
+          "single_family_fits": true,
+          "single_family_headroom_after_reserve_bytes": 581595840
+        },
+        "fp8": {
+          "delta_bytes": 2495610880,
+          "single_family_fits": true,
+          "single_family_headroom_after_reserve_bytes": 6285849024
+        }
+      },
+      "self_attn.k_proj": {
+        "bf16": {
+          "delta_bytes": 120586176,
+          "single_family_fits": true,
+          "single_family_headroom_after_reserve_bytes": 8660873728
+        },
+        "fp8": {
+          "delta_bytes": 36700160,
+          "single_family_fits": true,
+          "single_family_headroom_after_reserve_bytes": 8744759744
+        }
+      },
+      "self_attn.o_proj": {
+        "bf16": {
+          "delta_bytes": 723517376,
+          "single_family_fits": true,
+          "single_family_headroom_after_reserve_bytes": 8057942528
+        },
+        "fp8": {
+          "delta_bytes": 220200960,
+          "single_family_fits": true,
+          "single_family_headroom_after_reserve_bytes": 8561258944
+        }
+      },
+      "self_attn.q_proj": {
+        "bf16": {
+          "delta_bytes": 1447034816,
+          "single_family_fits": true,
+          "single_family_headroom_after_reserve_bytes": 7334425088
+        },
+        "fp8": {
+          "delta_bytes": 440401920,
+          "single_family_fits": true,
+          "single_family_headroom_after_reserve_bytes": 8341057984
+        }
+      },
+      "self_attn.v_proj": {
+        "bf16": {
+          "delta_bytes": 120586176,
+          "single_family_fits": true,
+          "single_family_headroom_after_reserve_bytes": 8660873728
+        },
+        "fp8": {
+          "delta_bytes": 36700160,
+          "single_family_fits": true,
+          "single_family_headroom_after_reserve_bytes": 8744759744
+        }
+      }
+    },
+    "q4": {
+      "linear_attn.in_proj_qkv": {
+        "bf16": {
+          "delta_bytes": 3696230400,
+          "single_family_fits": true,
+          "single_family_headroom_after_reserve_bytes": 5845448704
+        },
+        "fp8": {
+          "delta_bytes": 1179648192,
+          "single_family_fits": true,
+          "single_family_headroom_after_reserve_bytes": 8362030912
+        }
+      },
+      "linear_attn.in_proj_z": {
+        "bf16": {
+          "delta_bytes": 2217738240,
+          "single_family_fits": true,
+          "single_family_headroom_after_reserve_bytes": 7323940864
+        },
+        "fp8": {
+          "delta_bytes": 707788992,
+          "single_family_fits": true,
+          "single_family_headroom_after_reserve_bytes": 8833890112
+        }
+      },
+      "linear_attn.out_proj": {
+        "bf16": {
+          "delta_bytes": 2217738240,
+          "single_family_fits": true,
+          "single_family_headroom_after_reserve_bytes": 7323940864
+        },
+        "fp8": {
+          "delta_bytes": 707788992,
+          "single_family_fits": true,
+          "single_family_headroom_after_reserve_bytes": 8833890112
+        }
+      },
+      "mlp.down_proj": {
+        "bf16": {
+          "delta_bytes": 8378122240,
+          "single_family_fits": true,
+          "single_family_headroom_after_reserve_bytes": 1163556864
+        },
+        "fp8": {
+          "delta_bytes": 2673869056,
+          "single_family_fits": true,
+          "single_family_headroom_after_reserve_bytes": 6867810048
+        }
+      },
+      "mlp.gate_proj": {
+        "bf16": {
+          "delta_bytes": 8378122240,
+          "single_family_fits": true,
+          "single_family_headroom_after_reserve_bytes": 1163556864
+        },
+        "fp8": {
+          "delta_bytes": 2673869056,
+          "single_family_fits": true,
+          "single_family_headroom_after_reserve_bytes": 6867810048
+        }
+      },
+      "mlp.up_proj": {
+        "bf16": {
+          "delta_bytes": 8378122240,
+          "single_family_fits": true,
+          "single_family_headroom_after_reserve_bytes": 1163556864
+        },
+        "fp8": {
+          "delta_bytes": 2673869056,
+          "single_family_fits": true,
+          "single_family_headroom_after_reserve_bytes": 6867810048
+        }
+      },
+      "self_attn.k_proj": {
+        "bf16": {
+          "delta_bytes": 123207680,
+          "single_family_fits": true,
+          "single_family_headroom_after_reserve_bytes": 9418471424
+        },
+        "fp8": {
+          "delta_bytes": 39321664,
+          "single_family_fits": true,
+          "single_family_headroom_after_reserve_bytes": 9502357440
+        }
+      },
+      "self_attn.o_proj": {
+        "bf16": {
+          "delta_bytes": 739246080,
+          "single_family_fits": true,
+          "single_family_headroom_after_reserve_bytes": 8802433024
+        },
+        "fp8": {
+          "delta_bytes": 235929664,
+          "single_family_fits": true,
+          "single_family_headroom_after_reserve_bytes": 9305749440
+        }
+      },
+      "self_attn.q_proj": {
+        "bf16": {
+          "delta_bytes": 1478492160,
+          "single_family_fits": true,
+          "single_family_headroom_after_reserve_bytes": 8063186944
+        },
+        "fp8": {
+          "delta_bytes": 471859264,
+          "single_family_fits": true,
+          "single_family_headroom_after_reserve_bytes": 9069819840
+        }
+      },
+      "self_attn.v_proj": {
+        "bf16": {
+          "delta_bytes": 123207680,
+          "single_family_fits": true,
+          "single_family_headroom_after_reserve_bytes": 9418471424
+        },
+        "fp8": {
+          "delta_bytes": 39321664,
+          "single_family_fits": true,
+          "single_family_headroom_after_reserve_bytes": 9502357440
+        }
+      }
+    }
+  },
+  "free_before_alloc_bytes": 33099350016,
+  "graph_allowance_bytes": 268435456,
+  "head_options_bytes": {
+    "bf16": 2542796800,
+    "fp8_estimate": 1271398404,
+    "mxfp4_estimate": 675430400,
+    "nvfp4_estimate": 715161604,
+    "q8g32_base": 1350860800
+  },
+  "library_workspace_bytes": 536870912,
+  "metadata_alignment_allowance_bytes": 134217728,
+  "optional_full_q4_projection_view_bytes": 12923699200,
+  "persistent_state_bytes": 2301427712,
+  "reserve_bytes": 2147483648,
+  "retained_mtp_artifact_bytes": 225659904,
+  "source": "docs/architecture/model-inventory.md"
+}

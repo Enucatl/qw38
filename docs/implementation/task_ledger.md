@@ -225,7 +225,7 @@ an achieved performance target.
 | TASK-016 | One-layer integration checkpoint | M6 | TASK-013, TASK-015 | One GDN-style and one attention-style layer through common runtime | DONE |
 | TASK-017 | Complete primary-language decode | M6 | TASK-016 | Embedding, 64 layers, persistent state, final norm, Q8 head, logits | DONE |
 | TASK-018 | Replan contracts and preserve evaluation controls | M7 | TASK-017 | Reconciled task/architecture authority, evidence inventory, frozen screening/calibration/acceptance protocol | DONE |
-| TASK-019 | SM120 quantization and kernel feasibility | M7 | TASK-018 | Real-shape NVFP4/MXFP4/Q4 comparison, native instruction evidence, conversion costs and memory budget | BLOCKED |
+| TASK-019 | SM120 quantization and kernel feasibility | M7 | TASK-018 | Real-shape NVFP4/MXFP4/Q4 comparison, native instruction evidence, conversion costs and memory budget | DONE |
 | TASK-020 | Calibrated precision policy and candidate selection | M7 | TASK-019 | Weight/activation error ablations, family policy, quality screening and provisional format/layout decision | TODO |
 | TASK-021 | Native quantized artifact and compiler | M8 | TASK-020 | Versioned quantizer/scales/layout, calibrated source-to-artifact path and independent reconstruction | TODO |
 | TASK-022 | Candidate decode and core quality gate | M8 | TASK-021 | Same-weight native/GEMV dispatch, full-model decode, continuation and complete EVAL-01 core evidence | TODO |
@@ -239,15 +239,26 @@ an achieved performance target.
 | TASK-030 | State and long-context bottleneck refinement | M10 | TASK-029 | Evidence-led GDN ownership/state-precision and attention-traffic decisions | TODO |
 | TASK-031 | Consolidated validation and architecture promotion | M10 | TASK-030 | Final reproducible artifact/runtime, quality/performance decision, reconciled docs and remaining gaps | TODO |
 
-### TASK-019 blocker
+### TASK-019 historical blocker and completion
 
-TASK-019 is `BLOCKED` after its one repair and one supplemental-evidence round.
+Historical 2026-09-24 outcome; the user reopened TASK-019 to complete its
+remaining acceptance evidence in the main thread.
+
+TASK-019 was `BLOCKED` after its one repair and one supplemental-evidence round.
 Independent GPU operand validation, real-input shape coverage and conversion
 costs, Q4/BF16 and GEMV controls, complete resident/transient memory budgets,
-and a justified candidate shortlist remain absent. The support replay also
-fails to record the CUTLASS revision inside the container and invokes
-`cuobjdump` with an invalid multi-binary resource option. See the task
-[completion report](tasks/TASK-019.md#final-review-outcome-2026-09-24).
+and a justified candidate shortlist were absent. The support replay also
+failed to record the CUTLASS revision inside the container and invoked
+`cuobjdump` with an invalid multi-binary resource option. See the historical
+[review outcome](tasks/TASK-019.md#review-repair-and-supplemental-evidence-2026-09-24).
+
+The reopened task is now `DONE` for feasibility. The corrected replay records
+the host-verified pinned revision and valid per-binary resource output;
+independent GPU contractions, 117 real-shape cases, 14,040 raw timing samples,
+Q4/BF16 and same-weight GEMV controls, and full one-view memory estimates are
+recorded in the [completion evidence](tasks/TASK-019.md#completion-after-reopening-2026-09-24).
+No final precision policy or end-to-end speed claim is promoted; TASK-020
+owns quality screening and candidate selection.
 
 ## Revised task contracts (TASK-018 onward)
 

@@ -2,9 +2,15 @@
 
 ## Status
 
-BLOCKED
+DONE
 
-## Blocked reason
+The historical partial reports below retain their original status language;
+the completion evidence at the end supersedes those interim findings.
+
+## Historical blocked reason
+
+Historical outcome of the 2026-09-24 review. The user explicitly reopened
+TASK-019 to repair the remaining evidence in the main thread.
 
 After one Sol repair pass and one supplemental evidence pass, independent GPU
 operand-reconstruction validation, real-weight/activation measurements,
@@ -121,11 +127,11 @@ Required: native NVFP4/MXFP4, bounded Q4-to-BF16 GEMM, BF16 library controls whe
 
 ## Acceptance criteria
 
-- [ ] Pinned SM120 build and native dense NVFP4/MXFP4 attempts have reproducible support and instruction evidence; any unsupported case has a concrete reason.
-- [ ] Independent operand-reconstruction contractions validate implemented kernels and tails.
-- [ ] The real-shape matrix reports conversion-inclusive latency, logical/padded work, output precision and resource/workspace costs.
-- [ ] Full candidate memory budgets respect actual allocatable memory and the frozen reserve.
-- [ ] A short list and eligible fallback are justified without claiming final quality or end-to-end speed.
+- [x] Pinned SM120 build and native dense NVFP4/MXFP4 attempts have reproducible support and instruction evidence; any unsupported case has a concrete reason.
+- [x] Independent operand-reconstruction contractions validate implemented kernels and tails.
+- [x] The real-shape matrix reports conversion-inclusive latency, logical/padded work, output precision and resource/workspace costs.
+- [x] Full candidate memory budgets respect actual allocatable memory and the frozen reserve.
+- [x] A short list and eligible fallback are justified without claiming final quality or end-to-end speed.
 
 ## Architecture blocker rule
 
@@ -133,7 +139,7 @@ A rejected candidate is a recorded result; use the eligible fallback within OVER
 
 ## Completion report
 
-### Result
+### Historical initial result
 
 IN PROGRESS — selected the immutable CUTLASS v4.8.0 candidate pin and confirmed the available project image exposes CUDA 13.4.1, GCC 14.2.0, CMake 3.28.3, and the RTX 5090 (SM120). The official NVFP4 target and direct MXFP4 variant both built and ran on the GPU. An initial synthetic sweep completed 52 points but was stopped during the CUTLASS host reference for NVFP4 M=256, N=248320, K=5120. It is not a complete benchmark, independent kernel validation, or acceptance evidence for any criterion.
 
@@ -364,3 +370,187 @@ incomplete and identified the revision/resource logging defects above. Since
 one code-repair round and one supplemental evidence round have been used,
 TASK-019 is `BLOCKED`. No candidate is selected, no architecture conflict was
 found, and TASK-020 remains ineligible.
+
+### Completion after reopening (2026-09-24)
+
+**Result: DONE for feasibility.** The earlier blocked result above is retained
+as history. The current evidence establishes correct native dense NVFP4 and
+MXFP4 execution, cost and memory bounds, and a shortlist for TASK-020. It does
+not promote a precision policy, production artifact ABI, or model quality
+result. The user required this repair to run in the main thread, so no new
+subagent or independent reviewer was used; the checks below are a main-thread
+audit of the raw logs and generated tables.
+
+The reproducible sources are `scripts/task019_cutlass_sm120.sh`,
+`scripts/task019_independent_probe.cu`, `scripts/task019_real_inputs.py`,
+`scripts/task019_derive_activations.cu`, `scripts/task019_prepare_inputs.sh`,
+`scripts/task019_controls.cu`, `scripts/task019_controls.sh`,
+`scripts/task019_real_matrix.sh`, `scripts/task019_summarize.py`, and
+`scripts/task019_memory_budget.py`. The complete 702-row support/cost table is
+[`task019-real-matrix.csv`](../task019-real-matrix.csv); the detailed VRAM
+budget and single-family exception arithmetic are
+[`task019-memory-budget.json`](../task019-memory-budget.json). Raw 20-sample
+records for all 117 cases are in `.cache/task019/real-matrix/core/` and
+`.cache/task019/real-matrix/head/`, indexed by
+`.cache/task019/real-matrix-core-final-index.log` and
+`.cache/task019/real-matrix-head-index.log`. The CSV parser refuses missing
+cases, missing samples, failed independent checks, or failed controls.
+
+**Provenance and inputs.** The support replay checks the host CUTLASS checkout
+at immutable revision `098de2a652cf8f00fd70b2df54051c7eccbb855a` before
+launch and passes that verified revision into the container log. The pinned
+image ID is `sha256:3844dc9c37087cecd40f96e62bd4f305ad405408f0d63312bda8aff8651f2b49`;
+CUDA is 13.4.59, driver 590.48.01, GPU RTX 5090/SM120, target `sm_120a`.
+The final matrix indices record source and binary identities: independent
+probe source `e71a7f6698cf3519440500c17d8bd4e529afeb8777d2206f1c524385fecaae3b`,
+NV/MX binaries `5eedb63aef09fca33e112062ef6d556aeae41000e446de176ae691043877f4f9` /
+`05f474da3692378f2bc6e5fa4ca11e229e30b9ccc0e5a49af2b6cb7dd60cbe62`,
+and control binary `1a8623feb61e04f5a1e050edffc2f0a710fa01a1735f46ddc19e82ee34a23415`.
+These are code/binary hashes only. No BF16 checkpoint tensor, generated input,
+packed payload, or scale content was hashed.
+
+All 13 families use actual BF16 checkpoint weight tensors: layer-0 MLP/GDN,
+layer-3 attention, and the full untied vocabulary head. The 5120-wide
+activations are deterministic embedding rows normalized with the actual
+layer-0 input norm; input metadata records tensor/shard names and token IDs.
+The 6144-wide and 17408-wide inputs are computed from those actual weights:
+SiLU of the layer-0 GDN z projection and a layer-0 SwiGLU gate/up projection.
+They are **representative operator-derived proxies**, not complete GDN or
+attention layer activations. TASK-020/022 must use full model traces for
+quality and final dispatch decisions. Each M uses the first M rows of its
+1024-row input file. The 13 families span M=1, 2, 8, 32, 64, 128, 256, 512,
+1024, including N=48 small gates, K=6144/17408, and the full N=248320 head.
+
+**Correctness and native resources.** The repaired support replay is
+`.cache/task019/support-evidence-tiled-pack.log`: both bounded CUTLASS
+host-reference examples passed, and the separate probe compared packed-byte
+reconstruction to device BF16 output for both formats at M=3, logical
+N=5/padded N=8, logical K=129/padded K=256, including zero blocks and tails,
+and at M=32/N=128/K=128 (4,096 checked outputs per format). Both passed with
+zero mismatches. Reconstruction decodes E2M1 nibbles and physical UE4M3/E8M0
+scale bytes independently, contracts in FP32 with A[M,K] × B[N,K] transpose,
+then rounds to BF16. It checks quantization error against the original BF16
+inputs separately. The reference policy uses per-16-value UE4M3 NVFP4 scales
+and per-32-value UE8M0 MXFP4 scales, E2M1 nearest-even codes and NVFP4
+tensor scale 1; it is identified by the recorded source/binary revisions,
+not a production artifact ABI. Every real-shape native result and
+same-packed-weight BF16
+activation GEMV probe passed; full-N BF16 cuBLAS and bounded Q4G64-to-BF16
+unpack/GEMM controls passed independent sampled contractions in every case.
+This is 117 cases × 6 paths × 20 raw timings = 14,040 samples, with five
+warmups per path. Real-shape numerical checks sample representative output
+rows/columns; the bounded edge check exhausts its output.
+
+The replay disassembly contains
+`OMMA.SF.16864.F32.E2M1.E2M1.UE4M3.4X` for NVFP4 and
+`OMMA.SF.16864.F32.E2M1.E2M1.E8` for MXFP4. Corrected per-binary
+`cuobjdump --dump-resource-usage` output is in the support log and
+`.cache/task019/real-matrix-resources.log`:
+
+| Kernel | Registers/thread | Stack | Shared/block | Local |
+| --- | ---: | ---: | ---: | ---: |
+| Native NVFP4 or MXFP4 GEMM | 168 | 0 | 1,024 B | 0 |
+| Same-weight GEMV, either format | 20 | 0 | 2,048 B | 0 |
+| Q4G64 unpack kernel | 20 | 0 | 0 | 0 |
+
+The selected CUTLASS instantiations give both operands the same wrapper type:
+NVFP4×NVFP4 or MXFP4×MXFP4, FP32 accumulation and BF16 output. A mixed
+BF16×FP4 or NVFP4×MXFP4 native path is **unsupported by this candidate**:
+there is no mixed operand instantiation, compiled kernel, or instruction proof.
+The BF16-activation GEMV is a separate CUDA kernel using the identical packed
+FP4 weight/scale bytes; it is not a mixed native MMA claim. Unsupported probe
+dimensions or non-identity alpha/beta return a concrete error, while all
+required real-shape points completed.
+
+**Timing and conversion.** The CSV records logical M/N/K, actual storage
+geometry, logical and storage-padded work counts, a threadblock tile-work
+estimate from
+the example's 128×128×128 tile, BF16 output, operand/scale/output/workspace
+bytes, CUDA free memory, one-time BF16 weight packing/upload, and median/p95
+of each raw kernel and host-complete time. The native paths have zero CUTLASS
+workspace bytes. Control workspace is the explicit user allocation only;
+cuBLAS internal allocation is included in its observed free-memory reading
+and the model budget's library allowance. Kernel time uses CUDA events;
+host-complete time includes
+BF16 activation scaling/packing, A/scale upload, dispatch, GEMM, BF16 store,
+synchronization and D2H output copy. Weight packing/upload is recorded
+separately because it is a one-time preparation cost. The conversion path is a
+minimal **CPU reference packer**; it is not a production GPU converter or a
+steady-state model timing. The BF16 control transfers BF16 A and D without
+packing; the Q4 control measures GPU unpack plus GEMM for at most 128 output
+rows. Q4 timings with N>128 therefore cannot be compared as full-N timings.
+
+Selected medians from the complete CSV, in milliseconds; each cell is
+kernel/host-complete. Q4's measured width is shown explicitly:
+
+| Family (M,N,K) | NVFP4 | MXFP4 | BF16 full N | Q4G64 measured N: time |
+| --- | ---: | ---: | ---: | ---: |
+| MLP gate (1,17408,5120) | 0.062/0.600 | 0.061/0.558 | 0.113/0.129 | 128: 0.010/0.022 |
+| MLP gate (1024,17408,5120) | 0.166/507.611 | 0.164/488.548 | 0.919/3.459 | 128: 0.020/0.519 |
+| GDN small gate (1,48,5120) | 0.026/0.560 | 0.026/0.520 | 0.007/0.017 | 48: 0.009/0.019 |
+| Attention q/g (128,12288,5120) | 0.028/63.409 | 0.028/60.973 | 0.098/0.380 | 128: 0.016/0.099 |
+| Head (1,248320,5120) | 0.718/1.269 | 0.716/1.245 | 1.641/1.691 | 128: 0.011/0.021 |
+| Head (1024,248320,5120) | 2.644/536.557 | 2.600/517.147 | 11.051/40.598 | 128: 0.020/0.515 |
+
+The large native kernel advantage in some aligned shapes is a feasibility
+signal only. CPU activation packing reaches about 508 ms at M=1024 MLP gate
+and about 1.7 s at M=1024 MLP down, overwhelming the GEMM saving. Small N=48
+is faster with the BF16 control at M=1. Same-weight GEMV is measured in every
+case but is not automatically better: M=1 MLP gate NVFP4 GEMV kernel median is
+about 0.136 ms versus 0.062 ms for native GEMM; the M=1 head GEMV is about
+2.2 ms versus 0.718 ms. The present GEMV is a correctness/control probe,
+not a tuned decode dispatch. Observed sampled quantization differences from
+BF16 reach 0.703125 (NVFP4), 0.958008 (MXFP4), and 0.570312 (bounded Q4G64)
+in absolute BF16 output units. Their differing input formats and sampled
+coverage prohibit a quality ranking; TASK-020 owns calibration and screening.
+
+**VRAM budget.** The budget is inventory-derived for the active language model
+with inactive MTP payload retained, full BF16 embedding, Q8G32 head, all
+projection payloads/scales, 144 MiB-class FP32 GDN/history state, BF16 KV for
+32,768 tokens (2 GiB), 1 GiB activation/output/scratch, 512 MiB library
+workspace, 256 MiB graphs, 128 MiB metadata/alignment and a frozen 2 GiB free
+reserve. The independently measured `cudaMemGetInfo` starting free amount is
+33,099,350,016 bytes (31,566 MiB). Native logs record allocation before/after
+and exact operands/scales/output/workspace; control logs record free memory
+after allocation. Whole-model candidate
+peaks are **estimates**, not measured integrated runtime peaks:
+
+| One-view projection policy, Q8 head | Resident weights/scales/retained payload (MiB) | Estimated peak incl. state/transients (MiB) | Headroom after 2 GiB reserve (MiB) |
+| --- | ---: | ---: | ---: |
+| Q4G64 | 16,303.5 | 20,418.3 | 9,099.7 |
+| NVFP4 | 17,028.5 | 21,143.3 | 8,374.7 |
+| MXFP4 | 16,303.5 | 20,418.3 | 9,099.7 |
+
+All one-view policies fit this measured free-capacity boundary under those
+allowances. An additional complete Q4 projection view adds 12,923,699,200
+bytes and does **not** fit any policy with the reserve. The JSON gives
+per-family FP8/BF16 replacement deltas and single-family fit results for each
+base policy, plus Q8/BF16/FP8/FP4 head option headroom. All individual
+family exceptions fit; simultaneous exceptions must be summed against the
+remaining headroom. FP8 and FP4 head entries are **storage estimates only**,
+not validated kernels or quality candidates. This is a budget for choosing
+which policies merit TASK-020 screening; actual integrated peak remains a
+TASK-022/026 obligation.
+
+**Feasible shortlist and fallback.** Carry NVFP4×NVFP4 and MXFP4×MXFP4
+forward as native large-projection feasibility candidates, with a single
+resident view and Q8 head baseline. Carry BF16 for narrow gates and selective
+high-precision exceptions. Retain Q4G64 weights with BF16 activations and the
+existing Q8 head as the eligible fallback. TASK-020 must assess activation
+and weight error with representative full-model traces, calibrate selective
+precision, and decide if GPU conversion and decode dispatch can recover the
+kernel-only benefit. TASK-019 makes no final candidate, quality, or
+end-to-end performance claim and found no architecture blocker.
+
+Reproduction commands (after preparing the pinned checkpoint and container):
+`./scripts/task019_cutlass_sm120.sh support`,
+`./scripts/task019_prepare_inputs.sh`,
+`./scripts/task019_controls.sh`,
+`./scripts/task019_real_matrix.sh core`,
+`./scripts/task019_real_matrix.sh head`,
+`python3 scripts/task019_summarize.py`, and
+`python3 scripts/task019_memory_budget.py --free-mib 31566 > docs/implementation/task019-memory-budget.json`.
+Focused final checks passed: all nine
+`tests/test_task019_fp4_reference.py` cases, `python3 -m py_compile` for the
+TASK-019 Python sources, `bash -n` for the four TASK-019 shell scripts,
+matrix/CSV/budget assertions, and staged whitespace validation.

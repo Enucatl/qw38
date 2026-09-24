@@ -14,7 +14,8 @@ if [[ $# -gt 1 || ( "${mode}" != support && "${mode}" != matrix ) ]]; then
   exit 2
 fi
 
-test "$(git -C "${cutlass}" rev-parse HEAD)" = "098de2a652cf8f00fd70b2df54051c7eccbb855a"
+cutlass_revision="$(git -C "${cutlass}" rev-parse HEAD)"
+test "${cutlass_revision}" = "098de2a652cf8f00fd70b2df54051c7eccbb855a"
 test "$(docker image inspect --format '{{.Id}}' "${image}")" = "${expected_image_id}"
 
 if [[ ! -x "${host_python}" || ! -d "${host_python_stdlib}" ]]; then
@@ -24,6 +25,7 @@ fi
 
 docker run --rm --gpus all \
   -e "TASK019_MODE=${mode}" \
+  -e "TASK019_CUTLASS_REVISION=${cutlass_revision}" \
   -v "${repo_root}:/workspace" \
   -v "${host_python}:${host_python}:ro" \
   -v "${host_python_stdlib}:${host_python_stdlib}:ro" \
@@ -64,7 +66,7 @@ docker run --rm --gpus all \
     compile_example "${build}/task019/79x_blackwell_geforce_mxfp4_mxfp4_bf16_gemm.cu" "${mx_correctness}"
     nvidia-smi --query-gpu=name,compute_cap,driver_version --format=csv,noheader
     nvcc --version | tail -4
-    echo "CUTLASS revision: $(git -C "${cutlass}" rev-parse HEAD)"
+    echo "CUTLASS revision (host-verified): ${TASK019_CUTLASS_REVISION}"
     echo "Mode: ${TASK019_MODE}"
     echo "Bounded CUTLASS host-reference checks: M=32 N=128 K=128, iterations=0"
     echo "Command: ${nv_correctness} --m=32 --n=128 --k=128 --iterations=0"
@@ -76,7 +78,27 @@ docker run --rm --gpus all \
     cuobjdump --dump-sass "${mx_correctness}" > "${build}/task019/mxfp4.sass.txt"
     grep -nFm 1 "OMMA.SF.16864.F32.E2M1.E2M1.UE4M3.4X" "${build}/task019/nvfp4.sass.txt"
     grep -nFm 1 "OMMA.SF.16864.F32.E2M1.E2M1.E8" "${build}/task019/mxfp4.sass.txt"
-    cuobjdump -res-usage "${nv_correctness}" "${mx_correctness}"
+    for binary in "${nv_correctness}" "${mx_correctness}"; do
+      echo "Resource usage for ${binary}:"
+      cuobjdump --dump-resource-usage "${binary}" \
+        | tee "${build}/task019/$(basename "${binary}").resources.txt"
+      grep -Eq "REG:|Register|register" \
+        "${build}/task019/$(basename "${binary}").resources.txt"
+    done
+    nv_probe="${build}/task019/task019_nvfp4_independent_probe"
+    mx_probe="${build}/task019/task019_mxfp4_independent_probe"
+    compile_example /workspace/scripts/task019_independent_probe.cu "${nv_probe}"
+    nvcc -std=c++17 --expt-relaxed-constexpr -arch=sm_120a -DTASK019_MX \
+      -I"${cutlass}/include" -I"${cutlass}/tools/util/include" \
+      -I"${cutlass}/examples/common" -I"${cutlass}/examples/util/include" \
+      /workspace/scripts/task019_independent_probe.cu -o "${mx_probe}"
+    sha256sum "${nv_probe}" "${mx_probe}"
+    for probe in "${nv_probe}" "${mx_probe}"; do
+      echo "Command: ${probe} --m=3 --n=8 --k=256 --logical-n=5 --logical-k=129"
+      "${probe}" --m=3 --n=8 --k=256 --logical-n=5 --logical-k=129
+      echo "Command: ${probe} --m=32 --n=128 --k=128"
+      "${probe}" --m=32 --n=128 --k=128
+    done
     if [[ "${TASK019_MODE}" == support ]]; then
       exit 0
     fi
