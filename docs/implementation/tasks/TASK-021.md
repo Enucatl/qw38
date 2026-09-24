@@ -1,67 +1,144 @@
-# TASK-021 — Tiled causal prefill attention
+# TASK-021 — Native quantized artifact and compiler
 
 ## Status
-TODO
-## Milestone
-M8 — Production V0 prefill
-## Purpose
-Implement the separate chunked causal attention core and cache append needed by production prefill.
-## Depends on
-- TASK-019
-## Normative references
-- `docs/architecture/architecture-v0.md` — Prefill full-attention strategy
-- `docs/architecture/model-semantics.md`
-- `docs/implementation/technology-baseline.md`
-- `docs/implementation/code-standards.md`
-## Architecture decisions consumed
-| Decision ID | Contract | Type |
-|---|---|---|
-| G-02, P-01–P-02, M-01 | Separate tiled schedule and precision/materialization | LOCKED |
-| T-03 | 128 threads, 32-query×64-key tile | TUNING |
-## Starting point
-Chunk projections and decode attention/cache provide semantics/reference.
-## Scope
-Implement batch Q/g/K/V preparation with completed BF16 cache append before reads, then one block/query-head/32-query tile scanning 64-key tiles with causal masking, FP32 online softmax/value accumulation, sigmoid gate, BF16 output, Q4 output projection/residual, and MLP. Support incoming populated cache and short/tail chunks.
-## Out of scope
-Quadratic score storage, decode segment kernel reuse as final path, simultaneous K/V shared buffers, projection fusion, paged KV.
-## Required interfaces
-Prefill attention plan accepts token-major chunk, absolute start, incoming populated length, capacity; commits cache/populated length transactionally.
-## Required semantics
-Each query attends all prior populated keys and valid keys up to itself; no future/padded keys. Q/K normalization and partial RoPE match decode. Cache contains prepared K and V once. Online merge is stable FP32; sigmoid gate applies before BF16 store.
-## Data representation
-32-query×64-key tile; shared Q/K/V staging with one 32 KiB buffer reused K then V and ≤8 KiB score/reduction scratch; output accumulators FP32 registers.
-## Implementation constraints
-Preparation/cache completion globally precedes attention; no full score/probability matrix; no K/V coexistence in shared memory.
-## Tuning defaults
-128 threads, 32 queries, 64 keys, single shared-buffer reuse.
-## Expected files/modules
-CUDA prefill preparation/attention, runtime layer integration, causal/cache tests.
-## Tests required
-### Unit tests
-Lengths/tails around 32/64/256, incoming lengths 0/nonzero, capacity failure, causal mask, positions, transactional append.
-### Reference/numerical tests
-Outputs/cache versus stable reference and repeated decode for arbitrary chunk partitions.
-### Integration tests
-Multiple attention+MLP chunks followed by one decode token.
-## Benchmark required
-Diagnostic timings/resources for 256-token chunk with several incoming lengths.
-## Acceptance criteria
-- [ ] Causal outputs/cache match references across boundaries.
-- [ ] Incoming and within-chunk keys are addressed correctly.
-- [ ] No quadratic scores or duplicated GQA cache exist.
-- [ ] Resource/timing evidence is recorded without architecture changes.
-## Architecture blocker rule
-On locked conflict stop with full blocker report; geometry pressure is tuning, not redesign permission.
-## Completion report
-### Result
-DONE | BLOCKED
-### Changes made
-### Tests run
-Exact commands/results.
-### Benchmark results
-Diagnostic only.
-### Architecture blocker
-None/full report.
-### Follow-up observations
-Concrete only.
 
+TODO
+
+## Milestone
+
+M8 — Compact runtime and both execution phases
+
+## Purpose
+
+Produce a versioned, independently validated artifact that expresses the selected quantization policy in the layout its consumers need.
+
+## Depends on
+
+- [TASK-020](TASK-020.md)
+
+## Normative references
+
+- [Implementation ledger](../task_ledger.md) — OVERALL-01, revised task contract,
+  overall decision rules, measurement envelope and migration of prior obligations.
+- [Architecture V0](../../architecture/architecture-v0.md) — retained model semantics
+  and controls; reopened decisions follow OVERALL-01.
+- [EVAL-01 / PERF-01](../../architecture/evaluation-policy-v0.md) — unchanged
+  quality criteria and measurement definitions, with task ownership remapped by the ledger.
+- [Technology baseline](../technology-baseline.md).
+- [Code standards](../code-standards.md).
+
+## Architecture decisions consumed
+
+| Decision | Contract for this task | Authority |
+| -------- | ---------------------- | --------- |
+| A-02 | Separate logical quantizer from physical layout ABI | Retained |
+| Q-01/Q-02, P-02, A-01/L-01 | Implement the TASK-020 candidate policy and selected views | OVERALL-01 selection |
+| Artifact validation and digest policy | Version new representations and preserve manifest-only digest rules | Retained |
+
+OVERALL-01 supersedes conflicting restrictions in the former task sequence.
+Historical EXP-A–H ordering does not constrain this task. Decisions outside
+the reopened scope remain binding.
+
+## Starting point
+
+TASK-020 selects the provisional quantizer, scales, family policy and layout/dispatch. Existing Q4/Q8/BF16 artifact support remains a diagnostic control.
+
+## Scope
+
+Implement the chosen policy as new logical quantizer and physical layout IDs;
+do not reinterpret or overwrite existing Q4/Q8 IDs. Document reconstruction
+equations, scale arrays including second-level factors, logical axes, kernel
+swizzles/alignment, policy/calibration identity, and compatibility behavior.
+Pack directly from BF16 into the consumer layout offline. Retain existing
+artifact validation and manifest-only digest policy; no unrelated hashing
+redesign is introduced.
+
+Validate independent unpack/reconstruction, deterministic compilation, tensor
+and scale ordering, padded tails, malformed metadata, unknown IDs, and bounded
+host/device memory. A second physical view must satisfy TASK-020's measured
+budget and selection rationale. **Exit:** an independently readable candidate
+artifact, compiler evidence and real model size/load-memory measurements;
+production decode and GEMM consumers can bind the same declared representation.
+
+## Out of scope
+
+Reusing Q4/Q8 IDs for FP4, whole-artifact/source payload hashing, silent policy changes, full-model expanded BF16 caching and unbudgeted duplicate views.
+
+## Required interfaces and data representation
+
+Extend typed quantizer/layout metadata and compiler policy with exact reconstruction equations, logical axes, packed data and scale spans, second-level scales, alignment/padding and calibration identity. Reader/binder compatibility must reject unknown or incompatible representations explicitly. Compile directly from the pinned BF16 source with bounded streaming memory.
+
+## Required semantics and constraints
+
+Packing preserves the selected logical values and scales. Document tensor/scale ordering and any allowed precision exceptions. Independently unpack every implemented representation, including malformed lengths/offsets and tail padding. Existing artifact IDs retain their meaning. Bound both compile/verification host memory and upload/transient device memory.
+
+Follow the code standards' identity and manifest-only digest policy. Keep
+benchmarks separate from correctness checks and record source, binary,
+artifact/policy, inputs, toolchain and hardware identities appropriate to each
+result. Partial or invalid evidence cannot establish quality acceptance.
+
+## Tuning defaults
+
+Use TASK-020's selected format/layout; changes require a recorded evidence-backed policy update. A second view must meet the measured memory and performance rationale.
+
+## Expected files/modules
+
+Format constants/schema/writer/reader, logical quantizers, physical packers and independent unpackers, compiler policy/streaming path, metadata compatibility tests and artifact report.
+
+## Tests required
+
+### Unit and contract checks
+
+Golden encodings/scales/packing, metadata identity, round-trip logical values, tails, offsets/lengths, unknown IDs and malformed or mismatched representation rejection.
+
+### Reference and numerical checks
+
+Independent reconstruction for real tensor families and synthetic edge cases; deterministic compilation from the same source and calibration policy.
+
+### Integration checks
+
+Compile and independently read the real candidate model; check graph bindings, family precision, declared scale/layout support and actual artifact size. Measure bounded compilation/verification and upload memory, including failure branches relevant to the new representation.
+
+## Benchmark required
+
+Artifact size, compiler/load/upload costs and host/device memory are required. Decode/prefill speed is measured by subsequent production consumers.
+
+## Acceptance criteria
+
+- [ ] New representations have explicit IDs, reconstruction/scaling equations, layout and compatibility rules without changing existing IDs.
+- [ ] Compilation is deterministic from the pinned source/calibration policy and independently reconstructs selected logical values.
+- [ ] Reader/schema tests reject unsupported or malformed metadata and bindings.
+- [ ] Real artifact size, load costs and bounded host/device peaks are measured.
+- [ ] The artifact exposes the representation required by both planned decode and GEMM consumers; any extra view has the approved measured budget.
+
+## Architecture blocker rule
+
+A rejected candidate is a recorded result; use the eligible fallback within OVERALL-01 without relaxing acceptance criteria. Missing required exit evidence prevents completion. A conflict outside the reopened decisions requires the full architecture-blocker report defined in the ledger; obsolete Q4-only or experiment-order restrictions are not blockers.
+
+## Completion report
+
+### Result
+
+TODO — no execution or acceptance evidence recorded for this revised task.
+
+### Changes made
+
+Record the concrete changes or measured keep decision, including decision and artifact/layout identities.
+
+### Tests run
+
+Record exact commands, outcomes, reference tolerances, covered boundaries and
+limits. Do not infer runtime correctness from documentation checks.
+
+### Benchmark results
+
+Record raw evidence paths, timing boundaries, quality context, memory and
+uncertainty, or the reason a benchmark is not required by this task.
+
+### Architecture blocker
+
+Record none or the complete ledger-defined blocker report.
+
+### Follow-up observations
+
+Record remaining coverage and performance gaps and their downstream owners.

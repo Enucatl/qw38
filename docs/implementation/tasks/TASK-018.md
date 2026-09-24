@@ -1,71 +1,161 @@
-# TASK-018 — Behavioral correctness baseline
+# TASK-018 — Replan contracts and preserve evaluation controls
 
 ## Status
-IN_PROGRESS
-## Milestone
-M7 — Behavioral correctness baseline
-## Purpose
-Freeze and implement the language-only correctness evidence needed before performance experiments can change selected hypotheses.
-## Depends on
-- TASK-017
-## Normative references
-- `docs/architecture/architecture-v0.md` — Behavior and performance validation
-- `docs/architecture/evaluation-policy-v0.md` — EVAL-01; selected suite and scoring authority
-- `docs/architecture/quantization-validation.md`
-- `docs/implementation/technology-baseline.md`
-- `docs/implementation/code-standards.md`
-## Architecture decisions consumed
-| Decision ID | Contract | Type |
-|---|---|---|
-| Q-01–Q-03, P-01–P-02, S-01–S-02 | V0 runtime and precision behavior | LOCKED |
-| EVAL-01 | Frozen qw38-language-v1 inputs, scoring, budgets and coverage | POLICY |
-## Starting point
-Complete V0 decode and BF16 diagnostic control exist; production prefill does not.
-## Scope
-Materialize EVAL-01's selected P100, C92, L12 and retrieval fixtures; capture up to 24-token teacher continuations and available top-k target log probabilities from the local Q4_K_M GGUF through CUDA llama.cpp, then freeze hashed tokenized inputs/loss masks and scoring rules before comparison. Implement aligned teacher-forced V0 target-token NLL, deterministic greedy text generation, fixed-key graders, qualitative review records, llama.cpp fresh-request replay, V0 reset/continuation/snapshot tests, and the mandatory 512/4096 retrieval cases. Freeze 32768 retrieval inputs now for execution in TASK-022. Run the complete llama.cpp and V0 arms on identical frozen inputs and targets, counting each target once and resetting at document boundaries. Compare generated capability answers against fixed keys. Do not infer full-vocabulary KL from llama.cpp REST top-k output. BF16 may receive only an optional elementary tensor/load sanity check; it is not a full evaluation arm. Clearly record untested coverage; implementers do not select a smaller passing subset.
-## Out of scope
-Performance tuning, threshold relaxation, calibration on evaluation data, MTP metrics, intermediate equality as the quality verdict, llama/GGUF as numerical authority.
-## Required interfaces
-Evaluation CLI/config produces machine-readable results bound to artifact, binary, input, mask, tokenizer, and policy hashes; language-only labels are mandatory.
-## Required semantics
-EVAL-01 selects mean NLL delta ≤+0.03 nats/token, each declared slice ≤+0.06, and the precise two-percentage-point capability regression screen with paired uncertainty. Its basic correctness, generated-text review and continuation gates also apply. INCONCLUSIVE, INVALID and FAIL results all block completion with distinct reasons. Greedy strings across models are inspected and graded, not required token-identical.
-## Data representation
-FP32 logits/log-softmax; immutable hashed token IDs/masks; results include counts by domain/context and uncertainty method.
-## Implementation constraints
-The Q4_K_M llama.cpp teacher is the external behavior comparator; fixed keys remain capability authority. Its REST probability output is limited to the explicitly recorded top-k and is not a full-vocabulary distribution. BF16 is not a full evaluation control. Failures block quality acceptance and are not silently repaired by wider precision.
-## Tuning defaults
-Validation thresholds above are policy defaults, not architecture.
-## Expected files/modules
-Evaluation tooling/harness, frozen manifests (not copyrighted corpus payload if licensing forbids), correctness integration tests.
-## Tests required
-### Unit tests
-NLL/KL math, masks/counting, hash binding, reset boundaries, deterministic argmax.
-### Reference/numerical tests
-Hand-computed logits, target alignment and mask fixtures scored against frozen teacher targets.
-### Integration tests
-Run the complete EVAL-01 core; repeated-decode continuation and save/restore at its declared boundaries; mandatory 512/4096 retrieval. Partial runs are diagnostic evidence only and cannot complete this task.
-## Benchmark required
-No throughput benchmark.
-## Acceptance criteria
-- [ ] EVAL-01 fixtures, Q4_K_M teacher continuations and suite/scoring/input identities are frozen before llama.cpp/V0 comparison.
-- [ ] llama.cpp and V0 results report available target NLL, top-k availability, generation, capability, continuation, and coverage; no truncated output is labeled full-vocabulary KL.
-- [ ] Language-only quality gate passes or task is BLOCKED with failing slices preserved.
-- [ ] MTP is excluded and no thresholds are silently changed.
-- [ ] Every mandatory core case is present; qualitative reviews are resolved; 32768 inputs are frozen and their execution is explicitly assigned to TASK-022.
-## Architecture blocker rule
-If locked V0 cannot produce correct behavior, report full `ARCHITECTURE_BLOCKER`; a quality failure alone does not authorize EXP-A/B/C/E early.
 
-## Quality failure recovery
-Preserve the failing baseline and frozen evaluation suite. First distinguish
-source/semantic implementation bugs from a failure of the selected quantization
-or activation-transport hypothesis. Fix implementation bugs under the existing
-contract. For a hypothesis failure, propose a narrow architecture amendment that
-names the decision, failing evidence, diagnostic comparison, affected weight
-families, artifact identity, and memory impact. Record the decision authority
-and explicit acceptance in the ledger before changing a locked policy or task
-order. Re-run the unchanged quality gate before accepting a replacement baseline
-and resuming the ledger. Do not relax thresholds or run an experiment early.
+IN_PROGRESS
+
+## Milestone
+
+M7 — Strategy and feasibility
+
+## Purpose
+
+Make the new sequence executable with consistent decision authority, preserved controls and a frozen comparison protocol.
+
+## Depends on
+
+- [TASK-017](TASK-017.md)
+
+## Normative references
+
+- [Implementation ledger](../task_ledger.md) — OVERALL-01, revised task contract,
+  overall decision rules, measurement envelope and migration of prior obligations.
+- [Architecture V0](../../architecture/architecture-v0.md) — retained model semantics
+  and controls; reopened decisions follow OVERALL-01.
+- [EVAL-01 / PERF-01](../../architecture/evaluation-policy-v0.md) — unchanged
+  quality criteria and measurement definitions, with task ownership remapped by the ledger.
+- [Technology baseline](../technology-baseline.md).
+- [Code standards](../code-standards.md).
+
+## Architecture decisions consumed
+
+| Decision | Contract for this task | Authority |
+| -------- | ---------------------- | --------- |
+| OVERALL-01 | Reconcile the revised task sequence and reopened decisions | User-directed amendment |
+| EVAL-01 / PERF-01 | Preserve quality thresholds, coverage and measurement definitions; remap owners | Policy |
+| A-02, Q-03, P-01, S-01/S-02 | Preserve semantics, quantizer/layout separation and initial precision/state controls | Retained control |
+
+OVERALL-01 supersedes conflicting restrictions in the former task sequence.
+Historical EXP-A–H ordering does not constrain this task. Decisions outside
+the reopened scope remain binding.
+
+## Starting point
+
+TASK-017 is complete. Existing Q4/Q8 decode, BF16 semantic evidence and evaluation tooling exist; the former V0 core gate is incomplete and production prefill does not exist. The task specifications have now been rewritten; the remaining reconciliation and protocol work still needs evidence.
+
+## Scope
+
+Preserve the current artifact, source/build identities, partial evaluations,
+profiling results and existing local changes as development evidence. The task
+files are synchronized with this replan; reconcile the remaining architecture
+decision register, quantization/layout/prefill
+plans, technology dependency rationale, and EVAL-01/PERF-01 task references with
+OVERALL-01. Distinguish historical V0 controls from proposed candidates.
+Inventory which frozen fixtures/references have authenticated provenance and
+which require regeneration; retain the 216-case core and six 32768 retrieval
+cases, scoring, budgets, and P100 review requirements.
+
+Freeze calibration/development/evaluation separation, the real-shape benchmark
+matrix, memory reserve, and comparison protocol. Retain the latest bounded
+decode smoke and continuation evidence as controls; do not launch another
+exhaustive old-V0 run merely to unlock feasibility work. **Exit:** consistent
+task specifications and decision authority, an explicit missing-evidence list,
+and a reproducible protocol. The old V0 quality gate remains unpassed; its
+candidate acceptance obligation moves to TASK-022/026, not to a waiver.
+
+## Out of scope
+
+Implementing new quantizers or kernels, exhaustive reruns of the old V0 gate to unlock feasibility, threshold relaxation, and marking historical partial evaluations accepted.
+
+## Required interfaces and data representation
+
+Produce an evidence inventory with artifact/build/input identities, provenance, valid coverage, missing evidence and regeneration owners. Freeze a protocol describing disjoint calibration, development screening and final evaluation sets; workload/shape coverage; memory reserve; any additional regression budgets; and measurement/report identities. Existing evaluation harness names may retain TASK-018 provenance without changing their semantics.
+
+## Required semantics and constraints
+
+Keep the 216-case core, six 32768 retrieval cases and P100 adjudication obligations. Preserve immutable evaluation inputs, keys, masks and scoring; inventory reference validity separately from generated-output completeness. Candidate core acceptance is owned by TASK-022, full prefill and 32768 acceptance by TASK-026, and matched performance by TASK-027. Do not fit calibration to final evaluation answers or discard failed/interrupted attempts.
+
+Follow the code standards' identity and manifest-only digest policy. Keep
+benchmarks separate from correctness checks and record source, binary,
+artifact/policy, inputs, toolchain and hardware identities appropriate to each
+result. Partial or invalid evidence cannot establish quality acceptance.
+
+## Tuning defaults
+
+Use the ledger's fixed measurement envelope and EVAL-01/PERF-01 definitions. Freeze proposed comparison budgets before candidate results; no new numerical quality threshold is introduced here.
+
+## Expected files/modules
+
+TASK-018–031 specifications, ledger, affected architecture/quantization/layout/prefill documents, technology dependency rationale, evaluation-policy task references, and evidence/protocol records.
+
+## Tests required
+
+### Unit and contract checks
+
+Check task IDs, titles, milestones, statuses, dependencies, local links and acceptance ownership against the ledger. Check for conflicting normative statements in affected documents.
+
+### Reference and numerical checks
+
+Audit preserved TASK-017 semantic controls and evaluation reference provenance. Review target/mask/count identities and identify invalid reference evidence requiring regeneration; this is not a new full-model evaluation.
+
+### Integration checks
+
+Confirm every old mandatory quality/performance obligation has a revised owner. Confirm the frozen protocol distinguishes calibration, development screening and final evaluation and covers both execution phases. Retain existing smoke and continuation results with their limits.
+
+## Benchmark required
+
+No new throughput benchmark. Preserve the recorded populated-decode profile and distinguish it from slow prompt ingestion and future production-prefill results.
+
+## Acceptance criteria
+
+- [x] TASK-018–031 titles, dependencies, scopes and acceptance criteria match OVERALL-01; prior TASK-018 evidence is retained.
+- [ ] Affected architecture and policy documents have consistent decision authority and remapped task references.
+- [ ] The evidence inventory identifies valid controls, incomplete/invalid attempts and regeneration owners without claiming an old-V0 quality pass.
+- [ ] Calibration/development/evaluation separation, shape/workload matrix, memory reserve and comparison protocol are frozen.
+- [ ] The 216-case core, P100 review and six 32768 cases retain unchanged gates and explicit downstream owners.
+
+## Architecture blocker rule
+
+A rejected candidate is a recorded result; use the eligible fallback within OVERALL-01 without relaxing acceptance criteria. Missing required exit evidence prevents completion. A conflict outside the reopened decisions requires the full architecture-blocker report defined in the ledger; obsolete Q4-only or experiment-order restrictions are not blockers.
+
 ## Completion report
+
+### Result
+
+IN_PROGRESS — task specifications synchronized with OVERALL-01. Architecture-document reconciliation, evidence inventory and protocol freeze remain open.
+
+### Changes made
+
+Replaced TASK-018–031 specifications and synchronized the ledger's reconciliation notice. Prior TASK-018 evidence is preserved below.
+
+### Tests run
+
+Record exact commands, outcomes, reference tolerances, covered boundaries and
+limits. Do not infer runtime correctness from documentation checks.
+
+### Benchmark results
+
+Record raw evidence paths, timing boundaries, quality context, memory and
+uncertainty, or the reason a benchmark is not required by this task.
+
+### Architecture blocker
+
+Record none or the complete ledger-defined blocker report.
+
+### Follow-up observations
+
+Record remaining coverage and performance gaps and their downstream owners.
+
+## Historical evidence — former TASK-018
+
+The following report is preserved verbatim from the former behavioral-correctness
+task. Its old task numbers, statuses, next actions and workflow restrictions are
+historical, not instructions for the revised sequence. In particular, the former
+TASK-022 long-context obligation now belongs to TASK-026; full candidate core
+acceptance belongs to TASK-022. No old partial result is promoted to a pass.
+The ledger's [preserved evidence](../task_ledger.md#preserved-evidence-from-the-former-task-018)
+provides the current summary, including later decode profiling.
+
 ### Result
 IN_PROGRESS — P10 speed diagnostic complete; full EVAL-01 acceptance remains pending.
 ### Changes made

@@ -18,13 +18,14 @@ its representation. NVFP4 is the leading candidate to investigate, not an
 accepted quality or performance result.
 
 **This ledger's revised task rows and task contracts below are authoritative
-for TASK-018–031.** The existing `tasks/TASK-018.md` through `TASK-031.md` describe
-the superseded sequence; their old titles, dependencies, scopes, completion
-rules, and statuses must not drive execution. Their evidence remains valid only
-within its recorded identities and coverage. TASK-018 will reconcile those
-task files and affected architecture documents before implementation resumes.
-This replan edits only this ledger and does not claim that reconciliation or
-any new implementation has happened.
+for TASK-018–031.** The corresponding `tasks/TASK-018.md` through `TASK-031.md`
+now expand these contracts with matching titles, dependencies, scopes and
+acceptance criteria. Their former specifications are superseded; the earlier
+TASK-018 report is explicitly preserved as historical evidence, valid only
+within its recorded identities and coverage. TASK-018 still owns reconciliation
+of affected architecture documents, the evidence inventory and protocol freeze
+before implementation resumes. Updating the ledger and task specifications
+does not complete those remaining obligations or any new implementation.
 
 The amendment reopens Q-01/Q-02 (projection/head precision), the projection
 operand part of P-02 (activation quantization), A-01/L-01 (weight views/packing),
@@ -239,8 +240,8 @@ an achieved performance target.
 
 ## Revised task contracts (TASK-018 onward)
 
-These briefs define the required scope and exit evidence. TASK-018 expands them
-into the existing task files without reinstating the superseded sequence.
+These briefs define the required scope and exit evidence. The corresponding
+task files expand them without reinstating the superseded sequence.
 Every numerical or runtime change keeps component correctness checks and
 same-schedule replay; every promoted candidate must pass EVAL-01. Performance
 experiments use separate benchmarks and record exact commands and identities.
@@ -248,8 +249,9 @@ experiments use separate benchmarks and record exact commands and identities.
 ### TASK-018 — Replan contracts and preserve evaluation controls
 
 Preserve the current artifact, source/build identities, partial evaluations,
-profiling results and existing local changes as development evidence. Reconcile
-the task files, architecture decision register, quantization/layout/prefill
+profiling results and existing local changes as development evidence. The task
+files are synchronized with this replan; reconcile the remaining architecture
+decision register, quantization/layout/prefill
 plans, technology dependency rationale, and EVAL-01/PERF-01 task references with
 OVERALL-01. Distinguish historical V0 controls from proposed candidates.
 Inventory which frozen fixtures/references have authenticated provenance and

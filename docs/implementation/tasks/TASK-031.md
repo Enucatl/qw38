@@ -1,68 +1,142 @@
-# TASK-031 — EXP-H prefill recurrence algorithm
+# TASK-031 — Consolidated validation and architecture promotion
 
 ## Status
+
 TODO
+
 ## Milestone
-M10 — Architecture-V0 experiments
+
+M10 — Measured refinement and promotion
+
 ## Purpose
-Test whether a 64-token chunkwise/WY evaluation can replace the selected serial register-resident prefill recurrence.
+
+Validate the combined candidate and record a supported promotion decision with reproducible architecture, quality, performance and capacity evidence.
+
 ## Depends on
-- TASK-030
+
+- [TASK-030](TASK-030.md)
+
 ## Normative references
-- `docs/architecture/architecture-v0.md` — EXP-H; prefill GDN recurrence
-- `docs/architecture/evaluation-policy-v0.md` — PERF-01; final parity-gap reassessment
-- `docs/architecture/performance-validation.md`
-- `docs/implementation/technology-baseline.md`
-- `docs/implementation/code-standards.md`
+
+- [Implementation ledger](../task_ledger.md) — OVERALL-01, revised task contract,
+  overall decision rules, measurement envelope and migration of prior obligations.
+- [Architecture V0](../../architecture/architecture-v0.md) — retained model semantics
+  and controls; reopened decisions follow OVERALL-01.
+- [EVAL-01 / PERF-01](../../architecture/evaluation-policy-v0.md) — unchanged
+  quality criteria and measurement definitions, with task ownership remapped by the ledger.
+- [Technology baseline](../technology-baseline.md).
+- [Code standards](../code-standards.md).
+
 ## Architecture decisions consumed
-| Decision ID | Contract | Type |
-|---|---|---|
-| G-02, S-02 | Selected prefill recurrence algorithm/ownership; experiment may recommend amendment | LOCKED UNDER TEST |
-| S-01, P-01 | FP32 persistent state and recurrence arithmetic | LOCKED |
+
+| Decision | Contract for this task | Authority |
+| -------- | ---------------------- | --------- |
+| OVERALL-01 | Consolidate selected precision/layout/schedule/state decisions | User-directed sequence |
+| EVAL-01 / PERF-01 | Final combined quality and per-row performance judgment | Binding policy |
+| A-02, retained semantics and compatibility | Document artifact/state identities and supported scope | Retained |
+
+OVERALL-01 supersedes conflicting restrictions in the former task sequence.
+Historical EXP-A–H ordering does not constrain this task. Decisions outside
+the reopened scope remain binding.
+
 ## Starting point
-Serial 64-token recurrence has correctness/behavior/performance baseline; other experiments concluded.
+
+TASK-028–030 have individually justified changes or keep decisions. Their combined runtime/artifact still needs final frozen-identity validation.
+
 ## Scope
-Specify and implement a mathematically equivalent 64-token chunkwise/WY candidate for the same GDN map, with explicit workspace and boundary state; independently verify equations; compare arbitrary tails/chunk partitions, finite-precision divergence, long-context behavior/continuation, workspace/memory, local recurrence and full prefill/TTFT/request timing. Keep weights, state ABI/precision, other kernels, and chunk size fixed.
+
+Freeze the final compiler/calibration/artifact/runtime/toolchain/dispatch
+identities and rerun EVAL-01 core plus long-context extension and all PERF-01
+rows on the combined candidate. Individually passing experiments do not imply
+their combination passes. Publish final precision/layout/scale/dispatch and
+memory policies, supported contexts, reproducible commands, rollback control,
+and remaining performance or coverage limits.
+
+**Exit:** reconciled architecture/format/task documents and a supported
+promote/retain-control decision. A quality failure prevents promotion. If
+quality passes but performance targets remain unmet or uncertain, report that
+explicitly; completing the experiment sequence does not assert speed parity
+or global optimality. No further experiment is silently added to this ledger.
+
 ## Out of scope
-Changing recurrence semantics, decode recurrence, state layout/precision, chunk size sweep, combining candidate with rejected experiments.
-## Required interfaces
-Explicit experimental recurrence plan/algorithm ID and workspace description; production serial path retained.
-## Required semantics
-Candidate realizes the same ordered state map and produces one o/token; finite-precision equivalence is tested, never assumed. Tails <64 and cross-256/chunk continuation are exact semantic boundaries.
-## Data representation
-FP32 S remains `[head,value,key]`; all additional candidate workspace is typed, bounded, lifetime-planned, and byte-counted.
-## Implementation constraints
-Independent reference/derivation in tests or focused design note; no quality threshold relaxation; measure full prefill.
+
+Promoting a quality failure, substituting individual experiment passes for a combined run, hiding unmet speed targets, adding unapproved tasks or claiming global optimality/general unsupported capabilities.
+
+## Required interfaces and data representation
+
+A final manifest/report binds compiler, source, calibration, quantizer/layout, artifact, runtime, dispatch/chunk/graph, state ABI and toolchain identities. Publish exact commands, raw evidence locations, accepted controls/rollback procedure, precision/scaling/layout/dispatch policies and context/memory limits.
+
+## Required semantics and constraints
+
+Rerun EVAL-01 core and mandatory 32768 extension on the combined candidate, with all reviews, provenance and replay obligations. Run every PERF-01 row at the same frozen identities. Separate quality acceptance, completion of measurements and attainment of per-row speed parity. The historical V0 control remains explicitly unaccepted if its quality gate is still incomplete.
+
+Follow the code standards' identity and manifest-only digest policy. Keep
+benchmarks separate from correctness checks and record source, binary,
+artifact/policy, inputs, toolchain and hardware identities appropriate to each
+result. Partial or invalid evidence cannot establish quality acceptance.
+
 ## Tuning defaults
-64-token comparison interval and frozen measurement protocol.
+
+Freeze all settings before final runs. Any corrective arithmetic/policy change creates a new candidate identity and requires the affected gates to be rerun before the final decision.
+
 ## Expected files/modules
-Experimental WY kernel/plan/workspace, reference/equivalence tests, final experiment report.
+
+Consolidated validation/performance reports, final architecture/quantization/layout/runtime-format/prefill/technology documentation, task completion records and reproducible run instructions.
+
 ## Tests required
-### Unit tests
-Lengths/tails 1,2,63,64 and multiple intervals; workspace bounds; reset/snapshot.
-### Reference/numerical tests
-Candidate versus serial/reference for adversarial gates and long sequences; divergence tracked at S/o/logits.
-### Integration tests
-Arbitrary prompt partitions, prefill→decode continuation, frozen long-context behavior.
+
+### Unit and contract checks
+
+Final identity, policy/representation compatibility and documentation/task-reference consistency checks; reuse relevant implementation regressions.
+
+### Reference and numerical checks
+
+Retained independent arithmetic, artifact reconstruction and model-semantic controls for the combined candidate. Report tolerances and any schedule-dependent effects.
+
+### Integration checks
+
+Complete EVAL-01 core, six 32768 retrieval cases, P100 adjudication, required same-schedule/cross-schedule/dispatch checks and session failure/replay coverage for the frozen combined artifact/runtime.
+
 ## Benchmark required
-Yes: local 64-token recurrence, full prefill/TTFT/request, workspace/resources.
+
+All mandatory PERF-01 rows with raw paired samples, median/p99/intervals, cold/warm separation, full memory accounting and final per-row parity/gap status.
+
 ## Acceptance criteria
-- [ ] Candidate equations and implementation have independent correctness evidence.
-- [ ] All tail/chunk/handoff and long-context quality checks pass for a change recommendation.
-- [ ] Workspace/resource/local/end-to-end deltas are identity-matched and uncertainty-aware.
-- [ ] Recommendation follows EXP-H; no architecture amendment occurs.
-- [ ] PERF-01 parity status is reassessed for the final accepted implementation using the matched llama.cpp baseline; any remaining speed gaps are explicit and do not invalidate a completed experiment.
+
+- [ ] Final compiler/calibration/artifact/runtime/toolchain/schedule identities are frozen and reproducible.
+- [ ] The combined candidate has complete EVAL-01 core and long-context evidence with resolved reviews and replay coverage.
+- [ ] All PERF-01 rows, memory/cold costs and per-row achieved/unmet/uncertain targets are reported.
+- [ ] Architecture/format/precision/state/task documents describe the actual selected implementation and remaining limits consistently.
+- [ ] A supported promote/retain-control decision is recorded; quality failures cannot be promoted and unmet performance remains explicit.
+
 ## Architecture blocker rule
-Candidate rejection is result; unrelated locked conflict requires full blocker report.
+
+Missing required final evidence prevents completion. A failed quality gate prevents promotion; preserve the failure and record the supported retain-control decision without labeling the failed candidate accepted. Measured unmet or uncertain performance targets are explicit outcomes and do not become quality waivers or implicit authorization for more tasks.
+
 ## Completion report
+
 ### Result
-DONE | BLOCKED
+
+TODO — no execution or acceptance evidence recorded for this revised task.
+
 ### Changes made
+
+Record the concrete changes or measured keep decision, including decision and artifact/layout identities.
+
 ### Tests run
-Exact commands/results.
+
+Record exact commands, outcomes, reference tolerances, covered boundaries and
+limits. Do not infer runtime correctness from documentation checks.
+
 ### Benchmark results
-Quality/workspace/resource/local/end-to-end evidence.
+
+Record raw evidence paths, timing boundaries, quality context, memory and
+uncertainty, or the reason a benchmark is not required by this task.
+
 ### Architecture blocker
-None/full report.
+
+Record none or the complete ledger-defined blocker report.
+
 ### Follow-up observations
-Keep/change recommendation and any explicit proposed amendment only.
+
+Record remaining coverage and performance gaps and their downstream owners.
