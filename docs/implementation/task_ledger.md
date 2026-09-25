@@ -240,7 +240,7 @@ an achieved performance target.
 | TASK-020 | Calibrated precision policy and candidate selection | M7 | TASK-019 | Weight/activation error ablations, family policy, quality screening and provisional format/layout decision | DONE |
 | TASK-021 | Native quantized artifact and compiler | M8 | TASK-020 | Versioned quantizer/scales/layout, calibrated source-to-artifact path and independent reconstruction | DONE |
 | TASK-022 | Candidate decode and core quality gate | M8 | TASK-021 | Eligible same-weight native/GEMV dispatch or measured Q4_K/Q8 fallback, full-model decode, continuation and complete 54-case EVAL-01 core evidence | DONE |
-| TASK-023 | Production prefill projections and workspace | M8 | TASK-022 | Native GEMMs, activation quantization/reuse, bounded chunks and precision-correct epilogues | TODO |
+| TASK-023 | Production prefill projections and workspace | M8 | TASK-022 | Native GEMMs, activation quantization/reuse, bounded chunks and precision-correct epilogues | DONE |
 | TASK-024 | GDN prefill algorithm and layer integration | M8 | TASK-023 | Measured serial/chunkwise recurrence choice, FIR/history and validated complete GDN layer | TODO |
 | TASK-025 | Causal attention prefill and layer integration | M8 | TASK-024 | Tiled attention, GQA/cache/position correctness and validated complete attention layer | TODO |
 | TASK-026 | Full-model prefill, handoff and quality gate | M8 | TASK-025 | End-to-end candidate, core suite plus 32768 retrieval, chunk/dispatch boundary validation | TODO |
@@ -410,6 +410,13 @@ no findings, gaps or requests. TASK-022 is DONE; see its
 [task record](tasks/TASK-022.md) for run identities and retained evidence.
 
 ### TASK-023 — Production prefill projections and workspace
+
+TASK-023 is DONE: bounded conversion-inclusive production projection paths,
+workspace and generation/evaluation head modes passed numerical checks and
+family benchmarks. The measured path uses BF16 activations and Q4_K/Q8
+unpack-to-BF16 plus cuBLAS Tensor Core GEMM. Full-model prefill/handoff and
+matched whole-request performance remain with TASK-026 and TASK-027. See the
+[task completion report](tasks/TASK-023.md).
 
 Integrate the selected native block-scaled GEMMs, or the measured fallback,
 into bounded token-major prefill. Include activation scale/pack generation,
