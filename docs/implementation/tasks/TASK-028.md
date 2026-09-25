@@ -22,8 +22,10 @@ Refine consequential precision or representation choices using whole-request bot
   overall decision rules, measurement envelope and migration of prior obligations.
 - [Architecture V0](../../architecture/architecture-v0.md) — retained model semantics
   and controls; reopened decisions follow OVERALL-01.
-- [EVAL-01 / PERF-01](../../architecture/evaluation-policy-v0.md) — unchanged
-  quality criteria and measurement definitions, with task ownership remapped by the ledger.
+- [EVAL-01 / PERF-01](../../architecture/evaluation-policy-v0.md) — scoring
+  criteria and measurement definitions.
+- [54-case core amendment](../../architecture/evaluation-policy-core-54.md) —
+  routine coverage and manual-only full-suite execution.
 - [Technology baseline](../technology-baseline.md).
 - [Code standards](../code-standards.md).
 
@@ -52,7 +54,7 @@ account for added code/layout complexity, memory and cold-load costs. Expand
 to FP6/FP8 or mixed inputs only with demonstrated SM120 support and a concrete
 quality/performance reason. Keep unrelated state and schedules fixed.
 
-**Exit:** keep/change decisions backed by full applicable EVAL-01 revalidation
+**Exit:** keep/change decisions backed by complete applicable 54-case EVAL-01 revalidation
 and whole-request measurements for the promoted variant. A documented decision
 to keep the initial representation is valid; exhaustive format combinations
 are not required. Unsuccessful variants remain evidence, not default paths.
@@ -94,7 +96,7 @@ Weight-only/activation-only diagnostics for numerical changes; exact logical val
 
 ### Integration checks
 
-Full applicable EVAL-01 revalidation for promoted variants, including core, P100 review, required long-context and continuation/dispatch coverage. Rejected variants preserve failure evidence and do not become defaults.
+Complete applicable 54-case EVAL-01 revalidation for promoted variants, including selected-P100 review, required long-context and continuation/dispatch coverage. Rejected variants preserve failure evidence and do not become defaults. The optional 216-case suite is human-initiated interactive work only; agents must never launch it.
 
 ## Benchmark required
 
@@ -104,7 +106,7 @@ Matched complete requests, prefill, populated decode and memory, plus cold compi
 
 - [ ] Each executed variant addresses a measured gap and has explicit policy/layout/calibration identity.
 - [ ] Kernel support, incremental memory and cold costs are demonstrated for every proposed representation.
-- [ ] Promoted variants pass the applicable full quality/context/continuation gates.
+- [ ] Promoted variants pass the applicable 54-case quality/context/continuation gates.
 - [ ] Whole-request evidence supports each keep/change decision and reports individual regressions.
 - [ ] The accepted representation or evidence-backed keep decision is recorded with rejected variants and remaining gaps.
 

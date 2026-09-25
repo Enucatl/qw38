@@ -11,7 +11,7 @@ prompt and ignores capitalization for alphabetic L12 answers; the old result
 remains historical evidence, not a language-v2 pass. The selected artifact
 still fails NLL and C92. Do not use it for TASK-023 production-prefill
 integration or mark this task complete. A corrected artifact needs the complete
-language-v2 gate before this task can complete.
+54-case language-v2 gate before this task can complete.
 
 The separately versioned [Q4_K MLP candidate](../q4k-candidate.md) was compiled
 from original BF16 and verified with the retained Quartz runtime precision.
@@ -49,8 +49,10 @@ Integrate the selected compact weights into full-model decode and establish the 
   overall decision rules, measurement envelope and migration of prior obligations.
 - [Architecture V0](../../architecture/architecture-v0.md) — retained model semantics
   and controls; reopened decisions follow OVERALL-01.
-- [EVAL-01 / PERF-01](../../architecture/evaluation-policy-v0.md) — unchanged
-  quality criteria and measurement definitions, with task ownership remapped by the ledger.
+- [EVAL-01 / PERF-01](../../architecture/evaluation-policy-v0.md) — scoring
+  criteria and measurement definitions.
+- [54-case core amendment](../../architecture/evaluation-policy-core-54.md) —
+  routine coverage and manual-only full-suite execution.
 - [Technology baseline](../technology-baseline.md).
 - [Code standards](../code-standards.md).
 
@@ -60,7 +62,7 @@ Integrate the selected compact weights into full-model decode and establish the 
 | -------- | ---------------------- | --------- |
 | Q-01/Q-02, projection part of P-02, L-01 | Consume TASK-021 candidate with explicit activation/dispatch identity | OVERALL-01 selection |
 | P-01, S-01/S-02, G-01/G-02 | Retain model equations, FP32 residual/state arithmetic and correct session semantics | Retained |
-| EVAL-01 | Complete core acceptance formerly owned by TASK-018 | Policy, ownership remapped |
+| EVAL-01 | Complete 54-case core acceptance formerly owned by TASK-018 | Policy, coverage and ownership remapped |
 
 OVERALL-01 supersedes conflicting restrictions in the former task sequence.
 Historical EXP-A–H ordering does not constrain this task. Decisions outside
@@ -68,7 +70,7 @@ the reopened scope remain binding.
 
 ## Starting point
 
-The TASK-021 candidate artifact is independently validated. Real-shape kernel evidence and old V0 semantic/development controls exist; the candidate has no full core quality pass.
+The TASK-021 candidate artifact is independently validated. Real-shape kernel evidence and old V0 semantic/development controls exist; the candidate has no accepted routine core quality pass.
 
 ## Scope
 
@@ -79,8 +81,9 @@ repacking. Preserve FP32 residual/state arithmetic, complete-token commits,
 poison/reset/restore semantics and FP32 output logits. Record activation policy
 as part of dispatch identity; a kernel switch can change numerical behavior.
 
-Run component and source-semantic regressions, then the complete EVAL-01 core
-(216 paired cases, 512/4096 retrieval, NLL/slices, capability, P100 adjudication,
+Run component and source-semantic regressions, then the complete 54-case EVAL-01 core
+(15 sampled P100, 15 sampled C92, all L12 and 512/4096 retrieval, NLL/slices,
+capability, selected P100 adjudication,
 same-schedule replay and declared continuation boundaries). Regenerate invalid
 reference evidence; historical partial outputs remain diagnostic only.
 **Exit:** a passing candidate decode core and measured populated-decode costs.
@@ -124,7 +127,7 @@ Decoded-operand contraction checks and retained TASK-017 source-semantic regress
 
 ### Integration checks
 
-All 216 paired core cases including 512/4096 retrieval, NLL/slices, capability, resolved 100-case P100 review and required comparator replay. Same-schedule reset/snapshot/interleave at lengths 1, 3, 4, 63, 64, 65, 255, 256, 257 plus late-failure recovery. Invalid or partial source attempts cannot supply accepted full coverage.
+All 54 paired core cases including 512/4096 retrieval, NLL/slices, capability, resolved 15-case P100 review and required comparator replay. Same-schedule reset/snapshot/interleave at lengths 1, 3, 4, 63, 64, 65, 255, 256, 257 plus late-failure recovery. Invalid or partial source attempts cannot supply accepted core coverage. The optional 216-case suite is human-initiated interactive work only; agents must never launch it.
 
 ## Benchmark required
 
@@ -134,7 +137,7 @@ Populated decode and family-level native/GEMV comparison with input scaling, lau
 
 - [ ] All primary-language layers and the head consume the selected artifact with explicit dispatch/activation policy and bounded scratch.
 - [ ] Numerical, source-semantic and session failure/recovery regressions pass.
-- [ ] Complete authenticated EVAL-01 core evidence passes, including NLL/slices, capability, retrieval, required replays and resolved P100 adjudication.
+- [ ] Complete authenticated 54-case EVAL-01 core evidence passes, including NLL/slices, capability, retrieval, required replays and resolved selected-P100 adjudication.
 - [ ] Same-schedule continuation/reset/snapshot and interleave checks pass at every required boundary.
 - [ ] Measured decode costs and selected fallbacks are reported; quality failures preserve the baseline and require unchanged-gate retesting.
 
@@ -270,8 +273,8 @@ source-logit probe. TASK-020's proxy winner was
 explicitly not bit-identical to this QW38 artifact. At the time of this blocked
 report, no alternate QW38 policy had a screened artifact and complete passing
 core gate. The later RoPE-corrected Q4_K artifact passes the frozen development
-screen but still requires source/component regressions and the same full
-216-case gate. Do not relax thresholds or reuse
+screen but still requires source/component regressions and the then-required
+full 216-case gate (now superseded by the 54-case routine gate above). Do not relax thresholds or reuse
 the rejected report as acceptance evidence. The language-v2 L12 amendment
 requires new fixture and paired-run identities before it can supply acceptance
 evidence; the language-v1 L12 conflict remains part of the historical report.

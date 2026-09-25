@@ -1,7 +1,7 @@
 # /// script
 # requires-python = "==3.12.*"
 # ///
-"""Run every TASK-018 core prompt once on the pinned Q4_K_M teacher."""
+"""Run the routine or manual full core on the pinned Q4_K_M teacher."""
 
 from __future__ import annotations
 
@@ -13,6 +13,7 @@ import os
 import re
 import struct
 import subprocess
+import sys
 import time
 import urllib.error
 import urllib.request
@@ -20,6 +21,11 @@ from collections import Counter
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+
+try:
+    from .task018_core_selection import CORE_SPEC, select_cases
+except ImportError:
+    from task018_core_selection import CORE_SPEC, select_cases
 
 IMAGE = "ghcr.io/ggml-org/llama.cpp:full-cuda13"
 MODEL = Path("models/Qwen3.8-27B-Q4_K_M.gguf")
@@ -89,26 +95,6 @@ def read_u32le(path: Path) -> list[int]:
 def write_u32le(path: Path, values: list[int]) -> None:
     """Write generated token IDs in the suite's little-endian format."""
     path.write_bytes(struct.pack(f"<{len(values)}I", *values))
-
-
-def core_cases(root: Path) -> list[dict[str, Any]]:
-    """Load the full P100/C92/L12/R512/R4096 core, never a sample."""
-    rows = [
-        json.loads(line)
-        for line in (root / "prompts.jsonl").read_text(encoding="utf-8").splitlines()
-    ]
-    cases = [
-        row
-        for row in rows
-        if row["family"] in {"P100", "C92", "L12"}
-        or (row["family"] == "R" and row["details"]["horizon"] in {512, 4096})
-    ]
-    counts = Counter(row["family"] for row in cases)
-    if len(cases) != 216 or counts != Counter(
-        {"P100": 100, "C92": 92, "L12": 12, "R": 12}
-    ):
-        raise ValueError(f"TASK-018 core inventory mismatch: {dict(counts)}")
-    return cases
 
 
 def request_case(
@@ -194,14 +180,17 @@ def request_case(
 
 
 def main() -> int:
-    """Run the full core arm and fresh-request replay, then hash its evidence."""
+    """Run the selected core arm and fresh-request replay, then hash evidence."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--fixtures", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--model", type=Path, default=MODEL)
     parser.add_argument("--port", type=int, default=18111)
     parser.add_argument("--startup-timeout", type=int, default=600)
+    parser.add_argument("--manual-full", action="store_true")
     args = parser.parse_args()
+    if args.manual_full and not sys.stdin.isatty():
+        parser.error("full 216-case evaluation requires an interactive manual launch")
     root, output, model = (
         args.fixtures.resolve(),
         args.output.resolve(),
@@ -227,7 +216,8 @@ def main() -> int:
     except BlockingIOError as exc:
         raise SystemExit("another TASK-018 llama evaluation holds the lock") from exc
 
-    cases = core_cases(root)
+    cases, sample = select_cases(root, full=args.manual_full)
+    full_cases, _ = select_cases(root, full=True)
     prompts = {
         case["id"]: read_u32le(root / case["prompt_token_file"]) for case in cases
     }
@@ -277,7 +267,9 @@ def main() -> int:
         "requested_context": max_context,
         "gpu_layers": "all",
         "prompt_cache": "default enabled, matching the teacher reference capture",
-        "cases_expected": 216,
+        "cases_expected": len(cases),
+        "evaluation_scope": "full-216" if args.manual_full else "core-54",
+        "sample_spec_sha256": None if sample is None else hash_file(CORE_SPEC),
         "generation": {
             "temperature": 0.0,
             "samplers": ["temperature"],
@@ -358,17 +350,25 @@ def main() -> int:
             record["token_sha256"] = hash_file(output / record["token_file"])
             records.append(record)
             print(
-                f"llama {index}/216 {case['id']} tokens={record['generation_tokens']} stop={record['generation_stop']}",
+                f"llama {index}/{len(cases)} {case['id']} tokens={record['generation_tokens']} stop={record['generation_stop']}",
                 flush=True,
             )
-        by_id = {case["id"]: case for case in cases}
+        by_id = {case["id"]: case for case in full_cases}
         replay_rows = []
         for case_id in sorted(REPLAY_IDS):
-            expected = next(row for row in records if row["id"] == case_id)
-            replay = request_case(base_url, by_id[case_id], prompts[case_id])
-            same = replay["output_token_ids"] == read_u32le(
-                output / expected["token_file"]
+            prompt_ids = prompts.get(case_id) or read_u32le(
+                root / by_id[case_id]["prompt_token_file"]
             )
+            expected = next((row for row in records if row["id"] == case_id), None)
+            first_ids = (
+                read_u32le(output / expected["token_file"])
+                if expected
+                else request_case(base_url, by_id[case_id], prompt_ids)[
+                    "output_token_ids"
+                ]
+            )
+            replay = request_case(base_url, by_id[case_id], prompt_ids)
+            same = replay["output_token_ids"] == first_ids
             if not same:
                 raise RuntimeError(
                     f"fresh llama request replay changed generated IDs: {case_id}"
@@ -378,6 +378,7 @@ def main() -> int:
                     "id": case_id,
                     "identical_ids": True,
                     "tokens": len(replay["output_token_ids"]),
+                    "in_core": expected is not None,
                 }
             )
             print(f"llama replay {case_id} identical={same}", flush=True)

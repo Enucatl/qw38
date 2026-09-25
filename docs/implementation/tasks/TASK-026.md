@@ -22,8 +22,10 @@ Validate the complete quantized engine across production prefill, decode transit
   overall decision rules, measurement envelope and migration of prior obligations.
 - [Architecture V0](../../architecture/architecture-v0.md) — retained model semantics
   and controls; reopened decisions follow OVERALL-01.
-- [EVAL-01 / PERF-01](../../architecture/evaluation-policy-v0.md) — unchanged
-  quality criteria and measurement definitions, with task ownership remapped by the ledger.
+- [EVAL-01 / PERF-01](../../architecture/evaluation-policy-v0.md) — scoring
+  criteria and measurement definitions.
+- [54-case core amendment](../../architecture/evaluation-policy-core-54.md) —
+  routine coverage and manual-only full-suite execution.
 - [Technology baseline](../technology-baseline.md).
 - [Code standards](../code-standards.md).
 
@@ -33,7 +35,7 @@ Validate the complete quantized engine across production prefill, decode transit
 | -------- | ---------------------- | --------- |
 | G-01/G-02, M-01 | Compose all language layers with bounded chunks and correct state handoff | Retained semantics and OVERALL-01 schedule |
 | Q-01/Q-02/P-02/L-01 | Accepted weights and explicit per-phase activation/dispatch policy | Candidate selection |
-| EVAL-01 | Core production-prefill rerun and six 32768 retrieval cases | Policy, ownership remapped |
+| EVAL-01 | 54-case core production-prefill rerun and six 32768 retrieval cases | Policy, coverage and ownership remapped |
 
 OVERALL-01 supersedes conflicting restrictions in the former task sequence.
 Historical EXP-A–H ordering does not constrain this task. Decisions outside
@@ -50,7 +52,7 @@ provide requested-row logits for evaluation without allocating T×vocabulary
 for the entire prompt. Test prefill into nonempty sessions and continuation
 across native GEMM/GEMV dispatch transitions with the same resident weights.
 
-Run the complete EVAL-01 core through production prefill plus decode, and the
+Run the complete 54-case EVAL-01 core through production prefill plus decode, and the
 six frozen 32768 retrieval cases in both required comparison arms. Preserve
 the original boundaries/partitions (including 1/63/64/65/255/256/257 and
 alternating 63/65), adding boundaries around chosen chunks and dispatch
@@ -63,7 +65,7 @@ blocks acceptance; full prefill equivalence is not inferred from one token.
 
 ## Out of scope
 
-Lowering quality thresholds, substituting a passing subset, inferring acceptance from one-token agreement, MTP/vision/batching claims and total T×vocabulary allocation.
+Lowering quality thresholds, substituting a subset of the frozen 54-case core, inferring acceptance from one-token agreement, MTP/vision/batching claims and total T×vocabulary allocation.
 
 ## Required interfaces and data representation
 
@@ -98,7 +100,7 @@ Component-level state/output checks across repeated decode, full/chunked prefill
 
 ### Integration checks
 
-Complete 216-case core through production prefill+decode, resolved P100 adjudication and six frozen 32768 retrieval cases for candidate and comparator. Exercise nonempty-session prefill, required partitions/checkpoints, interleave, snapshot/restore and late-failure recovery; document same-schedule and cross-schedule results separately.
+Complete 54-case core through production prefill+decode, resolved selected-P100 adjudication and six frozen 32768 retrieval cases for candidate and comparator. Exercise nonempty-session prefill, required partitions/checkpoints, interleave, snapshot/restore and late-failure recovery; document same-schedule and cross-schedule results separately. The optional 216-case suite is human-initiated interactive work only; agents must never launch it.
 
 ## Benchmark required
 
@@ -107,7 +109,7 @@ Diagnostic full-model prefill/handoff and memory measurements, including final-r
 ## Acceptance criteria
 
 - [ ] Both layer types compose through all 64 layers with bounded prefill workspace and correct head modes.
-- [ ] Full EVAL-01 core through production prefill passes with authenticated references and resolved reviews.
+- [ ] The complete 54-case EVAL-01 core through production prefill passes with authenticated references and resolved reviews.
 - [ ] All six 32768 retrieval cases have passing required paired evidence; missing mandatory coverage blocks acceptance.
 - [ ] Required partition/checkpoint, dispatch-transition, incoming-state and failure/replay checks pass.
 - [ ] Measured resident/transient memory fits the declared capacity/reserve; context and schedule coverage are explicit.

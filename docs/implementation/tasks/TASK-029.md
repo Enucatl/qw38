@@ -22,8 +22,10 @@ Reduce measured scheduling, conversion, fusion and launch costs in both phases w
   overall decision rules, measurement envelope and migration of prior obligations.
 - [Architecture V0](../../architecture/architecture-v0.md) — retained model semantics
   and controls; reopened decisions follow OVERALL-01.
-- [EVAL-01 / PERF-01](../../architecture/evaluation-policy-v0.md) — unchanged
-  quality criteria and measurement definitions, with task ownership remapped by the ledger.
+- [EVAL-01 / PERF-01](../../architecture/evaluation-policy-v0.md) — scoring
+  criteria and measurement definitions.
+- [54-case core amendment](../../architecture/evaluation-policy-core-54.md) —
+  routine coverage and manual-only full-suite execution.
 - [Technology baseline](../technology-baseline.md).
 - [Code standards](../code-standards.md).
 
@@ -53,7 +55,7 @@ generation and workspace costs when deciding fusion. Keep weights fixed.
 
 **Exit:** justified scheduling/fusion decisions and verified full-request gains
 or a measured keep decision. Rerun affected numerical/continuation gates and
-full behavioral gates for arithmetic changes; replay covers graph/dispatch
+the applicable 54-case behavioral gates for arithmetic changes; replay covers graph/dispatch
 boundaries and failure recovery. Optimize both prefill and populated decode.
 
 ## Out of scope
@@ -93,7 +95,7 @@ Fused versus separate numerical paths including rounding and repeated normalizat
 
 ### Integration checks
 
-Continuation, snapshot/reset/interleave and failure recovery across selected chunk/dispatch/graph boundaries. Arithmetic changes require the full applicable EVAL-01 behavioral gates before promotion.
+Continuation, snapshot/reset/interleave and failure recovery across selected chunk/dispatch/graph boundaries. Arithmetic changes require the complete applicable 54-case EVAL-01 behavioral gates before promotion. The optional 216-case suite is human-initiated interactive work only; agents must never launch it.
 
 ## Benchmark required
 
@@ -104,7 +106,7 @@ Complete conversion-inclusive projection/layer costs and matched prefill, popula
 - [ ] Changes or keep decisions address measured scheduling/fusion/launch costs in both execution phases.
 - [ ] Weights and unrelated state contracts remain fixed and numerical effects are explicit.
 - [ ] Boundary, memory-lifetime and failure/replay checks pass, including graph mode if added.
-- [ ] Arithmetic changes pass full applicable behavioral/context gates.
+- [ ] Arithmetic changes pass the applicable 54-case behavioral/context gates.
 - [ ] Complete-request measurements justify decisions with workspace/resource costs and remaining regressions reported.
 
 ## Architecture blocker rule

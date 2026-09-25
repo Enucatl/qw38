@@ -41,7 +41,16 @@ added by this amendment.
 EVAL-01 quality criteria and PERF-01 measurement definitions remain binding.
 Their old task-number references and requirement that the old V0 gate precede
 all experiments are superseded by the migration table below. Candidate
-screening may precede full quality acceptance; production promotion may not.
+screening may precede routine core quality acceptance; production promotion may not.
+
+The [54-case core amendment](../architecture/evaluation-policy-core-54.md)
+governs routine TASK-022–031 evaluation: 15 frozen P100, 15 frozen C92, all
+12 L12 and all 12 R-512/R-4096 cases. TASK-026 and later applicable gates
+retain the six R-32768 cases. The 216-case suite is optional, strictly
+human-initiated interactive work; agents and automation must never launch or
+require it. The full run already in flight on 2026-09-25 continues untouched
+under its captured policy identity. Historical 216-case evidence remains
+historical and is not relabeled as a 54-case result.
 
 ## Normative authority
 
@@ -49,6 +58,8 @@ screening may precede full quality acceptance; production promotion may not.
 - `docs/architecture/architecture-v0.md` for retained semantics and controls;
   reopened decisions are governed by OVERALL-01
 - `docs/architecture/evaluation-policy-v0.md` — EVAL-01 / PERF-01
+- `docs/architecture/evaluation-policy-core-54.md` — routine coverage and
+  manual-only full-suite execution
 - `docs/implementation/technology-baseline.md`
 - `docs/implementation/code-standards.md`
 
@@ -228,7 +239,7 @@ an achieved performance target.
 | TASK-019 | SM120 quantization and kernel feasibility | M7 | TASK-018 | Real-shape NVFP4/MXFP4/Q4 comparison, native instruction evidence, conversion costs and memory budget | DONE |
 | TASK-020 | Calibrated precision policy and candidate selection | M7 | TASK-019 | Weight/activation error ablations, family policy, quality screening and provisional format/layout decision | DONE |
 | TASK-021 | Native quantized artifact and compiler | M8 | TASK-020 | Versioned quantizer/scales/layout, calibrated source-to-artifact path and independent reconstruction | DONE |
-| TASK-022 | Candidate decode and core quality gate | M8 | TASK-021 | Same-weight native/GEMV dispatch, full-model decode, continuation and complete EVAL-01 core evidence | BLOCKED |
+| TASK-022 | Candidate decode and core quality gate | M8 | TASK-021 | Same-weight native/GEMV dispatch, full-model decode, continuation and complete 54-case EVAL-01 core evidence | BLOCKED |
 | TASK-023 | Production prefill projections and workspace | M8 | TASK-022 | Native GEMMs, activation quantization/reuse, bounded chunks and precision-correct epilogues | TODO |
 | TASK-024 | GDN prefill algorithm and layer integration | M8 | TASK-023 | Measured serial/chunkwise recurrence choice, FIR/history and validated complete GDN layer | TODO |
 | TASK-025 | Causal attention prefill and layer integration | M8 | TASK-024 | Tiled attention, GQA/cache/position correctness and validated complete attention layer | TODO |
@@ -266,7 +277,8 @@ assigned to TASK-021/022/026.
 These briefs define the required scope and exit evidence. The corresponding
 task files expand them without reinstating the superseded sequence.
 Every numerical or runtime change keeps component correctness checks and
-same-schedule replay; every promoted candidate must pass EVAL-01. Performance
+same-schedule replay; every promoted candidate must pass the applicable 54-case
+EVAL-01 core and required long-context extension. Performance
 experiments use separate benchmarks and record exact commands and identities.
 
 ### TASK-018 — Replan contracts and preserve evaluation controls
@@ -278,8 +290,9 @@ decision register, quantization/layout/prefill
 plans, technology dependency rationale, and EVAL-01/PERF-01 task references with
 OVERALL-01. Distinguish historical V0 controls from proposed candidates.
 Inventory which frozen fixtures/references have authenticated provenance and
-which require regeneration; retain the 216-case core and six 32768 retrieval
-cases, scoring, budgets, and P100 review requirements.
+which require regeneration; retain the original 216-case fixture inventory and
+six 32768 retrieval cases, scoring, budgets, and review requirements. Routine
+coverage is governed by the 54-case amendment above.
 
 Freeze calibration/development/evaluation separation, the real-shape benchmark
 matrix, memory reserve, and comparison protocol. Retain the latest bounded
@@ -368,8 +381,8 @@ repacking. Preserve FP32 residual/state arithmetic, complete-token commits,
 poison/reset/restore semantics and FP32 output logits. Record activation policy
 as part of dispatch identity; a kernel switch can change numerical behavior.
 
-Run component and source-semantic regressions, then the complete EVAL-01 core
-(216 paired cases, 512/4096 retrieval, NLL/slices, capability, P100 adjudication,
+Run component and source-semantic regressions, then the complete 54-case EVAL-01 core
+(15 P100, 15 C92, all L12 and 512/4096 retrieval, NLL/slices, capability, selected P100 adjudication,
 same-schedule replay and declared continuation boundaries). Regenerate invalid
 reference evidence; historical partial outputs remain diagnostic only.
 **Exit:** a passing candidate decode core and measured populated-decode costs.
@@ -437,7 +450,7 @@ provide requested-row logits for evaluation without allocating T×vocabulary
 for the entire prompt. Test prefill into nonempty sessions and continuation
 across native GEMM/GEMV dispatch transitions with the same resident weights.
 
-Run the complete EVAL-01 core through production prefill plus decode, and the
+Run the complete 54-case EVAL-01 core through production prefill plus decode, and the
 six frozen 32768 retrieval cases in both required comparison arms. Preserve
 the original boundaries/partitions (including 1/63/64/65/255/256/257 and
 alternating 63/65), adding boundaries around chosen chunks and dispatch
@@ -472,7 +485,7 @@ account for added code/layout complexity, memory and cold-load costs. Expand
 to FP6/FP8 or mixed inputs only with demonstrated SM120 support and a concrete
 quality/performance reason. Keep unrelated state and schedules fixed.
 
-**Exit:** keep/change decisions backed by full applicable EVAL-01 revalidation
+**Exit:** keep/change decisions backed by complete applicable 54-case EVAL-01 revalidation
 and whole-request measurements for the promoted variant. A documented decision
 to keep the initial representation is valid; exhaustive format combinations
 are not required. Unsuccessful variants remain evidence, not default paths.
@@ -487,7 +500,7 @@ generation and workspace costs when deciding fusion. Keep weights fixed.
 
 **Exit:** justified scheduling/fusion decisions and verified full-request gains
 or a measured keep decision. Rerun affected numerical/continuation gates and
-full behavioral gates for arithmetic changes; replay covers graph/dispatch
+the applicable 54-case behavioral gates for arithmetic changes; replay covers graph/dispatch
 boundaries and failure recovery. Optimize both prefill and populated decode.
 
 ### TASK-030 — State and long-context bottleneck refinement
@@ -508,7 +521,7 @@ the former obligatory experiments.
 ### TASK-031 — Consolidated validation and architecture promotion
 
 Freeze the final compiler/calibration/artifact/runtime/toolchain/dispatch
-identities and rerun EVAL-01 core plus long-context extension and all PERF-01
+identities and rerun the 54-case EVAL-01 core plus long-context extension and all PERF-01
 rows on the combined candidate. Individually passing experiments do not imply
 their combination passes. Publish final precision/layout/scale/dispatch and
 memory policies, supported contexts, reproducible commands, rollback control,
@@ -525,7 +538,7 @@ or global optimality. No further experiment is silently added to this ledger.
 | Former obligation | Revised owner |
 | ----------------- | ------------- |
 | TASK-018 fixture/reference freeze and evidence preservation | TASK-018 |
-| TASK-018 full repeated-decode core quality gate | TASK-022, applied to selected candidate; old V0 evidence retained as incomplete |
+| TASK-018 repeated-decode core quality gate | TASK-022, applied to selected candidate with 54-case coverage; old V0 evidence retained as incomplete |
 | TASK-019 common-view prefill GEMM | TASK-019 feasibility, TASK-021 layout and TASK-023 integration; common view is measured |
 | TASK-020 GDN plus TASK-031 / EXP-H recurrence algorithm | TASK-024; algorithm comparison precedes production commitment |
 | TASK-021 attention | TASK-025 |
@@ -566,7 +579,7 @@ TASK-001 → 002 → 003 → 004 → 005 → 006
 | ---- | ------- | -------- | ------------------ |
 | TASK-017 | Resolved: stale compiler executable reported a graph-binding failure. | Current compiler source already assigns retained MTP layer bindings index 0; rebuilding produced both production and BF16 identity artifacts. | Completed primary-language decode and independent BF16/source validation; see [`TASK-017`](tasks/TASK-017.md). |
 | TASK-018 | Resolved: authority and sampler reproducibility findings were corrected and independently reviewed. | Fresh Sol high review of commit `bc3e33823b2a638004a00d30e15260990861a76` returned PASS with no findings or evidence requests. | TASK-020 materializes calibration/development token manifests before fitting; TASK-022/026 rebind preserved evaluation inputs to the reconciled policy identity before acceptance. |
-| TASK-022 | The original Q4G64/Q8G32 artifact fails the language-v1 EVAL-01 core gate; its L12 scorer also required the immutable llama comparator's 10/12 to become 12/12. A language-v2 amendment is selected but has no complete paired gate. | Historical 216-case pair at `.cache/evaluation/qw38-language-v1/paired/llama-20260924T231919Z-512992-candidate-20260925T000444Z-521240/summary.json`: NLL delta +0.144261, C92 9/92 versus llama 41/92, L12 llama 10/12. The RoPE-corrected Q4_K artifact passes the frozen eight-window development bound at +0.001487 versus comparator; see `.cache/task022/rope-fixed-development-report.json` and `task022-numerical-attribution.md`. | Run the complete language-v2 core gate on the corrected artifact, finish remaining TASK-022 evidence, and activate TASK-023 only after acceptance. |
+| TASK-022 | The original Q4G64/Q8G32 artifact fails the language-v1 EVAL-01 core gate; its L12 scorer also required the immutable llama comparator's 10/12 to become 12/12. A language-v2 amendment is selected but has no complete paired gate. | Historical 216-case pair at `.cache/evaluation/qw38-language-v1/paired/llama-20260924T231919Z-512992-candidate-20260925T000444Z-521240/summary.json`: NLL delta +0.144261, C92 9/92 versus llama 41/92, L12 llama 10/12. The RoPE-corrected Q4_K artifact passes the frozen eight-window development bound at +0.001487 versus comparator; see `.cache/task022/rope-fixed-development-report.json` and `task022-numerical-attribution.md`. | Run the complete 54-case language-v2 core gate on the corrected artifact, finish remaining TASK-022 evidence, and activate TASK-023 only after acceptance. |
 
 ## Preserved evidence from the former TASK-018
 

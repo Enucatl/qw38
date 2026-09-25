@@ -1,6 +1,22 @@
 #!/usr/bin/env bash
 set -u
 
+case_count=54
+prepare_args=()
+if [ "${1:-}" = "--manual-full" ] && [ "$#" -eq 1 ]; then
+  if [ ! -t 0 ]; then
+    echo "full 216-case evaluation requires an interactive manual launch" >&2
+    exit 2
+  fi
+  read -r -p "Type RUN FULL 216 to launch the full evaluation: " confirmation
+  if [ "$confirmation" != "RUN FULL 216" ]; then exit 2; fi
+  case_count=216
+  prepare_args=(--full)
+elif [ "$#" -ne 0 ]; then
+  echo "usage: $0 [--manual-full]" >&2
+  exit 2
+fi
+
 fixture_dir=".cache/evaluation/qw38-language-v2"
 run_prefix="${QW38_EVAL_RUN_PREFIX:-v0}"
 run_dir="$fixture_dir/runs/$run_prefix-$(date -u +%Y%m%dT%H%M%SZ)-$$"
@@ -22,7 +38,7 @@ binary="${QW38_EVAL_BINARY:-.cache/task018-build/src/qw38-evaluate}"
 artifact="${QW38_EVAL_ARTIFACT:-build/pinned-debug/qwen-v0.qw38}"
 state_binary="${QW38_STATE_REPLAY_BINARY:-.cache/task018-build/src/qw38-state-replay}"
 uv run --script scripts/task018_prepare_core.py \
-  --fixtures "$fixture_dir" --output "$run_dir/core.tsv" >"$run_dir/prepare.log" 2>&1
+  --fixtures "$fixture_dir" --output "$run_dir/core.tsv" "${prepare_args[@]}" >"$run_dir/prepare.log" 2>&1
 prepare_code=$?
 if [ "$prepare_code" -eq 0 ]; then
   docker run --rm --gpus all -v /home/user/qw38:/repo -v /home/user/qw38:/home/user/qw38 -w /repo \
@@ -51,7 +67,7 @@ fi
 ended_utc="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 elapsed_seconds=$(($(date +%s) - started_epoch))
 python3 - "$run_dir/result.json.tmp" "$run_dir/result.json" \
-  "$started_utc" "$ended_utc" "$elapsed_seconds" "$exit_code" "$binary" "$artifact" "$state_binary" "$state_code" "$eval_code" <<'PY'
+  "$started_utc" "$ended_utc" "$elapsed_seconds" "$exit_code" "$binary" "$artifact" "$state_binary" "$state_code" "$eval_code" "$case_count" <<'PY'
 import hashlib
 import json
 import os
@@ -60,7 +76,8 @@ import subprocess
 import sys
 from pathlib import Path
 
-tmp, result, started, ended, elapsed, code, binary, artifact, state_binary, state_code, eval_code = sys.argv[1:]
+tmp, result, started, ended, elapsed, code, binary, artifact, state_binary, state_code, eval_code, case_count = sys.argv[1:]
+expected_cases = int(case_count)
 def sha(path):
     h = hashlib.sha256()
     with open(path, "rb") as stream:
@@ -85,12 +102,13 @@ if cases_path.is_file():
 generated = {path.name: sha(path) for path in sorted(run_dir.glob("*.generated.u32le"))}
 logits = {path.name: sha(path) for path in sorted(run_dir.glob("*.candidate-logits.f32le"))}
 core_case_rows = len((run_dir / "core.tsv").read_text().splitlines()) if (run_dir / "core.tsv").is_file() else 0
-status = ("COMPLETE" if int(code) == 0 and core_case_rows == 216 and completed_cases == 216
-          and durable_case_rows == 216 and len(generated) == 216 and len(logits) == 216
+status = ("COMPLETE" if int(code) == 0 and core_case_rows == expected_cases and completed_cases == expected_cases
+          and durable_case_rows == expected_cases and len(generated) == expected_cases and len(logits) == expected_cases
           else "PARTIAL" if completed_cases or generated or logits else "INCOMPLETE")
 record = {
     "status": status,
-    "coverage": {"expected_core_cases": 216, "prepared_core_rows": core_case_rows,
+    "evaluation_scope": "full-216" if expected_cases == 216 else "core-54",
+    "coverage": {"expected_core_cases": expected_cases, "prepared_core_rows": core_case_rows,
                  "completed_cases_from_log": completed_cases,
                  "durable_case_jsonl_rows": durable_case_rows,
                  "malformed_case_jsonl_rows": malformed_case_rows,

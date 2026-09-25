@@ -22,8 +22,10 @@ Validate the combined candidate and record a supported promotion decision with r
   overall decision rules, measurement envelope and migration of prior obligations.
 - [Architecture V0](../../architecture/architecture-v0.md) — retained model semantics
   and controls; reopened decisions follow OVERALL-01.
-- [EVAL-01 / PERF-01](../../architecture/evaluation-policy-v0.md) — unchanged
-  quality criteria and measurement definitions, with task ownership remapped by the ledger.
+- [EVAL-01 / PERF-01](../../architecture/evaluation-policy-v0.md) — scoring
+  criteria and measurement definitions.
+- [54-case core amendment](../../architecture/evaluation-policy-core-54.md) —
+  routine coverage and manual-only full-suite execution.
 - [Technology baseline](../technology-baseline.md).
 - [Code standards](../code-standards.md).
 
@@ -46,7 +48,7 @@ TASK-028–030 have individually justified changes or keep decisions. Their comb
 ## Scope
 
 Freeze the final compiler/calibration/artifact/runtime/toolchain/dispatch
-identities and rerun EVAL-01 core plus long-context extension and all PERF-01
+identities and rerun the 54-case EVAL-01 core plus long-context extension and all PERF-01
 rows on the combined candidate. Individually passing experiments do not imply
 their combination passes. Publish final precision/layout/scale/dispatch and
 memory policies, supported contexts, reproducible commands, rollback control,
@@ -68,7 +70,7 @@ A final manifest/report binds compiler, source, calibration, quantizer/layout, a
 
 ## Required semantics and constraints
 
-Rerun EVAL-01 core and mandatory 32768 extension on the combined candidate, with all reviews, provenance and replay obligations. Run every PERF-01 row at the same frozen identities. Separate quality acceptance, completion of measurements and attainment of per-row speed parity. The historical V0 control remains explicitly unaccepted if its quality gate is still incomplete.
+Rerun the 54-case EVAL-01 core and mandatory 32768 extension on the combined candidate, with all reviews, provenance and replay obligations. Run every PERF-01 row at the same frozen identities. Separate quality acceptance, completion of measurements and attainment of per-row speed parity. The historical V0 control remains explicitly unaccepted if its quality gate is still incomplete. The optional 216-case suite is human-initiated interactive work only; agents must never launch it.
 
 Follow the code standards' identity and manifest-only digest policy. Keep
 benchmarks separate from correctness checks and record source, binary,
@@ -95,7 +97,7 @@ Retained independent arithmetic, artifact reconstruction and model-semantic cont
 
 ### Integration checks
 
-Complete EVAL-01 core, six 32768 retrieval cases, P100 adjudication, required same-schedule/cross-schedule/dispatch checks and session failure/replay coverage for the frozen combined artifact/runtime.
+Complete 54-case EVAL-01 core, six 32768 retrieval cases, selected-P100 adjudication, required same-schedule/cross-schedule/dispatch checks and session failure/replay coverage for the frozen combined artifact/runtime.
 
 ## Benchmark required
 
@@ -104,7 +106,7 @@ All mandatory PERF-01 rows with raw paired samples, median/p99/intervals, cold/w
 ## Acceptance criteria
 
 - [ ] Final compiler/calibration/artifact/runtime/toolchain/schedule identities are frozen and reproducible.
-- [ ] The combined candidate has complete EVAL-01 core and long-context evidence with resolved reviews and replay coverage.
+- [ ] The combined candidate has complete 54-case EVAL-01 core and long-context evidence with resolved reviews and replay coverage.
 - [ ] All PERF-01 rows, memory/cold costs and per-row achieved/unmet/uncertain targets are reported.
 - [ ] Architecture/format/precision/state/task documents describe the actual selected implementation and remaining limits consistently.
 - [ ] A supported promote/retain-control decision is recorded; quality failures cannot be promoted and unmet performance remains explicit.

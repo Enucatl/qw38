@@ -19,9 +19,11 @@ import numpy as np
 import transformers
 
 try:
+    from .task018_core_selection import CORE_SPEC, select_cases
     from .task018_metrics import CaseMetric, paired_case_bootstrap
     from .task018_scoring import Grade, grade_c92, grade_l12, grade_retrieval
 except ImportError:
+    from task018_core_selection import CORE_SPEC, select_cases
     from task018_metrics import CaseMetric, paired_case_bootstrap
     from task018_scoring import Grade, grade_c92, grade_l12, grade_retrieval
 
@@ -193,7 +195,8 @@ def validate_lineage(
         or lm.get("server_binary_sha256")
         != manifest["source_teacher"]["llama_server_binary_sha256"]
         or lm.get("model_size_bytes") != manifest["source_teacher"]["file_size_bytes"]
-        or lm.get("cases_validated") != 216
+        or lm.get("cases_validated")
+        != (216 if lm.get("evaluation_scope", "full-216") == "full-216" else len(cases))
     ):
         raise ValueError("llama run is not bound to current frozen fixture/teacher")
     replay_rows = lm.get("fresh_request_replay", [])
@@ -220,7 +223,13 @@ def validate_lineage(
         or core_meta.get("teacher_probabilities_sha256")
         != manifest["teacher_probability_capture"]["sha256"]
         or core_meta.get("case_tsv_sha256") != vm["case_tsv_sha256"]
-        or core_meta.get("core_cases") != 216
+        or core_meta.get("core_cases") != len(cases)
+        or core_meta.get("sample_spec_sha256")
+        != (sha(CORE_SPEC) if len(cases) == 54 else None)
+        or (
+            lm.get("cases_validated") == len(cases)
+            and lm.get("sample_spec_sha256") != core_meta.get("sample_spec_sha256")
+        )
     ):
         raise ValueError("V0 core is not bound to current frozen fixture/teacher")
     require_hash(v0 / "cases.jsonl", vm["cases_jsonl_sha256"], "V0 cases")
@@ -236,7 +245,7 @@ def validate_lineage(
     if len(fixed) != 12:
         raise ValueError("L12 fixed target inventory differs")
     tsv_lines = core_path.read_text(encoding="utf-8").splitlines()
-    if len(tsv_lines) != 216:
+    if len(tsv_lines) != len(cases):
         raise ValueError("V0 core TSV is incomplete")
     expected_ids = {case["id"] for case in cases}
     if set(lrows) != expected_ids or set(vrows) != expected_ids:
@@ -439,7 +448,7 @@ def review_gate(
     """Require complete, output-bound human adjudication before closing P100."""
     if submitted is None:
         return "PENDING", rows
-    ratings = unique_rows(submitted, 100, "P100 human reviews")
+    ratings = unique_rows(submitted, len(rows), "P100 human reviews")
     if set(ratings) != {row["id"] for row in rows}:
         raise ValueError("P100 human review IDs differ from frozen outputs")
     statuses: list[str] = []
@@ -599,26 +608,34 @@ def main() -> int:
         raise IncompleteCoverageError(
             "paired report requires complete llama and V0 runs"
         )
-    vrows = unique_rows(v0 / "cases.jsonl", 216, "V0 run")
+    scope = vm.get("evaluation_scope", "full-216")
+    llama_scope = lm.get("evaluation_scope", "full-216")
+    if scope not in {"core-54", "full-216"} or llama_scope not in {scope, "full-216"}:
+        raise ValueError("paired arms have incompatible evaluation scopes")
+    expected_count = 54 if scope == "core-54" else 216
+    vrows = unique_rows(v0 / "cases.jsonl", expected_count, "V0 run")
     all_cases = [
         json.loads(line) for line in (root / "prompts.jsonl").read_text().splitlines()
     ]
-    cases = [
-        c
-        for c in all_cases
-        if c["family"] in {"P100", "C92", "L12"}
-        or (c["family"] == "R" and c["details"]["horizon"] in {512, 4096})
-    ]
-    if len(cases) != 216:
-        raise ValueError("frozen core inventory is not exactly 216 cases")
+    cases, _ = select_cases(root, full=scope == "full-216")
     frozen_32768 = sum(
         c["family"] == "R" and c["details"]["horizon"] == 32768 for c in all_cases
     )
     if frozen_32768 != 6:
         raise ValueError("R32768 deferred inventory is not exactly six frozen cases")
-    lrows = unique_rows(llama / "cases.jsonl", 216, "llama run")
-    if set(lrows) != {c["id"] for c in cases} or set(vrows) != set(lrows):
+    lrows = unique_rows(
+        llama / "cases.jsonl",
+        216 if llama_scope == "full-216" else expected_count,
+        "llama run",
+    )
+    expected_llama_ids = (
+        {c["id"] for c in select_cases(root, full=True)[0]}
+        if llama_scope == "full-216"
+        else {c["id"] for c in cases}
+    )
+    if set(lrows) != expected_llama_ids or set(vrows) != {c["id"] for c in cases}:
         raise ValueError("paired arm IDs differ from frozen core")
+    lrows = {case["id"]: lrows[case["id"]] for case in cases}
     manifest = json.loads((root / "manifest.json").read_text())
     effective_policy_sha256, rebind_sha256 = validate_policy_rebind(
         root, manifest, args.policy_rebind
@@ -644,7 +661,9 @@ def main() -> int:
     ):
         raise ValueError("teacher reference JSONL hash differs from fixture manifest")
     refs = unique_rows(root / refs_meta, 192, "teacher references")
-    teacher_ids = {case["id"] for case in cases if case["family"] in {"P100", "C92"}}
+    teacher_ids = {
+        case["id"] for case in all_cases if case["family"] in {"P100", "C92"}
+    }
     if len(teacher_ids) != 192 or set(refs) != teacher_ids or set(probs) != teacher_ids:
         raise ValueError(
             "teacher references/probabilities are not exactly the frozen 192 P100/C92 cases"
@@ -1055,8 +1074,13 @@ def main() -> int:
     else:
         overall_status = "PASS"
     candidate_policy = vm["artifact_identity"]["precision_policy_id"]
-    candidate_name = "QW38 CandidateV1" if candidate_policy == 0x0402 else "QW38 V0"
-    task_name = "TASK-022" if candidate_policy == 0x0402 else "TASK-018"
+    candidate_names = {
+        0x0401: "QW38 V0",
+        0x0402: "QW38 CandidateV1",
+        0x0403: "QW38 CandidateV2",
+    }
+    candidate_name = candidate_names[candidate_policy]
+    task_name = "TASK-018" if candidate_policy == 0x0401 else "TASK-022"
     text_outputs = [
         {"id": row["id"], "llama": row["llama_text_file"], "v0": row["v0_text_file"]}
         for row in per_case
@@ -1067,7 +1091,7 @@ def main() -> int:
         "mtp_enabled": False,
         "roles": {"comparator": "Q4_K_M llama.cpp", "candidate": candidate_name},
         "schedule": {
-            "core_cases": "all 216 P100/C92/L12/R512/R4096 cases once; reset at document boundaries",
+            "core_cases": f"{len(cases)} frozen {scope} P100/C92/L12/R512/R4096 cases once; reset at document boundaries",
             "target_alignment": "same frozen Q4_K_M teacher IDs for P100/C92; frozen fixed keys for L12/R",
             "retrieval_32768": "frozen now; execution assigned to TASK-026",
         },
@@ -1078,6 +1102,9 @@ def main() -> int:
         },
         "raw_generated_text": text_outputs,
         "suite": manifest["suite"],
+        "evaluation_scope": scope,
+        "llama_evaluation_scope": llama_scope,
+        "sample_spec_sha256": sha(CORE_SPEC) if scope == "core-54" else None,
         "policy_sha256": effective_policy_sha256,
         "capture_policy_sha256": manifest["policy_sha256"],
         "policy_rebind_sha256": rebind_sha256,
@@ -1211,9 +1238,9 @@ def main() -> int:
         f"# {task_name} paired run\n\n"
         f"Status: **{overall_status}**.\n\n"
         f"Mode: `language-only`; MTP enabled: `false`. Comparator: Q4_K_M llama.cpp. Candidate: {candidate_name}. "
-        "Schedule: all 216 core cases once, using frozen teacher IDs for P100/C92 and fixed keys for L12/R; "
+        f"Schedule: all {len(cases)} {scope} cases once, using frozen teacher IDs for P100/C92 and fixed keys for L12/R; "
         "R32768 execution is assigned to TASK-026. Precision: teacher top-20 selected target logprobs; candidate FP32 full-vocabulary logits.\n\n"
-        f"Core coverage: {len(per_case)}/216. Teacher-forced NLL: {nll_total[2]} aligned P100/C92 tokens; "
+        f"Core coverage: {len(per_case)}/{len(cases)}. Teacher-forced NLL: {nll_total[2]} aligned P100/C92 tokens; "
         f"Candidate minus llama = {nll_point:.6f} nats/token. Full-vocabulary KL is unavailable.\n\n"
         f"C92: llama {c92_llama}/{len(c92_rows)}, candidate {c92_v0}/{len(c92_rows)}; R/L fixed-key grades and per-case details are in `cases.jsonl`.\n\n"
         f"P100 output review: {qualitative_status}; rows are in `p100-review.jsonl`.\n\n"
@@ -1234,6 +1261,9 @@ def main() -> int:
         "precision": summary["precision"],
         "raw_generated_text": text_outputs,
         "suite": manifest["suite"],
+        "evaluation_scope": scope,
+        "llama_evaluation_scope": llama_scope,
+        "sample_spec_sha256": sha(CORE_SPEC) if scope == "core-54" else None,
         "fixture_manifest_sha256": sha(root / "manifest.json"),
         "policy_sha256": effective_policy_sha256,
         "capture_policy_sha256": manifest["policy_sha256"],

@@ -22,8 +22,10 @@ Resolve demonstrated state or long-context traffic bottlenecks, retaining curren
   overall decision rules, measurement envelope and migration of prior obligations.
 - [Architecture V0](../../architecture/architecture-v0.md) — retained model semantics
   and controls; reopened decisions follow OVERALL-01.
-- [EVAL-01 / PERF-01](../../architecture/evaluation-policy-v0.md) — unchanged
-  quality criteria and measurement definitions, with task ownership remapped by the ledger.
+- [EVAL-01 / PERF-01](../../architecture/evaluation-policy-v0.md) — scoring
+  criteria and measurement definitions.
+- [54-case core amendment](../../architecture/evaluation-policy-core-54.md) —
+  routine coverage and manual-only full-suite execution.
 - [Technology baseline](../technology-baseline.md).
 - [Code standards](../code-standards.md).
 
@@ -95,7 +97,7 @@ One-step and long-horizon recurrent state/output divergence with fixed weights/a
 
 ### Integration checks
 
-Full applicable EVAL-01 core/32768 coverage and same-schedule continuation/reset/snapshot/interleave for a promoted change, including arbitrary incoming state and prefill/decode transitions.
+Complete applicable 54-case EVAL-01 core/32768 coverage and same-schedule continuation/reset/snapshot/interleave for a promoted change, including arbitrary incoming state and prefill/decode transitions. The optional 216-case suite is human-initiated interactive work only; agents must never launch it.
 
 ## Benchmark required
 
