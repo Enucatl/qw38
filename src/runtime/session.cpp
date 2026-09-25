@@ -125,6 +125,18 @@ std::expected<void, Error> KvPopulatedSlot::commit_append(
   return {};
 }
 
+std::expected<void, Error> KvPopulatedSlot::commit_chunk(
+    std::uint64_t position, std::uint32_t count) const {
+  auto populated = value();
+  if (!populated) return std::unexpected(populated.error());
+  if (count == 0 || position != *populated || position > capacity_ ||
+      count > capacity_ - position)
+    return std::unexpected(make_error(ErrorCode::InvalidPopulatedLength,
+                                      "position", "invalid KV chunk append"));
+  *value_ = position + count;
+  return {};
+}
+
 std::expected<ConvCursorSlot, Error> ConvCursorSlot::bind(
     std::uint32_t* value) {
   if (value == nullptr) {

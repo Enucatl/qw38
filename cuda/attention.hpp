@@ -3,6 +3,7 @@
 #include "cuda/error.hpp"
 #include "cuda/stream.hpp"
 
+#include <cstddef>
 #include <cstdint>
 #include <expected>
 
@@ -41,6 +42,39 @@ inline constexpr int kAttnPrepBlocks = kAttnPrepQueryBlocks + kAttnPrepKvBlocks;
     std::int32_t position, std::uint16_t* q_out, std::uint16_t* g_out,
     std::uint16_t* kv, std::uint32_t attn_layer, std::uint64_t capacity,
     std::uint64_t token, Stream const& stream);
+
+// Token-major chunk preparation. Only valid rows are written to cache.
+[[nodiscard]] std::expected<void, Error> launch_attention_prepare_chunk(
+    std::uint16_t const* qg, std::uint16_t const* k_raw,
+    std::uint16_t const* v_raw, std::uint16_t const* gamma_q,
+    std::uint16_t const* gamma_k, float const* inv_freq, float eps,
+    std::uint64_t first_position, std::uint32_t valid_tokens,
+    std::uint16_t* q_out, std::uint16_t* g_out, std::uint16_t* kv,
+    std::uint32_t attn_layer, std::uint64_t capacity, Stream const& stream);
+
+inline constexpr std::uint32_t kAttnPrefillQueryTile = 1;
+inline constexpr std::uint32_t kAttnPrefillQueryTileControl = 4;
+inline constexpr std::uint32_t kAttnPrefillKeyTile = 32;
+
+struct AttentionPrefillResources {
+  int registers{};
+  std::size_t shared_bytes{};
+  std::size_t local_bytes{};
+  int occupancy_blocks_per_sm{};
+};
+
+// One block per query head and query row. K and V share one key tile;
+// FP32 online statistics and numerators remain block-local.
+[[nodiscard]] std::expected<void, Error> launch_attention_prefill_scan(
+    std::uint16_t const* q, std::uint16_t const* g,
+    std::uint16_t const* kv, std::uint32_t attn_layer,
+    std::uint64_t capacity, std::uint64_t first_position,
+    std::uint32_t valid_tokens, std::uint16_t* y,
+    Stream const& stream,
+    std::uint32_t query_tile = kAttnPrefillQueryTile);
+
+[[nodiscard]] std::expected<AttentionPrefillResources, Error>
+attention_prefill_resources(std::uint32_t query_tile = kAttnPrefillQueryTile);
 
 // One 128-thread block per query head per 256-key segment. FP32 online softmax
 // over causal range [0, populated). Writes FP32 max, sum, and 256-value

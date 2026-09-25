@@ -442,6 +442,16 @@ set_tests_properties(
 )
 
 add_executable(qw38_attention_unit_test attention_unit_test.cpp)
+add_executable(qw38_attention_prefill_test attention_prefill_test.cpp)
+target_link_libraries(qw38_attention_prefill_test PRIVATE qw38_cuda qw38_format)
+target_compile_features(qw38_attention_prefill_test PRIVATE cxx_std_23)
+add_test(NAME attention_prefill COMMAND qw38_attention_prefill_test)
+set_tests_properties(attention_prefill PROPERTIES LABELS "cuda;gpu;attention;prefill")
+add_executable(qw38_attention_prefill_artifact_test attention_prefill_artifact_test.cpp)
+target_link_libraries(qw38_attention_prefill_artifact_test PRIVATE qw38_runtime)
+target_compile_features(qw38_attention_prefill_artifact_test PRIVATE cxx_std_23)
+add_test(NAME attention_prefill_artifact COMMAND qw38_attention_prefill_artifact_test)
+set_tests_properties(attention_prefill_artifact PROPERTIES LABELS "cuda;gpu;attention;prefill;extended")
 target_link_libraries(qw38_attention_unit_test PRIVATE qw38_runtime qw38_compiler qw38_reference)
 target_compile_features(qw38_attention_unit_test PRIVATE cxx_std_23)
 target_compile_options(qw38_attention_unit_test PRIVATE

@@ -67,6 +67,7 @@ add_library(qw38_runtime STATIC
   runtime/mlp.cpp
   runtime/prefill.cpp
   runtime/prefill_gdn.cpp
+  runtime/prefill_attention.cpp
   runtime/gdn.cpp
   runtime/attention.cpp
 )

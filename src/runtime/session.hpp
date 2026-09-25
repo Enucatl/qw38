@@ -37,6 +37,8 @@ class KvPopulatedSlot {
   [[nodiscard]] std::expected<std::uint64_t, Error> value() const;
   [[nodiscard]] std::expected<void, Error> commit_append(
       std::uint64_t position) const;
+  [[nodiscard]] std::expected<void, Error> commit_chunk(
+      std::uint64_t position, std::uint32_t count) const;
 
  private:
   std::uint64_t* value_{nullptr};

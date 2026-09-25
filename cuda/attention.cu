@@ -1,4 +1,5 @@
 #include "cuda/attention.hpp"
+#include "cuda/prefill.hpp"
 
 #include <array>
 #include <cstddef>
@@ -121,6 +122,14 @@ __global__ void attention_prepare_kernel(
     float position, std::uint16_t* q_out, std::uint16_t* g_out,
     std::uint16_t* kv, std::uint32_t attn_layer, std::uint64_t capacity,
     std::uint64_t token) {
+  std::size_t const row = blockIdx.y;
+  qg += row * kAttnQueryHeads * 2u * kAttnHeadDim;
+  k_raw += row * kAttnKvHeads * kAttnHeadDim;
+  v_raw += row * kAttnKvHeads * kAttnHeadDim;
+  q_out += row * kAttnQueryHeads * kAttnHeadDim;
+  g_out += row * kAttnQueryHeads * kAttnHeadDim;
+  position += static_cast<float>(row);
+  token += row;
   std::size_t const head_stride =
       static_cast<std::size_t>(capacity) * kAttnHeadDim;
   std::size_t const comp_stride =
@@ -395,7 +404,7 @@ std::expected<void, Error> require_disjoint_prepare_operands(
     std::uint16_t const* v_raw, std::uint16_t const* gamma_q,
     std::uint16_t const* gamma_k, float const* inv_freq,
     std::uint16_t* q_out, std::uint16_t* g_out, std::uint16_t* kv,
-    std::uint64_t capacity) {
+    std::uint64_t capacity, std::uint32_t rows = 1) {
   constexpr std::uint64_t kBf16Bytes = sizeof(std::uint16_t);
   constexpr std::uint64_t kQGBytes =
       static_cast<std::uint64_t>(kAttnQueryHeads) * 2u * kAttnHeadDim *
@@ -421,14 +430,14 @@ std::expected<void, Error> require_disjoint_prepare_operands(
   auto const kv_bytes = capacity * kKvBytesPerToken;
 
   std::array<std::expected<ByteInterval, Error>, 9> checked{
-      checked_interval(qg, kQGBytes, "qg"),
-      checked_interval(k_raw, kKvProjectionBytes, "k_raw"),
-      checked_interval(v_raw, kKvProjectionBytes, "v_raw"),
+      checked_interval(qg, kQGBytes * rows, "qg"),
+      checked_interval(k_raw, kKvProjectionBytes * rows, "k_raw"),
+      checked_interval(v_raw, kKvProjectionBytes * rows, "v_raw"),
       checked_interval(gamma_q, kGammaBytes, "gamma_q"),
       checked_interval(gamma_k, kGammaBytes, "gamma_k"),
       checked_interval(inv_freq, kInvFreqBytes, "inv_freq"),
-      checked_interval(q_out, kPreparedBytes, "q_out"),
-      checked_interval(g_out, kPreparedBytes, "g_out"),
+      checked_interval(q_out, kPreparedBytes * rows, "q_out"),
+      checked_interval(g_out, kPreparedBytes * rows, "g_out"),
       checked_interval(kv, kv_bytes, "kv")};
   std::array<ByteInterval, 9> intervals{};
   for (std::size_t i = 0; i < checked.size(); ++i) {
@@ -450,6 +459,104 @@ std::expected<void, Error> require_disjoint_prepare_operands(
     }
   }
   return {};
+}
+
+template <std::uint32_t Q>
+__global__ void attention_prefill_scan_kernel(
+    std::uint16_t const* q, std::uint16_t const* g,
+    std::uint16_t const* kv, std::uint32_t attn_layer,
+    std::uint64_t capacity, std::uint64_t first_position,
+    std::uint32_t valid_tokens, std::uint16_t* y) {
+  constexpr std::uint32_t K = kAttnPrefillKeyTile;
+  __shared__ float qs[Q * kAttnHeadDim];
+  __shared__ float num[Q * kAttnHeadDim];
+  __shared__ std::uint16_t tile[K * kAttnHeadDim];
+  __shared__ float scores[Q * K];
+  __shared__ float m[Q], l[Q], old_scale[Q];
+  std::uint32_t const h = blockIdx.x;
+  std::uint32_t const row0 = blockIdx.y * Q;
+  std::uint32_t const tid = threadIdx.x;
+  std::size_t const head_stride = static_cast<std::size_t>(capacity) * kAttnHeadDim;
+  std::size_t const comp_stride = kAttnKvHeads * head_stride;
+  std::uint16_t const* layer = kv + static_cast<std::size_t>(attn_layer) *
+      2u * comp_stride;
+  std::uint16_t const* k_base = layer + (h / kAttnGqaGroup) * head_stride;
+  std::uint16_t const* v_base = k_base + comp_stride;
+  for (std::uint32_t i = tid; i < Q * kAttnHeadDim; i += blockDim.x) {
+    std::uint32_t const r = i / kAttnHeadDim;
+    std::uint32_t const d = i % kAttnHeadDim;
+    qs[i] = row0 + r < valid_tokens
+        ? bf16_to_fp32(q[(static_cast<std::size_t>(row0 + r) * kAttnQueryHeads + h) *
+                         kAttnHeadDim + d]) : 0.0f;
+    num[i] = 0.0f;
+  }
+  if (tid < Q) { m[tid] = -INFINITY; l[tid] = 0.0f; }
+  __syncthreads();
+  std::uint64_t const last = first_position +
+      min(valid_tokens, row0 + Q);
+  for (std::uint64_t base = 0; base < last; base += K) {
+    for (std::uint32_t i = tid; i < K * kAttnHeadDim; i += blockDim.x) {
+      std::uint64_t const token = base + i / kAttnHeadDim;
+      tile[i] = token < last
+          ? k_base[token * kAttnHeadDim + i % kAttnHeadDim] : 0;
+    }
+    __syncthreads();
+    if (tid < Q * K) {
+      std::uint32_t const r = tid / K, key = tid % K;
+      std::uint64_t const token = base + key;
+      if (row0 + r < valid_tokens && token <= first_position + row0 + r) {
+        float dot = 0.0f;
+        for (std::uint32_t d = 0; d < kAttnHeadDim; ++d)
+          dot += qs[r * kAttnHeadDim + d] *
+                 bf16_to_fp32(tile[key * kAttnHeadDim + d]);
+        scores[tid] = dot * kAttnScale;
+      } else {
+        scores[tid] = -INFINITY;
+      }
+    }
+    __syncthreads();
+    if (tid < Q) {
+      float best = m[tid];
+      for (std::uint32_t key = 0; key < K; ++key)
+        best = fmaxf(best, scores[tid * K + key]);
+      old_scale[tid] = m[tid] == -INFINITY ? 0.0f : expf(m[tid] - best);
+      if (best != -INFINITY) {
+        l[tid] *= old_scale[tid];
+        for (std::uint32_t key = 0; key < K; ++key) {
+          float const score = scores[tid * K + key];
+          float const p = score == -INFINITY ? 0.0f : expf(score - best);
+          scores[tid * K + key] = p;
+          l[tid] += p;
+        }
+        m[tid] = best;
+      }
+    }
+    __syncthreads();
+    for (std::uint32_t i = tid; i < K * kAttnHeadDim; i += blockDim.x) {
+      std::uint64_t const token = base + i / kAttnHeadDim;
+      tile[i] = token < last
+          ? v_base[token * kAttnHeadDim + i % kAttnHeadDim] : 0;
+    }
+    __syncthreads();
+    for (std::uint32_t i = tid; i < Q * kAttnHeadDim; i += blockDim.x) {
+      std::uint32_t const r = i / kAttnHeadDim, d = i % kAttnHeadDim;
+      float acc = num[i] * old_scale[r];
+      for (std::uint32_t key = 0; key < K; ++key)
+        acc += scores[r * K + key] *
+               bf16_to_fp32(tile[key * kAttnHeadDim + d]);
+      num[i] = acc;
+    }
+    __syncthreads();
+  }
+  for (std::uint32_t i = tid; i < Q * kAttnHeadDim; i += blockDim.x) {
+    std::uint32_t const r = i / kAttnHeadDim, d = i % kAttnHeadDim;
+    if (row0 + r < valid_tokens) {
+      std::size_t const off = (static_cast<std::size_t>(row0 + r) *
+          kAttnQueryHeads + h) * kAttnHeadDim + d;
+      float const value = num[i] / l[r] * sigmoid_fp32(bf16_to_fp32(g[off]));
+      y[off] = fp32_to_bf16_rne(value);
+    }
+  }
 }
 
 }  // namespace
@@ -506,6 +613,136 @@ std::expected<void, Error> launch_attention_prepare(
       qg, k_raw, v_raw, gamma_q, gamma_k, inv_freq, eps, pos, q_out, g_out, kv,
       attn_layer, capacity, token);
   return check(cudaGetLastError(), "attention_prepare_kernel");
+}
+
+std::expected<void, Error> launch_attention_prepare_chunk(
+    std::uint16_t const* qg, std::uint16_t const* k_raw,
+    std::uint16_t const* v_raw, std::uint16_t const* gamma_q,
+    std::uint16_t const* gamma_k, float const* inv_freq, float eps,
+    std::uint64_t first_position, std::uint32_t valid_tokens,
+    std::uint16_t* q_out, std::uint16_t* g_out, std::uint16_t* kv,
+    std::uint32_t attn_layer, std::uint64_t capacity, Stream const& stream) {
+  if (auto st = require_stream(stream, "attention_prepare_chunk"); !st) return st;
+  if (!qg || !k_raw || !v_raw || !gamma_q || !gamma_k || !inv_freq ||
+      !q_out || !g_out || !kv || attn_layer >= kAttnLayers ||
+      !valid_tokens || valid_tokens > 1024u ||
+      first_position >= capacity || valid_tokens > capacity - first_position ||
+      first_position + valid_tokens - 1u >
+          static_cast<std::uint64_t>(std::numeric_limits<std::int32_t>::max()) ||
+      !finite_pos(eps))
+    return std::unexpected(make_error(ErrorCode::InvalidArgument,
+                                      "attention_prepare_chunk", "invalid chunk geometry or operand"));
+  if (auto st = require_disjoint_prepare_operands(
+          qg, k_raw, v_raw, gamma_q, gamma_k, inv_freq,
+          q_out, g_out, kv, capacity, valid_tokens); !st) return st;
+  auto const kv_bytes = static_cast<std::uint64_t>(kAttnLayers) * 2u *
+      kAttnKvHeads * capacity * kAttnHeadDim * sizeof(std::uint16_t);
+  struct Span { void const* ptr; std::uint64_t bytes; std::uint32_t alignment; };
+  std::array<Span, 9> const spans{{
+      {qg, static_cast<std::uint64_t>(valid_tokens) * kAttnQueryHeads * 2u *
+               kAttnHeadDim * 2u, 2u},
+      {k_raw, static_cast<std::uint64_t>(valid_tokens) * kAttnKvHeads *
+                  kAttnHeadDim * 2u, 2u},
+      {v_raw, static_cast<std::uint64_t>(valid_tokens) * kAttnKvHeads *
+                  kAttnHeadDim * 2u, 2u},
+      {gamma_q, kAttnHeadDim * 2u, 2u}, {gamma_k, kAttnHeadDim * 2u, 2u},
+      {inv_freq, kAttnRopeFreqs * 4u, 4u},
+      {q_out, static_cast<std::uint64_t>(valid_tokens) * kAttnQueryHeads *
+                  kAttnHeadDim * 2u, 2u},
+      {g_out, static_cast<std::uint64_t>(valid_tokens) * kAttnQueryHeads *
+                  kAttnHeadDim * 2u, 2u},
+      {kv, kv_bytes, 2u}}};
+  for (auto const& span : spans)
+    if (auto st = validate_prefill_device_span(
+            span.ptr, span.bytes, span.alignment, stream.device()); !st) return st;
+  auto guard = stream.activate();
+  if (!guard) return std::unexpected(guard.error());
+  dim3 const grid(kAttnPrepBlocks, valid_tokens);
+  attention_prepare_kernel<<<grid, kAttnPrepThreads, 0, stream.native()>>>(
+      qg, k_raw, v_raw, gamma_q, gamma_k, inv_freq, eps,
+      static_cast<float>(first_position), q_out, g_out, kv,
+      attn_layer, capacity, first_position);
+  return check(cudaGetLastError(), "attention_prepare_chunk_kernel");
+}
+
+std::expected<void, Error> launch_attention_prefill_scan(
+    std::uint16_t const* q, std::uint16_t const* g,
+    std::uint16_t const* kv, std::uint32_t attn_layer,
+    std::uint64_t capacity, std::uint64_t first_position,
+    std::uint32_t valid_tokens, std::uint16_t* y,
+    Stream const& stream, std::uint32_t query_tile) {
+  if (auto st = require_stream(stream, "attention_prefill_scan"); !st) return st;
+  if (!q || !g || !kv || !y || attn_layer >= kAttnLayers ||
+      !valid_tokens || valid_tokens > 1024u ||
+      first_position >= capacity || valid_tokens > capacity - first_position ||
+      (query_tile != kAttnPrefillQueryTile &&
+       query_tile != kAttnPrefillQueryTileControl))
+    return std::unexpected(make_error(ErrorCode::InvalidArgument,
+                                      "attention_prefill_scan", "invalid chunk geometry or operand"));
+  auto const prepared_bytes = static_cast<std::uint64_t>(valid_tokens) *
+      kAttnQueryHeads * kAttnHeadDim * 2u;
+  constexpr std::uint64_t kv_bytes_per_token =
+      static_cast<std::uint64_t>(kAttnLayers) * 2u * kAttnKvHeads *
+      kAttnHeadDim * 2u;
+  if (capacity > std::numeric_limits<std::uint64_t>::max() / kv_bytes_per_token)
+    return std::unexpected(make_error(ErrorCode::Overflow,
+                                      "attention_prefill_scan", "cache byte count overflows"));
+  auto const kv_bytes = static_cast<std::uint64_t>(kAttnLayers) * 2u *
+      kAttnKvHeads * capacity * kAttnHeadDim * 2u;
+  std::array<std::expected<ByteInterval, Error>, 4> checked{
+      checked_interval(q, prepared_bytes, "q"),
+      checked_interval(g, prepared_bytes, "g"),
+      checked_interval(kv, kv_bytes, "kv"),
+      checked_interval(y, prepared_bytes, "y")};
+  std::array<ByteInterval, 4> ranges{};
+  for (std::size_t i = 0; i < checked.size(); ++i) {
+    if (!checked[i]) return std::unexpected(checked[i].error());
+    ranges[i] = *checked[i];
+    if (auto st = validate_prefill_device_span(
+            reinterpret_cast<void const*>(ranges[i].begin),
+            ranges[i].end - ranges[i].begin, 2u, stream.device()); !st) return st;
+  }
+  for (std::size_t i = 0; i < ranges.size(); ++i)
+    for (std::size_t j = i + 1; j < ranges.size(); ++j)
+      if (overlaps(ranges[i], ranges[j]))
+        return std::unexpected(make_error(ErrorCode::InvalidArgument,
+                                          "attention_prefill_scan", "live operands overlap"));
+  auto guard = stream.activate();
+  if (!guard) return std::unexpected(guard.error());
+  dim3 const grid(kAttnQueryHeads,
+                  (valid_tokens + query_tile - 1u) / query_tile);
+  if (query_tile == kAttnPrefillQueryTile)
+    attention_prefill_scan_kernel<kAttnPrefillQueryTile>
+        <<<grid, kAttnScanThreads, 0, stream.native()>>>(
+            q, g, kv, attn_layer, capacity, first_position, valid_tokens, y);
+  else
+    attention_prefill_scan_kernel<kAttnPrefillQueryTileControl>
+        <<<grid, kAttnScanThreads, 0, stream.native()>>>(
+            q, g, kv, attn_layer, capacity, first_position, valid_tokens, y);
+  return check(cudaGetLastError(), "attention_prefill_scan_kernel");
+}
+
+std::expected<AttentionPrefillResources, Error> attention_prefill_resources(
+    std::uint32_t query_tile) {
+  if (query_tile != kAttnPrefillQueryTile &&
+      query_tile != kAttnPrefillQueryTileControl)
+    return std::unexpected(make_error(ErrorCode::InvalidArgument,
+                                      "attention_prefill_resources", "invalid query tile"));
+  void const* kernel = query_tile == kAttnPrefillQueryTile
+      ? reinterpret_cast<void const*>(attention_prefill_scan_kernel<kAttnPrefillQueryTile>)
+      : reinterpret_cast<void const*>(attention_prefill_scan_kernel<kAttnPrefillQueryTileControl>);
+  cudaFuncAttributes attr{};
+  auto st = check(cudaFuncGetAttributes(&attr, kernel),
+                  "cudaFuncGetAttributes(attention_prefill_scan_kernel)");
+  if (!st) return std::unexpected(st.error());
+  int occupancy = 0;
+  st = check(cudaOccupancyMaxActiveBlocksPerMultiprocessor(
+      &occupancy, kernel, kAttnScanThreads, 0),
+      "cudaOccupancyMaxActiveBlocksPerMultiprocessor(attention_prefill_scan_kernel)");
+  if (!st) return std::unexpected(st.error());
+  return AttentionPrefillResources{attr.numRegs,
+      static_cast<std::size_t>(attr.sharedSizeBytes),
+      static_cast<std::size_t>(attr.localSizeBytes), occupancy};
 }
 
 std::expected<void, Error> launch_attention_scan(

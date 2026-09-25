@@ -3,6 +3,7 @@
 #include "cuda/prefill.hpp"
 #include "runtime/error.hpp"
 #include "runtime/gdn.hpp"
+#include "runtime/attention.hpp"
 #include "runtime/model.hpp"
 
 #include <cstdint>
@@ -105,5 +106,63 @@ class PrefillGdnWorkspace {
     qw38::cuda::PrefillEngine& engine, float const* residual,
     float* h_mid, float* next_h, std::uint32_t valid_tokens,
     std::uint64_t first_position, std::uint32_t recurrence_interval = 64);
+
+class PrefillAttentionLayerPlan {
+ public:
+  PrefillAttentionLayerPlan(PrefillAttentionLayerPlan const&) = default;
+  PrefillAttentionLayerPlan& operator=(PrefillAttentionLayerPlan const&) = default;
+
+ private:
+  friend std::expected<PrefillAttentionLayerPlan, Error>
+  bind_prefill_attention_layer(Model const&, Session&, std::uint32_t,
+                               qw38::cuda::Stream const&);
+  friend std::expected<void, Error> execute_prefill_attention_layer(
+      PrefillAttentionLayerPlan const&, class PrefillAttentionWorkspace&,
+      qw38::cuda::PrefillEngine&, float const*, float*, float*,
+      std::uint32_t, std::uint64_t);
+  PrefillAttentionLayerPlan(AttentionPrepPlan const& prep,
+      PrefillLayerProjectionPlan const& projections)
+      : prep_(prep), projections_(projections) {}
+  AttentionPrepPlan prep_{};
+  PrefillLayerProjectionPlan projections_{};
+};
+
+[[nodiscard]] std::expected<PrefillAttentionLayerPlan, Error>
+bind_prefill_attention_layer(Model const& model, Session& session,
+                             std::uint32_t layer,
+                             qw38::cuda::Stream const& stream);
+
+struct PrefillAttentionSlices {
+  std::uint16_t* normalized{};  // BF16 [M,5120]
+  std::uint16_t* qg{};          // BF16 [M,24,2,256]
+  std::uint16_t* k{};           // BF16 [M,4,256]
+  std::uint16_t* v{};           // BF16 [M,4,256]
+  std::uint16_t* q{};           // BF16 [M,24,256]
+  std::uint16_t* g{};           // BF16 [M,24,256]
+  std::uint16_t* y{};           // BF16 [M,24,256]
+};
+
+class PrefillAttentionWorkspace {
+ public:
+  [[nodiscard]] static std::expected<PrefillAttentionWorkspace, Error> create(
+      std::uint32_t token_capacity, int device);
+  [[nodiscard]] PrefillAttentionSlices slices() noexcept;
+  [[nodiscard]] std::uint32_t token_capacity() const noexcept { return capacity_; }
+  [[nodiscard]] std::uint64_t bytes() const noexcept { return storage_.bytes(); }
+  [[nodiscard]] void const* data() const noexcept { return storage_.data(); }
+  [[nodiscard]] int device() const noexcept { return storage_.device(); }
+
+ private:
+  qw38::cuda::DeviceBuffer storage_{};
+  std::uint32_t capacity_{};
+};
+
+// Complete attention mixer and MLP for a contiguous valid chunk. Synchronizes
+// before return; a post-launch failure poisons the bound Session.
+[[nodiscard]] std::expected<void, Error> execute_prefill_attention_layer(
+    PrefillAttentionLayerPlan const& plan, PrefillAttentionWorkspace& workspace,
+    qw38::cuda::PrefillEngine& engine, float const* residual,
+    float* h_mid, float* next_h, std::uint32_t valid_tokens,
+    std::uint64_t first_position);
 
 }  // namespace qw38::runtime

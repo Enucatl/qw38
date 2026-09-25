@@ -242,7 +242,7 @@ an achieved performance target.
 | TASK-022 | Candidate decode and core quality gate | M8 | TASK-021 | Eligible same-weight native/GEMV dispatch or measured Q4_K/Q8 fallback, full-model decode, continuation and complete 54-case EVAL-01 core evidence | DONE |
 | TASK-023 | Production prefill projections and workspace | M8 | TASK-022 | Native GEMMs, activation quantization/reuse, bounded chunks and precision-correct epilogues | DONE |
 | TASK-024 | GDN prefill algorithm and layer integration | M8 | TASK-023 | Measured serial/chunkwise recurrence choice, FIR/history and validated complete GDN layer | DONE |
-| TASK-025 | Causal attention prefill and layer integration | M8 | TASK-024 | Tiled attention, GQA/cache/position correctness and validated complete attention layer | TODO |
+| TASK-025 | Causal attention prefill and layer integration | M8 | TASK-024 | Tiled attention, GQA/cache/position correctness and validated complete attention layer | DONE |
 | TASK-026 | Full-model prefill, handoff and quality gate | M8 | TASK-025 | End-to-end candidate, core suite plus 32768 retrieval, chunk/dispatch boundary validation | TODO |
 | TASK-027 | Matched whole-request performance baseline | M9 | TASK-026 | PERF-01 comparison, cold/warm costs, peak memory and bottleneck-ranked gap report | TODO |
 | TASK-028 | Conversion-minimized native FP4 path | M10 | TASK-027 | Real-family NVFP4/MXFP4 path with GPU activation conversion, native prefill/decode comparison, quality, capacity and complete-request evidence | TODO |
