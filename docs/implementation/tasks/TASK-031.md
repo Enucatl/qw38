@@ -1,4 +1,4 @@
-# TASK-031 — Consolidated validation and architecture promotion
+# TASK-031 — State and long-context bottleneck refinement
 
 ## Status
 
@@ -10,7 +10,7 @@ M10 — Measured refinement and promotion
 
 ## Purpose
 
-Validate the combined candidate and record a supported promotion decision with reproducible architecture, quality, performance and capacity evidence.
+Resolve demonstrated state or long-context traffic bottlenecks, retaining current precision/layout when changes have no material benefit.
 
 ## Depends on
 
@@ -33,9 +33,9 @@ Validate the combined candidate and record a supported promotion decision with r
 
 | Decision | Contract for this task | Authority |
 | -------- | ---------------------- | --------- |
-| OVERALL-01 | Consolidate selected precision/layout/schedule/state decisions | User-directed sequence |
-| EVAL-01 / PERF-01 | Final combined quality and per-row performance judgment | Binding policy |
-| A-02, retained semantics and compatibility | Document artifact/state identities and supported scope | Retained |
+| S-01/S-02 | Isolated GDN state-storage precision or layout/ownership comparisons | Explicitly reopened in TASK-031 |
+| P-01/P-02 | FP32 recurrent arithmetic; BF16 KV/history retained | Binding controls |
+| Q-01/Q-02, L-01, unrelated schedules | Hold weights and other accepted choices fixed | Experimental control |
 
 OVERALL-01 supersedes conflicting restrictions in the former task sequence.
 Historical EXP-A–H ordering does not constrain this task. Decisions outside
@@ -43,34 +43,34 @@ the reopened scope remain binding.
 
 ## Starting point
 
-TASK-028–030 have individually justified changes or keep decisions. Their combined runtime/artifact still needs final frozen-identity validation.
+TASK-030 supplies the refined execution profile, accepted representation/schedule and explicit remaining long-context gaps.
 
 ## Scope
 
-Freeze the final compiler/calibration/artifact/runtime/toolchain/dispatch
-identities and rerun the 54-case EVAL-01 core plus long-context extension and all PERF-01
-rows on the combined candidate. Individually passing experiments do not imply
-their combination passes. Publish final precision/layout/scale/dispatch and
-memory policies, supported contexts, reproducible commands, rollback control,
-and remaining performance or coverage limits.
+Use the post-refinement profile to decide whether GDN layout/ownership,
+persistent-state traffic/precision or attention KV rereads warrant work.
+The 144 MiB FP32 GDN state is small beside weights; narrowing it is not an
+automatic priority. If testing BF16 persistent state, retain FP32 recurrence
+arithmetic, change only storage, and require long-horizon quality and complete
+snapshot/continuation evidence. Version any changed state ABI. Preserve BF16
+KV/history in this sequence.
 
-**Exit:** reconciled architecture/format/task documents and a supported
-promote/retain-control decision. A quality failure prevents promotion. If
-quality passes but performance targets remain unmet or uncertain, report that
-explicitly; completing the experiment sequence does not assert speed parity
-or global optimality. No further experiment is silently added to this ledger.
+**Exit:** isolated keep/change decisions with populated long-context decode,
+prefill/request, quality and memory evidence. If no material state bottleneck
+exists, document retention of current precision/layout instead of undertaking
+the former obligatory experiments.
 
 ## Out of scope
 
-Promoting a quality failure, substituting individual experiment passes for a combined run, hiding unmet speed targets, adding unapproved tasks or claiming global optimality/general unsupported capabilities.
+Automatic BF16 state conversion, FP4 state, KV/history precision changes, new attention semantics and combining precision/layout changes without isolated evidence.
 
 ## Required interfaces and data representation
 
-A final manifest/report binds compiler, source, calibration, quantizer/layout, artifact, runtime, dispatch/chunk/graph, state ABI and toolchain identities. Publish exact commands, raw evidence locations, accepted controls/rollback procedure, precision/scaling/layout/dispatch policies and context/memory limits.
+Any changed GDN state ABI has an explicit version, shape/order/precision description, ownership and snapshot compatibility behavior. Bindings reject incompatible state instead of silently reinterpreting bytes. Memory/traffic reports distinguish fixed GDN storage from context-dependent KV and any extra workspace.
 
 ## Required semantics and constraints
 
-Rerun the 54-case EVAL-01 core and mandatory 32768 extension on the combined candidate, with all reviews, provenance and replay obligations. Run every PERF-01 row at the same frozen identities. Separate quality acceptance, completion of measurements and attainment of per-row speed parity. The historical V0 control remains explicitly unaccepted if its quality gate is still incomplete. The optional 216-case suite is human-initiated interactive work only; agents must never launch it.
+Keep recurrence equations and arithmetic FP32. A BF16 storage experiment changes only load/store precision, with layout/ownership held fixed; a layout experiment holds precision fixed. Require long-horizon error/continuation evidence. Attention-traffic work preserves causal GQA and BF16 KV/history without permanent replication or eviction semantics.
 
 Follow the code standards' identity and manifest-only digest policy. Keep
 benchmarks separate from correctness checks and record source, binary,
@@ -79,41 +79,41 @@ result. Partial or invalid evidence cannot establish quality acceptance.
 
 ## Tuning defaults
 
-Freeze all settings before final runs. Any corrective arithmetic/policy change creates a new candidate identity and requires the affected gates to be rerun before the final decision.
+Choose work from the post-refinement profile. The 144 MiB FP32 GDN state is not automatically a priority; a measured decision to retain it and its layout completes the investigation when no useful bottleneck exists.
 
 ## Expected files/modules
 
-Consolidated validation/performance reports, final architecture/quantization/layout/runtime-format/prefill/technology documentation, task completion records and reproducible run instructions.
+Only affected recurrence ownership/state storage or attention-traffic paths, versioned state/snapshot bindings if needed, focused references and long-context experiment reports.
 
 ## Tests required
 
 ### Unit and contract checks
 
-Final identity, policy/representation compatibility and documentation/task-reference consistency checks; reuse relevant implementation regressions.
+Changed state layout/encoding and independent reconstruction, snapshot compatibility/rejection, ownership bounds and attention masks for any traffic change.
 
 ### Reference and numerical checks
 
-Retained independent arithmetic, artifact reconstruction and model-semantic controls for the combined candidate. Report tolerances and any schedule-dependent effects.
+One-step and long-horizon recurrent state/output divergence with fixed weights/arithmetic; independent state-layout checks and causal attention equivalence where applicable.
 
 ### Integration checks
 
-Complete 54-case EVAL-01 core, six 32768 retrieval cases, selected-P100 adjudication, required same-schedule/cross-schedule/dispatch checks and session failure/replay coverage for the frozen combined artifact/runtime.
+Complete applicable 54-case EVAL-01 core/32768 coverage and same-schedule continuation/reset/snapshot/interleave for a promoted change, including arbitrary incoming state and prefill/decode transitions. The optional 216-case suite is human-initiated interactive work only; agents must never launch it.
 
 ## Benchmark required
 
-All mandatory PERF-01 rows with raw paired samples, median/p99/intervals, cold/warm separation, full memory accounting and final per-row parity/gap status.
+Populated long-context decode, prefill and whole requests with state/KV traffic, spills/occupancy, resident memory and workspace. A keep decision cites the accepted profile and measured lack of a material state bottleneck.
 
 ## Acceptance criteria
 
-- [ ] Final compiler/calibration/artifact/runtime/toolchain/schedule identities are frozen and reproducible.
-- [ ] The combined candidate has complete 54-case EVAL-01 core and long-context evidence with resolved reviews and replay coverage.
-- [ ] All PERF-01 rows, memory/cold costs and per-row achieved/unmet/uncertain targets are reported.
-- [ ] Architecture/format/precision/state/task documents describe the actual selected implementation and remaining limits consistently.
-- [ ] A supported promote/retain-control decision is recorded; quality failures cannot be promoted and unmet performance remains explicit.
+- [ ] The profile justifies each selected state/traffic experiment or retention of the current controls.
+- [ ] Precision and layout changes are isolated; FP32 arithmetic and BF16 KV/history remain intact.
+- [ ] Any changed state ABI and snapshot compatibility are explicit and independently validated.
+- [ ] Promoted changes pass long-horizon quality and complete continuation/failure recovery coverage.
+- [ ] Whole-request/context/memory measurements support keep/change decisions without prioritizing storage reduction alone.
 
 ## Architecture blocker rule
 
-Missing required final evidence prevents completion. A failed quality gate prevents promotion; preserve the failure and record the supported retain-control decision without labeling the failed candidate accepted. Measured unmet or uncertain performance targets are explicit outcomes and do not become quality waivers or implicit authorization for more tasks.
+A rejected candidate is a recorded result; use the eligible fallback within OVERALL-01 without relaxing acceptance criteria. Missing required exit evidence prevents completion. A conflict outside the reopened decisions requires the full architecture-blocker report defined in the ledger; obsolete Q4-only or experiment-order restrictions are not blockers.
 
 ## Completion report
 

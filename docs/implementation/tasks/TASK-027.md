@@ -111,7 +111,7 @@ Required: all PERF-01 prefill, populated decode and complete-request rows, cold 
 
 ## Architecture blocker rule
 
-Missing required comparison or quality evidence prevents completion. A speed gap is a measured result and does not block TASK-028–031. Measurement difficulty alone does not reopen retained architecture contracts; report any actual conflict using the ledger's full blocker fields.
+Missing required comparison or quality evidence prevents completion. A speed gap is a measured result and does not block TASK-028–032. Measurement difficulty alone does not reopen retained architecture contracts; report any actual conflict using the ledger's full blocker fields.
 
 ## Completion report
 

@@ -37,7 +37,7 @@ The 216-case P100/C92/L12/R-512/R-4096 evaluation is **manual-only**. It may
 run only when a human explicitly starts that full command interactively. An
 agent, task runner, CI job, scheduled job, or automatic retry must never launch
 or require it, including for TASK-022, TASK-026, promoted changes in
-TASK-028–030, or final TASK-031 validation. A full run is optional additional
+TASK-028–031, or final TASK-032 validation. A full run is optional additional
 evidence; completion or promotion of those tasks does not depend on it. Label
 any such result `full-216`, keep it separate from `core-54`, and never merge
 partial coverage across scopes into an accepted report.

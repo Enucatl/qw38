@@ -635,7 +635,7 @@ TASK-027 must deliver the complete matched baseline and gap report even if the
 candidate is slower. **Missing comparison evidence blocks TASK-027; missing speed parity
 does not block the subsequent authorized optimization experiments.** Otherwise
 requiring a faster baseline would prevent the work intended to improve it.
-Carry the measured gaps through TASK-028–031 and reassess after the final
+Carry the measured gaps through TASK-028–032 and reassess after the final
 experiment. Experiment completion and achievement of the performance target
 are separate statuses; an unmet target stays explicitly unmet. A speed gap
 never authorizes a quality relaxation or an experiment out of order.

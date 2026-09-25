@@ -1,7 +1,7 @@
 # Qwen3.8-27B model compiler plan (TASK-10)
 
 > **OVERALL-01 authority:** This Phase 1 plan records compiler boundaries and
-> ownership classes, not the reopened TASK-018–031 candidate schedule. TASK-020
+> ownership classes, not the reopened TASK-018–032 candidate schedule. TASK-020
 > owns the calibrated family policy and must materialize authenticated,
 > disjoint calibration and development inputs before fitting/screening.
 > TASK-021 owns the candidate artifact/compiler path. EVAL-01 quality

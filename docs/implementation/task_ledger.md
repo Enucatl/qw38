@@ -18,7 +18,7 @@ its representation. NVFP4 is the leading candidate to investigate, not an
 accepted quality or performance result.
 
 **This ledger's revised task rows and task contracts below are authoritative
-for TASK-018–031.** The corresponding `tasks/TASK-018.md` through `TASK-031.md`
+for TASK-018–032.** The corresponding `tasks/TASK-018.md` through `TASK-032.md`
 now expand these contracts with matching titles, dependencies, scopes and
 acceptance criteria. Their former specifications are superseded; the earlier
 TASK-018 report is explicitly preserved as historical evidence, valid only
@@ -33,7 +33,7 @@ operand part of P-02 (activation quantization), A-01/L-01 (weight views/packing)
 and the associated M-01/T-01–03 schedules and materialization choices. It
 permits early GDN prefill algorithm comparison under G-02. FP32 residuals,
 accumulation/reductions and recurrent arithmetic, BF16 KV/history, and FP32
-GDN state remain initial controls; TASK-030 may separately test state precision
+GDN state remain initial controls; TASK-031 may separately test state precision
 and ownership. Model equations, tensor identities, tokenizer, causal behavior,
 and primary-language scope remain binding. MTP execution and vision are not
 added by this amendment.
@@ -44,7 +44,7 @@ all experiments are superseded by the migration table below. Candidate
 screening may precede routine core quality acceptance; production promotion may not.
 
 The [54-case core amendment](../architecture/evaluation-policy-core-54.md)
-governs routine TASK-022–031 evaluation: 15 frozen P100, 15 frozen C92, all
+governs routine TASK-022–032 evaluation: 15 frozen P100, 15 frozen C92, all
 12 L12 and all 12 R-512/R-4096 cases. TASK-026 and later applicable gates
 retain the six R-32768 cases. The 216-case suite is optional, strictly
 human-initiated interactive work; agents and automation must never launch or
@@ -73,7 +73,7 @@ historical and is not relabeled as a 54-case result.
   investigations explicitly authorized here.
 - Every blocker report contains: `Decision ID`, `Attempted implementation`, `Observed problem`, `Evidence`, `Why this is architectural rather than tuning`, `Smallest plausible alternative`, and `Affected downstream tasks`.
 - TASK-018–020 establish controls, feasibility, and a provisional candidate;
-  TASK-021–026 implement and validate it; TASK-027–031 measure, tune, and decide
+  TASK-021–026 implement and validate it; TASK-027–032 measure, tune, and decide
   promotion. Keep unrelated variables fixed in comparisons. Joint format/kernel
   choices are allowed, with weight-only and activation-only error ablations.
 - Keep benchmarks separate from correctness tests. Preserve exact commands, results, artifact/binary identities, and hardware context in each completion report.
@@ -245,10 +245,11 @@ an achieved performance target.
 | TASK-025 | Causal attention prefill and layer integration | M8 | TASK-024 | Tiled attention, GQA/cache/position correctness and validated complete attention layer | TODO |
 | TASK-026 | Full-model prefill, handoff and quality gate | M8 | TASK-025 | End-to-end candidate, core suite plus 32768 retrieval, chunk/dispatch boundary validation | TODO |
 | TASK-027 | Matched whole-request performance baseline | M9 | TASK-026 | PERF-01 comparison, cold/warm costs, peak memory and bottleneck-ranked gap report | TODO |
-| TASK-028 | Precision and representation refinement | M10 | TASK-027 | Targeted head/family/activation/view tradeoffs with complete quality and request evidence | TODO |
-| TASK-029 | Scheduling, dispatch and fusion refinement | M10 | TASK-028 | Measured chunk/crossover, normalization/quantization/epilogue and launch-overhead decisions | TODO |
-| TASK-030 | State and long-context bottleneck refinement | M10 | TASK-029 | Evidence-led GDN ownership/state-precision and attention-traffic decisions | TODO |
-| TASK-031 | Consolidated validation and architecture promotion | M10 | TASK-030 | Final reproducible artifact/runtime, quality/performance decision, reconciled docs and remaining gaps | TODO |
+| TASK-028 | Conversion-minimized native FP4 path | M10 | TASK-027 | Real-family NVFP4/MXFP4 path with GPU activation conversion, native prefill/decode comparison, quality, capacity and complete-request evidence | TODO |
+| TASK-029 | Precision and representation refinement | M10 | TASK-028 | Targeted head/family/activation/view tradeoffs with complete quality and request evidence | TODO |
+| TASK-030 | Scheduling, dispatch and fusion refinement | M10 | TASK-029 | Measured chunk/crossover, normalization/quantization/epilogue and launch-overhead decisions | TODO |
+| TASK-031 | State and long-context bottleneck refinement | M10 | TASK-030 | Evidence-led GDN ownership/state-precision and attention-traffic decisions | TODO |
+| TASK-032 | Consolidated validation and architecture promotion | M10 | TASK-031 | Final reproducible artifact/runtime, quality/performance decision, reconciled docs and remaining gaps | TODO |
 
 ### TASK-019 historical blocker and completion
 
@@ -476,9 +477,24 @@ individual losses. Missing parity does not block refinement; missing required
 comparison evidence does. No synthetic throughput or old slow prompt loop may
 stand in for these production measurements.
 
-### TASK-028 — Precision and representation refinement
+### TASK-028 — Conversion-minimized native FP4 path
 
-Use TASK-027 gaps to revisit only consequential choices: per-family precision,
+Build and measure a real native NVFP4/MXFP4 projection path after the matched
+TASK-027 baseline. Prepare resident FP4 weights once from the pinned BF16
+source; generate and reuse activation codes/scales on the GPU, avoiding CPU
+packing and hot-path weight repacking. Include conversion, launches, native
+MMA, epilogues and any same-weight decode GEMV in both phases. Compare complete
+requests, quality, peak memory and cold costs with the accepted Q4_K/Q8
+control. Use TASK-020 family error evidence to bound the experiment, but test
+at least one actual model family rather than relying on synthetic kernels.
+
+**Exit:** native instruction, numerical and conversion-inclusive evidence plus
+a quality/capacity/performance keep/change decision. A failed FP4 experiment is
+a recorded result; native kernel speed alone does not promote a new format.
+
+### TASK-029 — Precision and representation refinement
+
+Use TASK-027 gaps and the TASK-028 FP4 result to revisit only consequential choices: per-family precision,
 head precision, activation scaling, or selected additional packed views.
 Compare alternatives using identical workloads and calibration separation;
 account for added code/layout complexity, memory and cold-load costs. Expand
@@ -490,7 +506,7 @@ and whole-request measurements for the promoted variant. A documented decision
 to keep the initial representation is valid; exhaustive format combinations
 are not required. Unsuccessful variants remain evidence, not default paths.
 
-### TASK-029 — Scheduling, dispatch and fusion refinement
+### TASK-030 — Scheduling, dispatch and fusion refinement
 
 Address measured chunk-size, small-M crossover, activation reuse, normalization
 plus quantization, epilogue, launch and synchronization costs. Consider CUDA
@@ -503,7 +519,7 @@ or a measured keep decision. Rerun affected numerical/continuation gates and
 the applicable 54-case behavioral gates for arithmetic changes; replay covers graph/dispatch
 boundaries and failure recovery. Optimize both prefill and populated decode.
 
-### TASK-030 — State and long-context bottleneck refinement
+### TASK-031 — State and long-context bottleneck refinement
 
 Use the post-refinement profile to decide whether GDN layout/ownership,
 persistent-state traffic/precision or attention KV rereads warrant work.
@@ -518,7 +534,7 @@ prefill/request, quality and memory evidence. If no material state bottleneck
 exists, document retention of current precision/layout instead of undertaking
 the former obligatory experiments.
 
-### TASK-031 — Consolidated validation and architecture promotion
+### TASK-032 — Consolidated validation and architecture promotion
 
 Freeze the final compiler/calibration/artifact/runtime/toolchain/dispatch
 identities and rerun the 54-case EVAL-01 core plus long-context extension and all PERF-01
@@ -544,11 +560,11 @@ or global optimality. No further experiment is silently added to this ledger.
 | TASK-021 attention | TASK-025 |
 | TASK-022 production-prefill core rerun, handoff and 32768 extension | TASK-026 |
 | TASK-023 matched performance baseline | TASK-027 |
-| TASK-024 / EXP-A weights, TASK-025 / EXP-B head, TASK-028 / EXP-E activation transport | TASK-019–022 initial decisions; TASK-028 measured refinement |
-| TASK-030 / EXP-G extra weight view | TASK-019–021 capacity/layout selection; TASK-028 if measurements justify refinement |
-| TASK-029 / EXP-F normalization/projection fusion | TASK-023 integration and TASK-029 measured refinement |
-| TASK-026 / EXP-C state precision, TASK-027 / EXP-D ownership | TASK-030, conditional on measured importance |
-| Final combined quality/performance reassessment | TASK-031 |
+| TASK-024 / EXP-A weights, TASK-025 / EXP-B head, TASK-028 / EXP-E activation transport | TASK-019–022 initial decisions; TASK-028 native FP4 experiment and TASK-029 measured refinement |
+| TASK-030 / EXP-G extra weight view | TASK-019–021 capacity/layout selection; TASK-029 if measurements justify refinement |
+| TASK-029 / EXP-F normalization/projection fusion | TASK-023 integration and TASK-030 measured refinement |
+| TASK-026 / EXP-C state precision, TASK-027 / EXP-D ownership | TASK-031, conditional on measured importance |
+| Final combined quality/performance reassessment | TASK-032 |
 
 ## Critical path
 
@@ -565,7 +581,7 @@ TASK-001 → 002 → 003 → 004 → 005 → 006
                                               ↓
                                       023 → 024 → 025 → 026  (prefill and complete quality)
                                                         ↓
-                                      027 → 028 → 029 → 030 → 031  (measure, refine, decide)
+                                      027 → 028 → 029 → 030 → 031 → 032  (measure, test FP4, refine, decide)
 ```
 
 ## Architecture blocker log
@@ -621,6 +637,7 @@ and gate required fixed-key answers. See
 | --------- | ---- | ------------------ | ------- |
 | EVAL-01 / PERF-01 | 2026-09-23 | Historical V0 validation policy and task ownership | The original decision selected DS4-derived language fixtures/scoring, staged context coverage, and llama.cpp Q4_K_M versus V0 as the former TASK-018 behavior pair. OVERALL-01 preserves the quality criteria, remaps candidate acceptance to TASK-022/026, and matched performance to TASK-027. See [evaluation policy](../architecture/evaluation-policy-v0.md). |
 | OVERALL-01 | 2026-09-24 | Q-01/Q-02, projection operands in P-02, A-01/L-01, related M-01/T-01–03, GDN prefill algorithm under G-02; S-01/S-02 only in TASK-030 | User-directed replan replaces TASK-018–031 with compute-compatible quantization selection before production commitment, native NVFP4/MXFP4 feasibility, calibration and family policy, both execution phases, full quality gates and whole-request measurement. This ledger supersedes conflicting old task scopes/order; TASK-018 reconciles the other documents. Evidence and quality/performance standards are retained under the migration table. No candidate is yet accepted. |
+| FP4-01 | 2026-09-25 | Q-01/Q-02, projection operands in P-02, A-01/L-01 | User-directed TASK-028 adds an end-to-end, conversion-minimized native NVFP4/MXFP4 experiment after the matched baseline. Original future TASK-028–031 shift to TASK-029–032, with the final promotion decision still last. |
 
 ## Repair index
 

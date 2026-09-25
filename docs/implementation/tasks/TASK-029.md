@@ -1,4 +1,4 @@
-# TASK-029 — Scheduling, dispatch and fusion refinement
+# TASK-029 — Precision and representation refinement
 
 ## Status
 
@@ -10,7 +10,7 @@ M10 — Measured refinement and promotion
 
 ## Purpose
 
-Reduce measured scheduling, conversion, fusion and launch costs in both phases without changing the selected weights.
+Refine consequential precision or representation choices using whole-request bottlenecks while preserving frozen quality and capacity requirements.
 
 ## Depends on
 
@@ -33,9 +33,9 @@ Reduce measured scheduling, conversion, fusion and launch costs in both phases w
 
 | Decision | Contract for this task | Authority |
 | -------- | ---------------------- | --------- |
-| M-01, T-01–03, G-02 | Tune chunks/crossovers, scratch boundaries and scheduling | OVERALL-01 |
-| Projection part of P-02 | Preserve selected activation policy; track fusion/rounding effects | Candidate control |
-| Q-01/Q-02, S-01/S-02, P-01 | Fixed weights/state and retained numerical semantics | Experimental control |
+| Q-01/Q-02, projection part of P-02 | Revisit family/head precision and activation scaling where measured gaps justify it | OVERALL-01 |
+| A-01/A-02/L-01 | Evaluate selected extra views with explicit logical/layout identity | OVERALL-01 |
+| S-01/S-02, G-02 | Hold state and unrelated schedules fixed | Experimental control |
 
 OVERALL-01 supersedes conflicting restrictions in the former task sequence.
 Historical EXP-A–H ordering does not constrain this task. Decisions outside
@@ -43,32 +43,34 @@ the reopened scope remain binding.
 
 ## Starting point
 
-TASK-028 records accepted precision/representation choices and remaining whole-request gaps.
+TASK-028 supplies a measured native FP4 keep/change decision alongside the
+TASK-027 matched baseline and ranked gaps.
 
 ## Scope
 
-Address measured chunk-size, small-M crossover, activation reuse, normalization
-plus quantization, epilogue, launch and synchronization costs. Consider CUDA
-graphs only if launch overhead warrants them and stable-address/state/error
-contracts remain valid. Include redundant normalization, occupancy, scale
-generation and workspace costs when deciding fusion. Keep weights fixed.
+Use TASK-027 gaps and the TASK-028 FP4 result to revisit only consequential choices: per-family precision,
+head precision, activation scaling, or selected additional packed views.
+Compare alternatives using identical workloads and calibration separation;
+account for added code/layout complexity, memory and cold-load costs. Expand
+to FP6/FP8 or mixed inputs only with demonstrated SM120 support and a concrete
+quality/performance reason. Keep unrelated state and schedules fixed.
 
-**Exit:** justified scheduling/fusion decisions and verified full-request gains
-or a measured keep decision. Rerun affected numerical/continuation gates and
-the applicable 54-case behavioral gates for arithmetic changes; replay covers graph/dispatch
-boundaries and failure recovery. Optimize both prefill and populated decode.
+**Exit:** keep/change decisions backed by complete applicable 54-case EVAL-01 revalidation
+and whole-request measurements for the promoted variant. A documented decision
+to keep the initial representation is valid; exhaustive format combinations
+are not required. Unsuccessful variants remain evidence, not default paths.
 
 ## Out of scope
 
-Weight requantization, unrelated state changes, mandatory CUDA graph adoption, fusion without complete-path measurement and bypassing commit/error semantics.
+Exhaustive format sweeps without a measured reason, final-evaluation calibration, simultaneous unrelated state/schedule changes, unsupported FP6/FP8 mixtures and unbudgeted second views.
 
 ## Required interfaces and data representation
 
-Version execution-plan identity with chunk/dispatch thresholds, quantization reuse, fusion and graph mode. Typed scratch lifetimes and any stable-address graph buffers remain bounded. Runtime errors preserve complete-token commit, poisoning, reset and restore contracts.
+Each variant has a policy/quantizer/layout identity, changed-family list, calibration provenance, kernel/dispatch support and exact incremental artifact/resident/transient bytes. Reports pair quality and complete-request results against the accepted control and retain rejected variants as evidence.
 
 ## Required semantics and constraints
 
-Measure normalization recomputation, scaling/packing, epilogues and saved materialization together. Keep selected weights fixed and record any changed activation rounding. Test dispatch/chunk thresholds and ensure padded work does not alter scale/state semantics. CUDA graphs, if warranted, must respect session storage lifetime, input updates and failure recovery.
+Keep model equations, evaluation criteria and calibration separation fixed. Isolate numerical-policy changes from lossless layout rearrangements and give each the appropriate correctness checks. Any additional view requires matching logical values and scale interpretation and explicit lifetime/load costs. Precision exceptions must be reflected in both phase consumers.
 
 Follow the code standards' identity and manifest-only digest policy. Keep
 benchmarks separate from correctness checks and record source, binary,
@@ -77,37 +79,37 @@ result. Partial or invalid evidence cannot establish quality acceptance.
 
 ## Tuning defaults
 
-Address measured gaps in priority order. Compare chunk sizes and small-M crossovers at fixed policies before combining changes; use identical workloads and output semantics. A measured keep decision is sufficient where tuning has no useful effect.
+Use TASK-027's largest relevant gaps to select a bounded set of experiments. FP6/FP8 or mixed inputs require demonstrated SM120 support and a concrete quality/performance rationale. Retaining the current policy is valid when evidence does not justify a change.
 
 ## Expected files/modules
 
-Affected runtime plans/dispatch, normalization/quantization/epilogue kernels, scratch ownership and optional graph launch path; focused regressions and performance report.
+Only affected quantizer/calibration/policy, packer/consumer/binding paths and their focused checks; variant and keep/change reports.
 
 ## Tests required
 
 ### Unit and contract checks
 
-Crossover/tail selection, scratch aliases/lifetimes, scale reuse, stable graph bindings if introduced and error/commit propagation.
+Changed encoding/scaling/family policy, layout/version/binding compatibility, independent reconstruction and extra-view memory accounting.
 
 ### Reference and numerical checks
 
-Fused versus separate numerical paths including rounding and repeated normalization; retain precision-specific epilogue and projection checks.
+Weight-only/activation-only diagnostics for numerical changes; exact logical value/scale equivalence for layout-only changes. Preserve established numerical controls.
 
 ### Integration checks
 
-Continuation, snapshot/reset/interleave and failure recovery across selected chunk/dispatch/graph boundaries. Arithmetic changes require the complete applicable 54-case EVAL-01 behavioral gates before promotion. The optional 216-case suite is human-initiated interactive work only; agents must never launch it.
+Complete applicable 54-case EVAL-01 revalidation for promoted variants, including selected-P100 review, required long-context and continuation/dispatch coverage. Rejected variants preserve failure evidence and do not become defaults. The optional 216-case suite is human-initiated interactive work only; agents must never launch it.
 
 ## Benchmark required
 
-Complete conversion-inclusive projection/layer costs and matched prefill, populated decode and requests. Include launch/wait time, workspace, occupancy and redundant arithmetic; validate combined changes against the accepted control.
+Matched complete requests, prefill, populated decode and memory, plus cold compiler/load/repack costs and diagnostic kernels. Report per-row losses and uncertainty; local speed alone cannot justify promotion.
 
 ## Acceptance criteria
 
-- [ ] Changes or keep decisions address measured scheduling/fusion/launch costs in both execution phases.
-- [ ] Weights and unrelated state contracts remain fixed and numerical effects are explicit.
-- [ ] Boundary, memory-lifetime and failure/replay checks pass, including graph mode if added.
-- [ ] Arithmetic changes pass the applicable 54-case behavioral/context gates.
-- [ ] Complete-request measurements justify decisions with workspace/resource costs and remaining regressions reported.
+- [ ] Each executed variant addresses a measured gap and has explicit policy/layout/calibration identity.
+- [ ] Kernel support, incremental memory and cold costs are demonstrated for every proposed representation.
+- [ ] Promoted variants pass the applicable 54-case quality/context/continuation gates.
+- [ ] Whole-request evidence supports each keep/change decision and reports individual regressions.
+- [ ] The accepted representation or evidence-backed keep decision is recorded with rejected variants and remaining gaps.
 
 ## Architecture blocker rule
 

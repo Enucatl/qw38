@@ -15,7 +15,7 @@ These are implementation decisions. Their quality and speed are **HYPOTHESIS**, 
 ## OVERALL-01 authority for TASK-018 onward
 
 The decision register and implementation prose below record the historical V0
-baseline and controls. For TASK-018–031, the revised
+baseline and controls. For TASK-018–032, the revised
 [`implementation ledger`](../implementation/task_ledger.md#replan-authority--overall-01-2026-09-24)
 is authoritative where it reopens Q-01/Q-02, the projection-operand part of
 P-02, A-01/L-01, associated M-01/T-01–03 choices, and the GDN prefill
@@ -23,7 +23,7 @@ algorithm under G-02. The listed V0 values remain implemented control choices;
 they are not a requirement to preserve Q4/Q8 as the production candidate or to
 finish the former experiment ordering before feasibility work. A-02, Q-03,
 P-01, and S-01/S-02 remain controls except for the explicitly scoped
-TASK-030 state investigation. EVAL-01 quality gates and PERF-01 measurement
+TASK-031 state investigation. EVAL-01 quality gates and PERF-01 measurement
 definitions remain binding. Revised task ownership is TASK-022 for candidate
 decode/core acceptance, TASK-026 for production-prefill and 32768 acceptance,
 and TASK-027 for matched performance.
@@ -55,7 +55,7 @@ This register is normative. Every V0 decision that changes on-disk bytes, numeri
 | Q-02 | Historical V0 control: `lm_head` uses Q8G32; head precision is reopened by OVERALL-01 | Vocabulary traffic and output sensitivity | DERIVED + HYPOTHESIS | Conservative head compression | Q4 is equally acceptable | TASK-019/020 candidate feasibility and screening |
 | Q-03 | Embeddings and small/sensitive families remain BF16 | Gather access class, recurrence/sensitivity analysis | DERIVED + HYPOTHESIS | Avoids low-value numerical and implementation variables | Narrowing produces material capacity/latency gain without behavior loss | Future family-specific study |
 | P-01 | FP32 residual, reductions, nonlinear/recurrent arithmetic | Numerical sensitivity analysis | DERIVED + HYPOTHESIS | Bounds accumulation and recurrence error | Narrower working paths are behaviorally sufficient | EXP-C, EXP-E |
-| P-02 | Historical V0 control: BF16 normalized/projection transport and BF16 KV/C; projection operand precision is reopened by OVERALL-01, while state semantics remain controlled | Source dtype, tensor-core path, state schema | OBSERVED + HYPOTHESIS | Reduces scratch/cache traffic and feeds prefill operands | BF16 transport changes behavior materially | TASK-019/020 operand evidence; TASK-030 state investigation |
+| P-02 | Historical V0 control: BF16 normalized/projection transport and BF16 KV/C; projection operand precision is reopened by OVERALL-01, while state semantics remain controlled | Source dtype, tensor-core path, state schema | OBSERVED + HYPOTHESIS | Reduces scratch/cache traffic and feeds prefill operands | BF16 transport changes behavior materially | TASK-019/020 operand evidence; TASK-028 native FP4 experiment; TASK-031 state investigation |
 | S-01 | FP32 GDN S | Recurrent equations and `mamba_ssm_dtype` intent | OBSERVED + DERIVED + HYPOTHESIS | Error crosses token boundaries; 144 MiB fixed state is affordable | BF16 state error remains bounded | EXP-C |
 | S-02 | S ABI is `[head,value,key]`, warp per value row | GDN dimensions and CUDA layout analysis | DERIVED + HYPOTHESIS | Coalesced key reduction, one read/update/write ownership | Alternate ownership wins end to end | EXP-D |
 | G-01 | Six Qwen-native semantic node families | Model semantics, dataflow, semantic graph | DERIVED | Preserves model-relevant state and boundaries | A node boundary prevents necessary optimization | EXP-F, profiling |

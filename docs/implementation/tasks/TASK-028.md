@@ -1,4 +1,4 @@
-# TASK-028 — Precision and representation refinement
+# TASK-028 — Conversion-minimized native FP4 path
 
 ## Status
 
@@ -10,134 +10,114 @@ M10 — Measured refinement and promotion
 
 ## Purpose
 
-Refine consequential precision or representation choices using whole-request bottlenecks while preserving frozen quality and capacity requirements.
+Test whether native NVFP4 or MXFP4 computation can improve complete-request
+speed without losing the selected model's quality or exceeding its memory
+budget. Compare a real GPU conversion path with the accepted Q4_K/Q8 runtime;
+the TASK-019 CPU reference packer is not a production performance result.
 
 ## Depends on
 
 - [TASK-027](TASK-027.md)
 
-## Normative references
-
-- [Implementation ledger](../task_ledger.md) — OVERALL-01, revised task contract,
-  overall decision rules, measurement envelope and migration of prior obligations.
-- [Architecture V0](../../architecture/architecture-v0.md) — retained model semantics
-  and controls; reopened decisions follow OVERALL-01.
-- [EVAL-01 / PERF-01](../../architecture/evaluation-policy-v0.md) — scoring
-  criteria and measurement definitions.
-- [54-case core amendment](../../architecture/evaluation-policy-core-54.md) —
-  routine coverage and manual-only full-suite execution.
-- [Technology baseline](../technology-baseline.md).
-- [Code standards](../code-standards.md).
-
 ## Architecture decisions consumed
 
 | Decision | Contract for this task | Authority |
 | -------- | ---------------------- | --------- |
-| Q-01/Q-02, projection part of P-02 | Revisit family/head precision and activation scaling where measured gaps justify it | OVERALL-01 |
-| A-01/A-02/L-01 | Evaluate selected extra views with explicit logical/layout identity | OVERALL-01 |
-| S-01/S-02, G-02 | Hold state and unrelated schedules fixed | Experimental control |
+| Q-01/Q-02, projection part of P-02 | Test FP4 weight and activation precision against the accepted candidate | FP4-01 / OVERALL-01 |
+| A-01/A-02/L-01 | Version any new packed view and account for its complete memory cost | FP4-01 / OVERALL-01 |
+| P-01, S-01/S-02 | Preserve FP32 arithmetic/state and unrelated semantics | Retained control |
 
-OVERALL-01 supersedes conflicting restrictions in the former task sequence.
-Historical EXP-A–H ordering does not constrain this task. Decisions outside
-the reopened scope remain binding.
+## Normative references
+
+- [Implementation ledger](../task_ledger.md) — OVERALL-01, FP4-01 and the task contract,
+  quality and performance decision rules.
+- [TASK-019](TASK-019.md) — demonstrated native SM120 instructions and the limits
+  of reference conversion timings.
+- [TASK-020](TASK-020.md) — FP4 family/activation error screening.
+- [EVAL-01 / PERF-01](../../architecture/evaluation-policy-v0.md) and the
+  [54-case core amendment](../../architecture/evaluation-policy-core-54.md).
+- [Technology baseline](../technology-baseline.md) and
+  [code standards](../code-standards.md).
 
 ## Starting point
 
-TASK-027 supplies a complete matched baseline and ranked gaps for the accepted candidate.
+TASK-027 provides an accepted Q4_K/Q8 full-request baseline and ranked costs.
+TASK-019 established native NVFP4/MXFP4 support, but its FP4 activation
+packing ran on the CPU. TASK-020 found quality losses in several FP4 families.
 
 ## Scope
 
-Use TASK-027 gaps to revisit only consequential choices: per-family precision,
-head precision, activation scaling, or selected additional packed views.
-Compare alternatives using identical workloads and calibration separation;
-account for added code/layout complexity, memory and cold-load costs. Expand
-to FP6/FP8 or mixed inputs only with demonstrated SM120 support and a concrete
-quality/performance reason. Keep unrelated state and schedules fixed.
+Build a bounded, executable native FP4 variant for at least one real projection
+family chosen from TASK-020 quality evidence and TASK-027 bottlenecks. Evaluate
+NVFP4 and MXFP4 for that family; document any format ruled out by its measured
+quality, memory or conversion cost. Quantize weights once from the pinned BF16
+source into a versioned resident native format. Do not repack full weights in
+the request hot path or silently retain duplicate weight views.
 
-**Exit:** keep/change decisions backed by complete applicable 54-case EVAL-01 revalidation
-and whole-request measurements for the promoted variant. A documented decision
-to keep the initial representation is valid; exhaustive format combinations
-are not required. Unsuccessful variants remain evidence, not default paths.
+Generate FP4 activation values and block scales on the GPU. Reuse a packed
+activation across compatible projections in the same decode step or prefill
+chunk where its scale and rounding contract permits. Compare separate conversion
+with a fused producer
+where a fused path is valid; count scale reductions, packing, launches, staging,
+padding, native MMA, epilogues and any BF16/GEMV decode fallback. Avoid CPU
+conversion in timed requests. Test native prefill and native small-M decode
+against a BF16-activation GEMV using the **same FP4 weight bytes**. Choose
+dispatch from conversion-inclusive measurements, including the case where GEMV
+is faster for one-token decode.
 
 ## Out of scope
 
-Exhaustive format sweeps without a measured reason, final-evaluation calibration, simultaneous unrelated state/schedule changes, unsupported FP6/FP8 mixtures and unbudgeted second views.
+CPU packing as a production path, synthetic-kernel speed as promotion evidence,
+hot-path full-weight repacking, unbudgeted duplicate resident weights and
+changes to unrelated state or scheduling policy.
 
 ## Required interfaces and data representation
 
-Each variant has a policy/quantizer/layout identity, changed-family list, calibration provenance, kernel/dispatch support and exact incremental artifact/resident/transient bytes. Reports pair quality and complete-request results against the accepted control and retain rejected variants as evidence.
+Record the candidate's quantizer, scale, physical layout and activation policy
+identities. A production binding must identify the resident view, native and
+GEMV consumers, scratch lifetimes and output precision. Any retained extra view
+has an explicit size and load lifetime.
 
-## Required semantics and constraints
+## Tests and measurements required
 
-Keep model equations, evaluation criteria and calibration separation fixed. Isolate numerical-policy changes from lossless layout rearrangements and give each the appropriate correctness checks. Any additional view requires matching logical values and scale interpretation and explicit lifetime/load costs. Precision exceptions must be reflected in both phase consumers.
-
-Follow the code standards' identity and manifest-only digest policy. Keep
-benchmarks separate from correctness checks and record source, binary,
-artifact/policy, inputs, toolchain and hardware identities appropriate to each
-result. Partial or invalid evidence cannot establish quality acceptance.
-
-## Tuning defaults
-
-Use TASK-027's largest relevant gaps to select a bounded set of experiments. FP6/FP8 or mixed inputs require demonstrated SM120 support and a concrete quality/performance rationale. Retaining the current policy is valid when evidence does not justify a change.
-
-## Expected files/modules
-
-Only affected quantizer/calibration/policy, packer/consumer/binding paths and their focused checks; variant and keep/change reports.
-
-## Tests required
-
-### Unit and contract checks
-
-Changed encoding/scaling/family policy, layout/version/binding compatibility, independent reconstruction and extra-view memory accounting.
-
-### Reference and numerical checks
-
-Weight-only/activation-only diagnostics for numerical changes; exact logical value/scale equivalence for layout-only changes. Preserve established numerical controls.
-
-### Integration checks
-
-Complete applicable 54-case EVAL-01 revalidation for promoted variants, including selected-P100 review, required long-context and continuation/dispatch coverage. Rejected variants preserve failure evidence and do not become defaults. The optional 216-case suite is human-initiated interactive work only; agents must never launch it.
-
-## Benchmark required
-
-Matched complete requests, prefill, populated decode and memory, plus cold compiler/load/repack costs and diagnostic kernels. Report per-row losses and uncertainty; local speed alone cannot justify promotion.
+- Independent reconstruction and contraction checks for FP4 weights and
+  activations, including scales, tails, zero blocks and output precision;
+  instruction evidence for the native path on the project RTX 5090.
+- Weight-only, activation-only and joint error measurements for the selected
+  family. Preserve FP32 residual/state/logit semantics and session replay.
+- Per-stage GPU timing and matched prefill, populated-decode and complete-request
+  timing against the same Q4_K/Q8 baseline. Report cold weight preparation and
+  upload separately from steady-state conversion. Do not compare the CPU
+  reference packer with a production GPU kernel as if they were equivalent.
+- Artifact bytes, resident and peak transient memory, scale buffers,
+  workspace, cold-load time and any extra view costs within the capacity budget.
+- Complete applicable 54-case EVAL-01, selected-P100, long-context and
+  continuation checks before any FP4 variant becomes the selected policy.
+  The optional 216-case suite remains human-initiated only.
 
 ## Acceptance criteria
 
-- [ ] Each executed variant addresses a measured gap and has explicit policy/layout/calibration identity.
-- [ ] Kernel support, incremental memory and cold costs are demonstrated for every proposed representation.
-- [ ] Promoted variants pass the applicable 54-case quality/context/continuation gates.
-- [ ] Whole-request evidence supports each keep/change decision and reports individual regressions.
-- [ ] The accepted representation or evidence-backed keep decision is recorded with rejected variants and remaining gaps.
+- [ ] At least one real model projection family runs a native NVFP4 or MXFP4
+  path with GPU activation conversion in both prefill and populated decode;
+  both formats receive an evidence-backed disposition.
+- [ ] Same-FP4-weight native/GEMV dispatch and reuse/fusion choices have
+  conversion-inclusive measurements, numerical checks and explicit identities.
+- [ ] Cold and steady-state time, artifact/resident/peak memory and full-request
+  effects are compared fairly against the accepted Q4_K/Q8 control.
+- [ ] Any promoted variant passes the applicable quality, long-context and
+  replay gates; rejected variants retain measured reasons.
+- [ ] The FP4 keep/change decision and remaining conversion bottlenecks are
+  recorded for TASK-029.
 
 ## Architecture blocker rule
 
-A rejected candidate is a recorded result; use the eligible fallback within OVERALL-01 without relaxing acceptance criteria. Missing required exit evidence prevents completion. A conflict outside the reopened decisions requires the full architecture-blocker report defined in the ledger; obsolete Q4-only or experiment-order restrictions are not blockers.
+A rejected FP4 candidate is a result and leaves the accepted Q4_K/Q8 control
+in place. Missing required comparison evidence prevents completion. A conflict
+outside the reopened decisions requires the ledger's full architecture-blocker
+report. A native kernel speedup alone does not justify promotion.
 
 ## Completion report
 
 ### Result
 
-TODO — no execution or acceptance evidence recorded for this revised task.
-
-### Changes made
-
-Record the concrete changes or measured keep decision, including decision and artifact/layout identities.
-
-### Tests run
-
-Record exact commands, outcomes, reference tolerances, covered boundaries and
-limits. Do not infer runtime correctness from documentation checks.
-
-### Benchmark results
-
-Record raw evidence paths, timing boundaries, quality context, memory and
-uncertainty, or the reason a benchmark is not required by this task.
-
-### Architecture blocker
-
-Record none or the complete ledger-defined blocker report.
-
-### Follow-up observations
-
-Record remaining coverage and performance gaps and their downstream owners.
+TODO — no experiment or acceptance evidence recorded yet.

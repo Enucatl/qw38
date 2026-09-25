@@ -1,4 +1,4 @@
-# TASK-030 — State and long-context bottleneck refinement
+# TASK-030 — Scheduling, dispatch and fusion refinement
 
 ## Status
 
@@ -10,7 +10,7 @@ M10 — Measured refinement and promotion
 
 ## Purpose
 
-Resolve demonstrated state or long-context traffic bottlenecks, retaining current precision/layout when changes have no material benefit.
+Reduce measured scheduling, conversion, fusion and launch costs in both phases without changing the selected weights.
 
 ## Depends on
 
@@ -33,9 +33,9 @@ Resolve demonstrated state or long-context traffic bottlenecks, retaining curren
 
 | Decision | Contract for this task | Authority |
 | -------- | ---------------------- | --------- |
-| S-01/S-02 | Isolated GDN state-storage precision or layout/ownership comparisons | Explicitly reopened in TASK-030 |
-| P-01/P-02 | FP32 recurrent arithmetic; BF16 KV/history retained | Binding controls |
-| Q-01/Q-02, L-01, unrelated schedules | Hold weights and other accepted choices fixed | Experimental control |
+| M-01, T-01–03, G-02 | Tune chunks/crossovers, scratch boundaries and scheduling | OVERALL-01 |
+| Projection part of P-02 | Preserve selected activation policy; track fusion/rounding effects | Candidate control |
+| Q-01/Q-02, S-01/S-02, P-01 | Fixed weights/state and retained numerical semantics | Experimental control |
 
 OVERALL-01 supersedes conflicting restrictions in the former task sequence.
 Historical EXP-A–H ordering does not constrain this task. Decisions outside
@@ -43,34 +43,32 @@ the reopened scope remain binding.
 
 ## Starting point
 
-TASK-029 supplies the refined execution profile, accepted representation/schedule and explicit remaining long-context gaps.
+TASK-029 records accepted precision/representation choices and remaining whole-request gaps.
 
 ## Scope
 
-Use the post-refinement profile to decide whether GDN layout/ownership,
-persistent-state traffic/precision or attention KV rereads warrant work.
-The 144 MiB FP32 GDN state is small beside weights; narrowing it is not an
-automatic priority. If testing BF16 persistent state, retain FP32 recurrence
-arithmetic, change only storage, and require long-horizon quality and complete
-snapshot/continuation evidence. Version any changed state ABI. Preserve BF16
-KV/history in this sequence.
+Address measured chunk-size, small-M crossover, activation reuse, normalization
+plus quantization, epilogue, launch and synchronization costs. Consider CUDA
+graphs only if launch overhead warrants them and stable-address/state/error
+contracts remain valid. Include redundant normalization, occupancy, scale
+generation and workspace costs when deciding fusion. Keep weights fixed.
 
-**Exit:** isolated keep/change decisions with populated long-context decode,
-prefill/request, quality and memory evidence. If no material state bottleneck
-exists, document retention of current precision/layout instead of undertaking
-the former obligatory experiments.
+**Exit:** justified scheduling/fusion decisions and verified full-request gains
+or a measured keep decision. Rerun affected numerical/continuation gates and
+the applicable 54-case behavioral gates for arithmetic changes; replay covers graph/dispatch
+boundaries and failure recovery. Optimize both prefill and populated decode.
 
 ## Out of scope
 
-Automatic BF16 state conversion, FP4 state, KV/history precision changes, new attention semantics and combining precision/layout changes without isolated evidence.
+Weight requantization, unrelated state changes, mandatory CUDA graph adoption, fusion without complete-path measurement and bypassing commit/error semantics.
 
 ## Required interfaces and data representation
 
-Any changed GDN state ABI has an explicit version, shape/order/precision description, ownership and snapshot compatibility behavior. Bindings reject incompatible state instead of silently reinterpreting bytes. Memory/traffic reports distinguish fixed GDN storage from context-dependent KV and any extra workspace.
+Version execution-plan identity with chunk/dispatch thresholds, quantization reuse, fusion and graph mode. Typed scratch lifetimes and any stable-address graph buffers remain bounded. Runtime errors preserve complete-token commit, poisoning, reset and restore contracts.
 
 ## Required semantics and constraints
 
-Keep recurrence equations and arithmetic FP32. A BF16 storage experiment changes only load/store precision, with layout/ownership held fixed; a layout experiment holds precision fixed. Require long-horizon error/continuation evidence. Attention-traffic work preserves causal GQA and BF16 KV/history without permanent replication or eviction semantics.
+Measure normalization recomputation, scaling/packing, epilogues and saved materialization together. Keep selected weights fixed and record any changed activation rounding. Test dispatch/chunk thresholds and ensure padded work does not alter scale/state semantics. CUDA graphs, if warranted, must respect session storage lifetime, input updates and failure recovery.
 
 Follow the code standards' identity and manifest-only digest policy. Keep
 benchmarks separate from correctness checks and record source, binary,
@@ -79,37 +77,37 @@ result. Partial or invalid evidence cannot establish quality acceptance.
 
 ## Tuning defaults
 
-Choose work from the post-refinement profile. The 144 MiB FP32 GDN state is not automatically a priority; a measured decision to retain it and its layout completes the investigation when no useful bottleneck exists.
+Address measured gaps in priority order. Compare chunk sizes and small-M crossovers at fixed policies before combining changes; use identical workloads and output semantics. A measured keep decision is sufficient where tuning has no useful effect.
 
 ## Expected files/modules
 
-Only affected recurrence ownership/state storage or attention-traffic paths, versioned state/snapshot bindings if needed, focused references and long-context experiment reports.
+Affected runtime plans/dispatch, normalization/quantization/epilogue kernels, scratch ownership and optional graph launch path; focused regressions and performance report.
 
 ## Tests required
 
 ### Unit and contract checks
 
-Changed state layout/encoding and independent reconstruction, snapshot compatibility/rejection, ownership bounds and attention masks for any traffic change.
+Crossover/tail selection, scratch aliases/lifetimes, scale reuse, stable graph bindings if introduced and error/commit propagation.
 
 ### Reference and numerical checks
 
-One-step and long-horizon recurrent state/output divergence with fixed weights/arithmetic; independent state-layout checks and causal attention equivalence where applicable.
+Fused versus separate numerical paths including rounding and repeated normalization; retain precision-specific epilogue and projection checks.
 
 ### Integration checks
 
-Complete applicable 54-case EVAL-01 core/32768 coverage and same-schedule continuation/reset/snapshot/interleave for a promoted change, including arbitrary incoming state and prefill/decode transitions. The optional 216-case suite is human-initiated interactive work only; agents must never launch it.
+Continuation, snapshot/reset/interleave and failure recovery across selected chunk/dispatch/graph boundaries. Arithmetic changes require the complete applicable 54-case EVAL-01 behavioral gates before promotion. The optional 216-case suite is human-initiated interactive work only; agents must never launch it.
 
 ## Benchmark required
 
-Populated long-context decode, prefill and whole requests with state/KV traffic, spills/occupancy, resident memory and workspace. A keep decision cites the accepted profile and measured lack of a material state bottleneck.
+Complete conversion-inclusive projection/layer costs and matched prefill, populated decode and requests. Include launch/wait time, workspace, occupancy and redundant arithmetic; validate combined changes against the accepted control.
 
 ## Acceptance criteria
 
-- [ ] The profile justifies each selected state/traffic experiment or retention of the current controls.
-- [ ] Precision and layout changes are isolated; FP32 arithmetic and BF16 KV/history remain intact.
-- [ ] Any changed state ABI and snapshot compatibility are explicit and independently validated.
-- [ ] Promoted changes pass long-horizon quality and complete continuation/failure recovery coverage.
-- [ ] Whole-request/context/memory measurements support keep/change decisions without prioritizing storage reduction alone.
+- [ ] Changes or keep decisions address measured scheduling/fusion/launch costs in both execution phases.
+- [ ] Weights and unrelated state contracts remain fixed and numerical effects are explicit.
+- [ ] Boundary, memory-lifetime and failure/replay checks pass, including graph mode if added.
+- [ ] Arithmetic changes pass the applicable 54-case behavioral/context gates.
+- [ ] Complete-request measurements justify decisions with workspace/resource costs and remaining regressions reported.
 
 ## Architecture blocker rule
 
