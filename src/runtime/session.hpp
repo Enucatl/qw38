@@ -52,6 +52,8 @@ class ConvCursorSlot {
   [[nodiscard]] std::expected<std::uint32_t, Error> value() const;
   [[nodiscard]] std::expected<void, Error> commit_advance(
       std::uint32_t cursor) const;
+  [[nodiscard]] std::expected<void, Error> commit_chunk(
+      std::uint32_t cursor, std::uint32_t count) const;
 
  private:
   std::uint32_t* value_{nullptr};
@@ -68,6 +70,8 @@ class GdnPositionSlot {
       std::uint64_t position) const;
   [[nodiscard]] std::expected<void, Error> commit(
       std::uint64_t position) const;
+  [[nodiscard]] std::expected<void, Error> commit_chunk(
+      std::uint64_t position, std::uint32_t count) const;
 
  private:
   std::uint64_t* value_{nullptr};

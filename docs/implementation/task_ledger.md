@@ -241,7 +241,7 @@ an achieved performance target.
 | TASK-021 | Native quantized artifact and compiler | M8 | TASK-020 | Versioned quantizer/scales/layout, calibrated source-to-artifact path and independent reconstruction | DONE |
 | TASK-022 | Candidate decode and core quality gate | M8 | TASK-021 | Eligible same-weight native/GEMV dispatch or measured Q4_K/Q8 fallback, full-model decode, continuation and complete 54-case EVAL-01 core evidence | DONE |
 | TASK-023 | Production prefill projections and workspace | M8 | TASK-022 | Native GEMMs, activation quantization/reuse, bounded chunks and precision-correct epilogues | DONE |
-| TASK-024 | GDN prefill algorithm and layer integration | M8 | TASK-023 | Measured serial/chunkwise recurrence choice, FIR/history and validated complete GDN layer | TODO |
+| TASK-024 | GDN prefill algorithm and layer integration | M8 | TASK-023 | Measured serial/chunkwise recurrence choice, FIR/history and validated complete GDN layer | DONE |
 | TASK-025 | Causal attention prefill and layer integration | M8 | TASK-024 | Tiled attention, GQA/cache/position correctness and validated complete attention layer | TODO |
 | TASK-026 | Full-model prefill, handoff and quality gate | M8 | TASK-025 | End-to-end candidate, core suite plus 32768 retrieval, chunk/dispatch boundary validation | TODO |
 | TASK-027 | Matched whole-request performance baseline | M9 | TASK-026 | PERF-01 comparison, cold/warm costs, peak memory and bottleneck-ranked gap report | TODO |
@@ -250,6 +250,13 @@ an achieved performance target.
 | TASK-030 | Scheduling, dispatch and fusion refinement | M10 | TASK-029 | Measured chunk/crossover, normalization/quantization/epilogue and launch-overhead decisions | TODO |
 | TASK-031 | State and long-context bottleneck refinement | M10 | TASK-030 | Evidence-led GDN ownership/state-precision and attention-traffic decisions | TODO |
 | TASK-032 | Consolidated validation and architecture promotion | M10 | TASK-031 | Final reproducible artifact/runtime, quality/performance decision, reconciled docs and remaining gaps | TODO |
+
+TASK-024 completed on 2026-09-25. The selected ordered FP32 state-resident
+recurrence uses 64-token intervals, supported by complete-layer measurements;
+GPU WY is deferred with a documented workspace/support limitation. The R24-04
+continuation test was repaired and passed, and Astra's final independent review
+passed with no findings, gaps or evidence requests. See the
+[completion report](tasks/TASK-024.md#completion-report).
 
 ### TASK-019 historical blocker and completion
 

@@ -150,6 +150,11 @@ std::expected<std::uint32_t, Error> ConvCursorSlot::value() const {
 
 std::expected<void, Error> ConvCursorSlot::commit_advance(
     std::uint32_t cursor) const {
+  return commit_chunk(cursor, 1u);
+}
+
+std::expected<void, Error> ConvCursorSlot::commit_chunk(
+    std::uint32_t cursor, std::uint32_t count) const {
   auto current = value();
   if (!current) {
     return std::unexpected(current.error());
@@ -158,7 +163,11 @@ std::expected<void, Error> ConvCursorSlot::commit_advance(
     return std::unexpected(make_error(ErrorCode::InvalidArgument, "cursor",
                                       "cursor changed before commit"));
   }
-  *value_ = (cursor + 1u) % kConvTaps;
+  if (count == 0) {
+    return std::unexpected(make_error(ErrorCode::InvalidArgument, "cursor",
+                                      "chunk must contain valid tokens"));
+  }
+  *value_ = (cursor + count % kConvTaps) % kConvTaps;
   return {};
 }
 
@@ -202,10 +211,19 @@ std::expected<void, Error> GdnPositionSlot::validate(
 
 std::expected<void, Error> GdnPositionSlot::commit(
     std::uint64_t position) const {
+  return commit_chunk(position, 1u);
+}
+
+std::expected<void, Error> GdnPositionSlot::commit_chunk(
+    std::uint64_t position, std::uint32_t count) const {
   if (auto st = validate(position); !st) {
     return st;
   }
-  *value_ = position + 1u;
+  if (count == 0 || position > std::numeric_limits<std::uint64_t>::max() - count) {
+    return std::unexpected(make_error(ErrorCode::Overflow, "position",
+                                      "invalid GDN chunk end"));
+  }
+  *value_ = position + count;
   return {};
 }
 

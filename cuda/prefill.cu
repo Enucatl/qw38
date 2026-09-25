@@ -176,7 +176,7 @@ std::expected<Region, Error> device_region(void const* pointer,
                                            int device) {
   auto r = region(pointer, bytes);
   if (!r) return std::unexpected(r.error());
-  if (r->begin % alignment != 0) {
+  if (alignment == 0 || r->begin % alignment != 0) {
     return std::unexpected(make_error(ErrorCode::InvalidArgument,
                                       "prefill.device_view", "misaligned pointer"));
   }
@@ -225,6 +225,14 @@ std::expected<void, Error> distinct(std::span<Region const> ranges) {
 }
 
 }  // namespace
+
+std::expected<void, Error> validate_prefill_device_span(
+    void const* pointer, std::uint64_t bytes, std::uint32_t alignment,
+    int device) {
+  auto value = device_region(pointer, bytes, alignment, device);
+  if (!value) return std::unexpected(value.error());
+  return {};
+}
 
 PrefillEngine::PrefillEngine(PrefillEngine&& other) noexcept { *this = std::move(other); }
 

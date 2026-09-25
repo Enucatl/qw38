@@ -22,6 +22,12 @@ inline constexpr std::uint32_t kPrefillDefaultWeightRows = 512;
 inline constexpr std::uint32_t kPrefillMaxK = 17408;
 inline constexpr std::uint32_t kPrefillHeadRows = 8;
 
+// Validate an externally borrowed device span before a multi-stage layer
+// begins mutating persistent state or output buffers.
+[[nodiscard]] std::expected<void, Error> validate_prefill_device_span(
+    void const* pointer, std::uint64_t bytes, std::uint32_t alignment,
+    int device);
+
 struct PrefillWeight {
   void const* codes{};
   void const* scales{};
@@ -106,6 +112,7 @@ class PrefillEngine {
     return token_capacity_;
   }
   [[nodiscard]] std::uint32_t weight_rows() const noexcept { return weight_rows_; }
+  [[nodiscard]] Stream const* stream() const noexcept { return stream_; }
 
  private:
   [[nodiscard]] std::expected<void, Error> contract(

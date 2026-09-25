@@ -422,6 +422,19 @@ add_test(NAME gdn_unit COMMAND qw38_gdn_unit_test)
 add_test(NAME gdn_reference COMMAND qw38_gdn_reference_test)
 add_test(NAME gdn_integration COMMAND qw38_gdn_integration_test)
 
+add_executable(qw38_gdn_prefill_test gdn_prefill_test.cpp)
+target_link_libraries(qw38_gdn_prefill_test PRIVATE qw38_runtime qw38_reference)
+target_compile_features(qw38_gdn_prefill_test PRIVATE cxx_std_23)
+add_test(NAME gdn_prefill COMMAND qw38_gdn_prefill_test)
+set_tests_properties(gdn_prefill PROPERTIES LABELS "cuda;gpu;gdn;prefill")
+
+add_executable(qw38_gdn_prefill_artifact_test gdn_prefill_artifact_test.cpp)
+target_link_libraries(qw38_gdn_prefill_artifact_test PRIVATE qw38_runtime)
+target_compile_features(qw38_gdn_prefill_artifact_test PRIVATE cxx_std_23)
+add_test(NAME gdn_prefill_artifact COMMAND qw38_gdn_prefill_artifact_test)
+set_tests_properties(gdn_prefill_artifact PROPERTIES
+  LABELS "cuda;gpu;gdn;prefill;extended")
+
 set_tests_properties(
   gdn_unit gdn_reference gdn_integration
   PROPERTIES

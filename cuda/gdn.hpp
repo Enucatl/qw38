@@ -34,6 +34,16 @@ inline constexpr std::uint32_t kGdnSElemsPerLayer =
     std::uint16_t const* qkv, std::uint16_t const* taps, std::uint16_t* history,
     std::uint32_t cursor, std::uint16_t* convolved, Stream const& stream);
 
+// Token-parallel FIR reads the incoming circular history without modifying it.
+// Commit is a separate channel-owned launch after every FIR reader completes.
+[[nodiscard]] std::expected<void, Error> launch_gdn_prefill_conv(
+    std::uint16_t const* qkv, std::uint16_t const* taps,
+    std::uint16_t const* history, std::uint32_t cursor,
+    std::uint16_t* convolved, std::uint32_t valid_tokens, Stream const& stream);
+[[nodiscard]] std::expected<void, Error> launch_gdn_prefill_history_commit(
+    std::uint16_t const* qkv, std::uint16_t* history, std::uint32_t cursor,
+    std::uint32_t valid_tokens, Stream const& stream);
+
 // One block per key head: L2-normalize q and k in FP32 (Eq. 16) and compute
 // three alpha/beta gates (Eq. 15). v is not written; it aliases convolved v.
 [[nodiscard]] std::expected<void, Error> launch_gdn_prepare(
@@ -41,12 +51,26 @@ inline constexpr std::uint32_t kGdnSElemsPerLayer =
     std::uint16_t const* a_log, std::uint16_t const* dt_bias, float eps,
     float* q_hat, float* k_hat, float* alpha, float* beta, Stream const& stream);
 
+[[nodiscard]] std::expected<void, Error> launch_gdn_prefill_prepare(
+    std::uint16_t const* convolved, float const* a, float const* b,
+    std::uint16_t const* a_log, std::uint16_t const* dt_bias, float eps,
+    float* q_hat, float* k_hat, float* alpha, float* beta,
+    std::uint32_t valid_tokens, Stream const& stream);
+
 // Decode recurrence: 1536 blocks/layer, 128 threads. s_layer indexes the
 // FP32 [layer,value_head,value,key] session buffer. No allocation.
 [[nodiscard]] std::expected<void, Error> launch_gdn_recurrence(
     float const* q_hat, float const* k_hat, float const* alpha, float const* beta,
     std::uint16_t const* v, float* s, std::uint32_t s_layer, float* o,
     Stream const& stream);
+
+// One state row owner retains four FP32 key fragments across each interval.
+// The caller supplies token-major prepared operands and FP32 persistent S.
+[[nodiscard]] std::expected<void, Error> launch_gdn_prefill_recurrence(
+    float const* q_hat, float const* k_hat, float const* alpha,
+    float const* beta, std::uint16_t const* convolved, float* s,
+    std::uint32_t s_layer, float* o, std::uint32_t valid_tokens,
+    std::uint32_t interval, Stream const& stream);
 
 // One block per value head: multiplicative gamma, FP32 SiLU(z), BF16 u [48,128].
 [[nodiscard]] std::expected<void, Error> launch_gdn_output_transform(
@@ -64,5 +88,8 @@ struct GdnRecurrenceResources {
 
 [[nodiscard]] std::expected<GdnRecurrenceResources, Error>
 gdn_recurrence_resources();
+
+[[nodiscard]] std::expected<GdnRecurrenceResources, Error>
+gdn_prefill_recurrence_resources();
 
 }  // namespace qw38::cuda
