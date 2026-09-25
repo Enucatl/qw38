@@ -123,6 +123,15 @@ std::expected<std::uint64_t, CompilerError> expected_tensor_bytes(
 }
 
 LogicalPhysicalMapping mapping_for(PhysicalLayoutId layout) {
+  if (layout == PhysicalLayoutId::CudaQ4KCandidateV2) {
+    return LogicalPhysicalMapping{
+        .kind = MappingKind::DenseTileNK,
+        .tile_rows = kDenseTileRows,
+        .tile_k = kDenseTileK,
+        .group_size = 256,
+        .packed_bytes_per_tile_row = 128,
+    };
+  }
   if (layout == PhysicalLayoutId::CudaQ4G64V0 ||
       layout == PhysicalLayoutId::CudaQ4G64CandidateV1) {
     return LogicalPhysicalMapping{
@@ -350,6 +359,21 @@ std::expected<void, CompilerError> emit_quantized(
                                       "quantizer group does not divide K"));
   }
   std::vector<std::byte> scale_bytes;
+  if (quantizer == LogicalQuantizerId::Q4KCandidateV2) {
+    // Keep source conversion and fitting bounded to the same eight-row slice.
+    for (std::uint64_t tn = 0; tn < n / kDenseTileRows; ++tn) {
+      auto logical = quantize_bf16(quantizer, kDenseTileRows, k,
+          src.subspan(tn * kDenseTileRows * k * 2, kDenseTileRows * k * 2));
+      if (!logical) return std::unexpected(logical.error());
+      auto packed = qw38::format::pack_cuda_v0(quantizer, layout, *logical);
+      if (!packed) return std::unexpected(from_format(packed.error()));
+      if (auto st = write_span(writer, name, packed->codes); !st) return st;
+      scale_bytes.insert(scale_bytes.end(), packed->scales.begin(), packed->scales.end());
+    }
+    auto st = writer.write_span(name, SpanKind::Scales, scale_bytes);
+    if (!st) return std::unexpected(from_format(st.error()));
+    return {};
+  }
   std::vector<float> row(static_cast<std::size_t>(k));
   for (std::uint64_t tn = 0; tn < n / kDenseTileRows; ++tn) {
     qw38::format::LogicalWeightCodes slice;
@@ -600,6 +624,12 @@ std::expected<ArtifactSchema, CompilerError> build_schema(
         "candidate compiler revision must identify the selected policy and calibration"));
   }
   ArtifactSchema schema{};
+  if (policy == WeightFormatPolicy::CandidateV2 &&
+      revision.ident != kQ4KCandidateCompilerIdent) {
+    return std::unexpected(make_error(
+        CompilerErrorCode::ArchitectureMismatch, "compiler.ident",
+        "Q4_K candidate revision must identify pinned no-imatrix fitting"));
+  }
   schema.compiler = revision;
   schema.source_hash = source_hash;
   schema.config_hash = config_hash;
@@ -607,6 +637,9 @@ std::expected<ArtifactSchema, CompilerError> build_schema(
   schema.precision = policy == WeightFormatPolicy::CandidateV1
                          ? candidate_v1_precision_policy()
                          : v0_precision_policy();
+  if (policy == WeightFormatPolicy::CandidateV2) {
+    schema.precision = qw38::format::candidate_v2_precision_policy();
+  }
   schema.scope = SemanticScope::LanguagePlusMtpDescriptors;
   schema.state = language_state_schema();
   schema.scratch = language_scratch_schema();
@@ -758,7 +791,8 @@ std::expected<void, CompilerError> emit_classified_tensor(
   if (fmt.quantizer == LogicalQuantizerId::Q4G64V0 ||
       fmt.quantizer == LogicalQuantizerId::Q8G32V0 ||
       fmt.quantizer == LogicalQuantizerId::Q4G64CandidateV1 ||
-      fmt.quantizer == LogicalQuantizerId::Q8G32CandidateV1) {
+      fmt.quantizer == LogicalQuantizerId::Q8G32CandidateV1 ||
+      fmt.quantizer == LogicalQuantizerId::Q4KCandidateV2) {
     return emit_quantized(writer, exp.name, src, exp.shape.dims[0],
                           exp.shape.dims[1], fmt.quantizer, fmt.layout);
   }
@@ -888,6 +922,36 @@ std::expected<void, CompilerError> verify_quantized_tensor(
         "quantized verification requires N%8==0 and K%256==0"));
   }
   auto const elements = n * k;
+  if (quantizer == LogicalQuantizerId::Q4KCandidateV2) {
+    if (elements > std::numeric_limits<std::uint64_t>::max() / 2 ||
+        source.size() != elements * 2 || payload.size() != elements / 2 ||
+        scales.size() != elements / 256 * 16) {
+      return std::unexpected(make_error(CompilerErrorCode::ShapeMismatch, name,
+                                        "Q4_K verification span lengths"));
+    }
+    std::array<std::byte, 8 * 256 * 2> source_tile{};
+    for (std::uint64_t tn = 0; tn < n / 8; ++tn) {
+      for (std::uint64_t tk = 0; tk < k / 256; ++tk) {
+        for (std::uint64_t r = 0; r < 8; ++r) {
+          std::memcpy(source_tile.data() + r * 512,
+                      source.data() + ((tn * 8 + r) * k + tk * 256) * 2, 512);
+        }
+        auto expected = quantize_bf16(quantizer, 8, 256, source_tile);
+        if (!expected) return std::unexpected(expected.error());
+        auto const tile = tn * (k / 256) + tk;
+        auto decoded = qw38::format::unpack_cuda_v0(
+            quantizer, layout, 8, 256, payload.subspan(tile * 1024, 1024),
+            scales.subspan(tile * 128, 128));
+        if (!decoded) return std::unexpected(from_format(decoded.error()));
+        if (decoded->codes != expected->codes ||
+            decoded->q4k_metadata != expected->q4k_metadata) {
+          return std::unexpected(make_error(CompilerErrorCode::HashMismatch, name,
+                                            "Q4_K source reconstruction mismatch"));
+        }
+      }
+    }
+    return {};
+  }
   auto const group = quantizer_group_size(quantizer);
   auto const packed_row =
       (quantizer == LogicalQuantizerId::Q4G64V0 ||
@@ -1050,7 +1114,8 @@ std::expected<void, CompilerError> verify_compiled_artifact(
       if (record->quantizer == LogicalQuantizerId::Q4G64V0 ||
           record->quantizer == LogicalQuantizerId::Q8G32V0 ||
           record->quantizer == LogicalQuantizerId::Q4G64CandidateV1 ||
-          record->quantizer == LogicalQuantizerId::Q8G32CandidateV1) {
+          record->quantizer == LogicalQuantizerId::Q8G32CandidateV1 ||
+          record->quantizer == LogicalQuantizerId::Q4KCandidateV2) {
         auto scales = art->scales(exp.name);
         if (!scales) {
           return std::unexpected(from_format(scales.error()));

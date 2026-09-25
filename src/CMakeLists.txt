@@ -25,7 +25,11 @@ add_library(qw38_compiler STATIC
   compiler/compile.cpp
   compiler/quantization/quantizer.cpp
   compiler/quantization/reference.cpp
+  compiler/quantization/q4k.cpp
 )
+# Reference fitting and reconstruction use the pinned scalar operation order.
+set_source_files_properties(compiler/quantization/q4k.cpp
+  compiler/quantization/reference.cpp PROPERTIES COMPILE_OPTIONS "-ffp-contract=off;-fno-fast-math")
 target_include_directories(qw38_compiler PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 target_link_libraries(qw38_compiler PUBLIC qw38_format)
 target_compile_features(qw38_compiler PUBLIC cxx_std_23)
@@ -83,6 +87,11 @@ target_compile_options(qw38_evaluate PRIVATE
   $<$<COMPILE_LANGUAGE:CXX>:-Wall -Wextra -Wpedantic>
 )
 set_target_properties(qw38_evaluate PROPERTIES OUTPUT_NAME qw38-evaluate)
+
+add_executable(qw38_task022_trace runtime/task022_trace.cpp)
+target_link_libraries(qw38_task022_trace PRIVATE qw38_runtime)
+target_compile_features(qw38_task022_trace PRIVATE cxx_std_23)
+set_target_properties(qw38_task022_trace PROPERTIES OUTPUT_NAME qw38-task022-trace)
 
 add_executable(qw38_state_replay runtime/state_replay.cpp)
 target_link_libraries(qw38_state_replay PRIVATE qw38_runtime)

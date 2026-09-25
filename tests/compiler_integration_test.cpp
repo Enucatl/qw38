@@ -595,7 +595,8 @@ int main() {
                "authority compiler records bounded peak RSS after completion");
         std::cout << "authority_identity_peak_rss_bytes="
                   << compiled->peak_rss_bytes << '\n';
-        auto verified = verify_identity_artifact(artifact_path, authority, rev);
+        auto verified = verify_identity_artifact(artifact_path, authority);
+        if (!verified) fail(qw38::compiler::error_message(verified.error()));
         expect(static_cast<bool>(verified),
                "authority identity artifact independently reconstructs exactly");
       }

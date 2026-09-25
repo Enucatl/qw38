@@ -29,9 +29,11 @@ using qw38::cuda::decode_scale_bytes;
 using qw38::cuda::kDecodeLayoutBf16DenseTileV0;
 using qw38::cuda::kDecodeLayoutQ4G64V0;
 using qw38::cuda::kDecodeLayoutQ4G64CandidateV1;
+using qw38::cuda::kDecodeLayoutQ4KCandidateV2;
 using qw38::cuda::kDecodeQuantizerNone;
 using qw38::cuda::kDecodeQuantizerQ4G64V0;
 using qw38::cuda::kDecodeQuantizerQ4G64CandidateV1;
+using qw38::cuda::kDecodeQuantizerQ4KCandidateV2;
 using qw38::format::ArithmeticDtype;
 using qw38::format::PhysicalLayoutId;
 using qw38::format::StorageClass;
@@ -76,12 +78,16 @@ std::expected<void, Error> require_alignment(
 }
 
 bool layout_ok(PhysicalLayoutId layout) noexcept {
-  return layout == PhysicalLayoutId::CudaQ4G64V0 ||
+  return layout == PhysicalLayoutId::CudaQ4KCandidateV2 ||
+         layout == PhysicalLayoutId::CudaQ4G64V0 ||
          layout == PhysicalLayoutId::CudaQ4G64CandidateV1 ||
          layout == PhysicalLayoutId::CudaBf16DenseTileV0;
 }
 
 std::uint16_t quantizer_for(PhysicalLayoutId layout) noexcept {
+  if (layout == PhysicalLayoutId::CudaQ4KCandidateV2) {
+    return kDecodeQuantizerQ4KCandidateV2;
+  }
   if (layout == PhysicalLayoutId::CudaQ4G64V0) {
     return kDecodeQuantizerQ4G64V0;
   }
@@ -145,9 +151,10 @@ std::expected<MlpWeightBinding, Error> bind_weight(ConstTensorView codes,
   }
   if (!layout_ok(codes.layout)) {
     return std::unexpected(
-        arg_error(field, "layout must be cuda_q4g64_v0 or cuda_bf16_dense_tile_v0"));
+        arg_error(field, "layout must be a supported Q4 or BF16 tile"));
   }
-  bool const q4 = codes.layout == PhysicalLayoutId::CudaQ4G64V0 ||
+  bool const q4 = codes.layout == PhysicalLayoutId::CudaQ4KCandidateV2 ||
+                  codes.layout == PhysicalLayoutId::CudaQ4G64V0 ||
                   codes.layout == PhysicalLayoutId::CudaQ4G64CandidateV1;
   if (q4) {
     if (codes.storage != StorageClass::Int4Grouped) {
@@ -318,17 +325,20 @@ DecodeMmvDesc mmv_from_weight(MlpWeightBinding const& w) {
   d.padded_n = w.padded_n;
   d.padded_k = w.padded_k;
   DecodeDtype const dtype =
-      (w.layout == kDecodeLayoutQ4G64V0 ||
+      (w.layout == kDecodeLayoutQ4KCandidateV2 ||
+       w.layout == kDecodeLayoutQ4G64V0 ||
        w.layout == kDecodeLayoutQ4G64CandidateV1) ? DecodeDtype::Q4
                                                    : DecodeDtype::Bf16;
   d.codes = decode_matrix_view(const_cast<void*>(w.codes.pointer), dtype,
                                w.layout, w.n, w.k,
                                w.padded_n, w.padded_k, w.codes_bytes, 16);
   if (w.scales_bytes != 0) {
+    // Q4_K metadata shares the FP16-backed span: eight units per superblock.
+    auto const units_per_row = static_cast<std::uint32_t>(w.scales_bytes / w.padded_n / 2u);
     d.scales = decode_matrix_view(
         const_cast<void*>(w.scales.pointer), DecodeDtype::Fp16, w.layout,
         w.padded_n,
-        w.padded_k / 64u, w.padded_n, w.padded_k / 64u,
+        units_per_row, w.padded_n, units_per_row,
         w.scales_bytes, 2);
   }
   return d;

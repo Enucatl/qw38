@@ -8,7 +8,7 @@
 namespace qw38::cuda {
 namespace {
 
-enum class WeightKind { Q4, Q8, Bf16 };
+enum class WeightKind { Q4, Q4K, Q8, Bf16 };
 
 __device__ __forceinline__ float bf16_to_fp32(std::uint16_t h) {
   return __uint_as_float(static_cast<std::uint32_t>(h) << 16);
@@ -39,7 +39,7 @@ __device__ __forceinline__ float fp16_to_fp32(std::uint16_t h) {
       bits = sign;
     } else {
       std::uint32_t m = man;
-      std::uint32_t e = 127 - 15;
+      std::uint32_t e = 127 - 14;
       while ((m & 0x400u) == 0) {
         m <<= 1;
         --e;
@@ -103,6 +103,26 @@ __device__ void decode8(std::byte const* codes, std::byte const* scales,
       int const nib = static_cast<int>((word >> (4 * i)) & 0xFu);
       int const code = (nib << 28) >> 28;
       out[i] = decode_scaled(code, scale);
+    }
+  } else if constexpr (Kind == WeightKind::Q4K) {
+    auto const* row = codes + tile_row * 128u + static_cast<std::uint32_t>(lane) * 4u;
+    auto const word = *reinterpret_cast<std::uint32_t const*>(row);
+    auto const* metadata = reinterpret_cast<std::uint8_t const*>(scales) + tile_row * 16u;
+    auto const* super_scales = reinterpret_cast<std::uint16_t const*>(metadata);
+    auto const* packed = metadata + 4;
+    int const group = lane >> 2;
+    unsigned const scale = group < 4 ? packed[group] & 63u
+        : (packed[group + 4] & 15u) | ((packed[group - 4] >> 6) << 4);
+    unsigned const minimum = group < 4 ? packed[group + 4] & 63u
+        : (packed[group + 4] >> 4) | ((packed[group] >> 6) << 4);
+    float const d = __fmul_rn(fp16_to_fp32(super_scales[0]), static_cast<float>(scale));
+    float const m = __fmul_rn(fp16_to_fp32(super_scales[1]), static_cast<float>(minimum));
+#pragma unroll
+    for (int i = 0; i < 8; ++i) {
+      unsigned const code = (word >> (4 * i)) & 15u;
+      // Match the reference reconstruction before Quartz's BF16 operand rounding.
+      float const decoded = __fsub_rn(__fmul_rn(d, static_cast<float>(code)), m);
+      out[i] = bf16_to_fp32(fp32_to_bf16_rne(decoded));
     }
   } else if constexpr (Kind == WeightKind::Q8) {
     auto const* row = codes + tile_row * 256u + static_cast<std::uint32_t>(lane) * 8u;
@@ -224,6 +244,9 @@ std::expected<void, Error> require_stream(Stream const& stream, std::string_view
 }
 
 bool layout_quantizer_ok(std::uint16_t layout, std::uint16_t quantizer) noexcept {
+  if (layout == kDecodeLayoutQ4KCandidateV2) {
+    return quantizer == kDecodeQuantizerQ4KCandidateV2;
+  }
   if (layout == kDecodeLayoutQ4G64V0) {
     return quantizer == kDecodeQuantizerQ4G64V0;
   }
@@ -243,7 +266,8 @@ bool layout_quantizer_ok(std::uint16_t layout, std::uint16_t quantizer) noexcept
 }
 
 DecodeDtype weight_dtype(std::uint16_t layout) noexcept {
-  if (layout == kDecodeLayoutQ4G64V0 ||
+  if (layout == kDecodeLayoutQ4KCandidateV2 ||
+      layout == kDecodeLayoutQ4G64V0 ||
       layout == kDecodeLayoutQ4G64CandidateV1) {
     return DecodeDtype::Q4;
   }
@@ -314,6 +338,9 @@ std::expected<void, Error> validate_non_overlap(DecodeMmvDesc const& d,
 }
 
 std::uint32_t group_size(std::uint16_t layout) noexcept {
+  if (layout == kDecodeLayoutQ4KCandidateV2) {
+    return 256;
+  }
   if (layout == kDecodeLayoutQ4G64V0 ||
       layout == kDecodeLayoutQ4G64CandidateV1) {
     return 64;
@@ -380,9 +407,10 @@ std::expected<void, Error> validate_geometry(DecodeMmvDesc const& d,
                                         "BF16 dense tile must not supply scales"));
     }
   } else {
+    auto const units_per_row = static_cast<std::uint32_t>(want_scales / d.padded_n / 2u);
     st = validate_view(d.scales, DecodeDtype::Fp16, d.layout, d.padded_n,
-                       d.padded_k / group_size(d.layout), d.padded_n,
-                       d.padded_k / group_size(d.layout), want_scales, 2, false,
+                       units_per_row, d.padded_n,
+                       units_per_row, want_scales, 2, false,
                        op, "scales");
     if (!st) {
       return st;
@@ -522,6 +550,14 @@ std::expected<void, Error> launch_layout(DecodeMmvDesc const& a,
                                          DecodeMmvDesc const* b,
                                          Stream const& stream,
                                          std::string_view op) {
+  if (a.layout == kDecodeLayoutQ4KCandidateV2) {
+    if constexpr (!Paired) {
+      if (a.k == kDecodeMaxK) {
+        return launch_kind<WeightKind::Q4K, false, true>(a, b, stream, op);
+      }
+    }
+    return launch_kind<WeightKind::Q4K, Paired>(a, b, stream, op);
+  }
   if (a.layout == kDecodeLayoutQ4G64V0 ||
       a.layout == kDecodeLayoutQ4G64CandidateV1) {
     if constexpr (!Paired) {
@@ -746,6 +782,9 @@ std::expected<void, Error> launch_decode_mmv_ranges(DecodeMmvRangeDesc const& de
         }
       }
     }
+  }
+  if (first.layout == kDecodeLayoutQ4KCandidateV2) {
+    return launch_range_kind<WeightKind::Q4K>(desc.ranges, stream);
   }
   if (first.layout == kDecodeLayoutQ4G64V0 ||
       first.layout == kDecodeLayoutQ4G64CandidateV1) {

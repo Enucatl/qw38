@@ -25,6 +25,7 @@ enum class WeightFormatPolicy : std::uint8_t {
   IdentityBf16 = 1,
   ProductionV0 = 2,
   CandidateV1 = 3,
+  CandidateV2 = 4,
 };
 
 [[nodiscard]] bool family_uses_q4g64(TensorFamily family) noexcept;

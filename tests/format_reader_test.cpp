@@ -603,6 +603,64 @@ void test_quantized_payload_domains() {
          "independent unpacker rejects the artifact domain rejected before CUDA");
 }
 
+void test_q4k_artifact() {
+  using namespace qw38::format;
+  ScratchDir dir("qw38-reader-q4k");
+  auto schema = test::base_schema();
+  schema.precision = candidate_v2_precision_policy();
+  TensorRecord t;
+  t.tensor_id = 1;
+  t.logical_name = "q4k";
+  t.shape = test::rank2(8, 256);
+  t.storage = StorageClass::Int4Grouped;
+  t.quantizer = LogicalQuantizerId::Q4KCandidateV2;
+  t.layout = PhysicalLayoutId::CudaQ4KCandidateV2;
+  t.mapping = {.kind = MappingKind::DenseTileNK, .tile_rows = 8,
+               .tile_k = 256, .group_size = 256, .packed_bytes_per_tile_row = 128};
+  schema.tensors.push_back(t);
+  auto writer = ArtifactWriter::create(dir.file("q4k.qw38"), schema);
+  expect(writer.has_value(), "Q4_K writer accepts distinct format and policy");
+  if (!writer) return;
+  std::vector<std::byte> codes(8 * 128, std::byte{0xf8});
+  std::vector<std::byte> metadata(8 * 16);
+  for (std::size_t row = 0; row < 8; ++row) {
+    metadata[row * 16] = std::byte{1};
+    metadata[row * 16 + 2] = std::byte{2};
+    for (std::size_t i = 4; i < 16; ++i) metadata[row * 16 + i] = std::byte{0xff};
+  }
+  expect(writer->write_span("q4k", SpanKind::Payload, codes).has_value(), "Q4_K write codes");
+  expect(writer->write_span("q4k", SpanKind::Scales, metadata).has_value(), "Q4_K write metadata");
+  expect(writer->finalize().has_value(), "Q4_K finalize");
+  auto artifact = Artifact::open(dir.file("q4k.qw38"));
+  expect(artifact.has_value(), "Q4_K reader accepts unsigned 8/15 and subnormal scales");
+  if (!artifact) return;
+  auto const& saved = artifact->schema();
+  expect(saved.precision.id == PrecisionPolicyId::CandidateV2 &&
+             saved.tensors[0].scales.length == 128 &&
+             saved.tensors[0].payload.length == 1024,
+         "Q4_K serialized IDs and byte extents survive roundtrip");
+  for (auto const policy : {PrecisionPolicyId::V0, PrecisionPolicyId::CandidateV1}) {
+    auto invalid = saved;
+    invalid.precision.id = policy;
+    auto status = validate_schema(invalid);
+    expect(!status && status.error().code == FormatErrorCode::InvalidPrecisionPolicy,
+           "Q4_K cannot use an older precision policy");
+  }
+  auto invalid = saved;
+  invalid.tensors[0].mapping.group_size = 64;
+  expect(!validate_schema(invalid), "Q4_K schema rejects Q4G64 grouping");
+  invalid = saved;
+  invalid.tensors[0].scales.length = 64;
+  expect(!validate_schema(invalid), "Q4_K schema rejects Q4G64 metadata extent");
+  invalid = saved;
+  invalid.tensors[0].layout = PhysicalLayoutId::CudaQ4G64CandidateV1;
+  expect(!validate_schema(invalid), "Q4_K schema rejects old physical identity");
+  auto bytes = read_all(dir.file("q4k.qw38"));
+  bytes[saved.tensors[0].scales.offset + 1] = std::byte{0x7c};
+  expect_code(Artifact::parse(bytes), FormatErrorCode::InvalidQuantizedPayload,
+              "Q4_K reader rejects NaN metadata before CUDA");
+}
+
 }  // namespace
 
 int main() {
@@ -618,6 +676,7 @@ int main() {
   test_manifest_record_field_corruption();
   test_manifest_limit_precedes_span_copy();
   test_quantized_payload_domains();
+  test_q4k_artifact();
   if (g_failures != 0) {
     std::cerr << g_failures << " reader unit checks failed\n";
     return 1;

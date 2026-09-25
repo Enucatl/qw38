@@ -42,6 +42,7 @@ ConstTensorView make_scale_view(qw38::format::TensorRecord const& rec,
                                 void const* ptr) {
   ConstTensorView v{};
   v.pointer = ptr;
+  // Q4_K metadata uses this same 16-bit backing span; only d/dmin are FP16.
   v.dtype = qw38::format::ArithmeticDtype::Fp16;
   v.layout = rec.layout;
   v.storage = rec.storage;

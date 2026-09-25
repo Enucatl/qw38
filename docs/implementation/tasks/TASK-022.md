@@ -10,9 +10,26 @@ become 12/12. The 2026-09-25 language-v2 policy amendment clarifies the L06
 prompt and ignores capitalization for alphabetic L12 answers; the old result
 remains historical evidence, not a language-v2 pass. The selected artifact
 still fails NLL and C92. Do not use it for TASK-023 production-prefill
-integration or mark this task complete. A new, explicitly versioned precision
-policy and artifact need screening and a complete language-v2 gate before this
-task can complete.
+integration or mark this task complete. A corrected artifact needs the complete
+language-v2 gate before this task can complete.
+
+The separately versioned [Q4_K MLP candidate](../q4k-candidate.md) was compiled
+from original BF16 and verified with the retained Quartz runtime precision.
+Its original eight-window development screen improved NLL by only 0.005765
+nats/token over Q4G64 and remained +0.139444 above the comparator. A follow-up
+found incorrect frozen RoPE frequencies in that artifact. The corrected
+compiler-patch-2 artifact scores +0.001487 above the comparator on the same
+screen and clears its frozen +0.03 promotion bound. The complete language-v2
+gate has not run; the task remains blocked.
+
+The [follow-up numerical attribution](../task022-numerical-attribution.md)
+finds the first sharp residual difference at layer 3 full attention on
+populated-context tokens, before that layer's MLP. The 353 GGUF F32 controls
+are byte-identical across the BF16-derived source, selected proxy, and external
+comparator, so an additional FP32 snapshot is not needed to inspect those
+payloads. Matched layer-3 traces isolate the RoPE correction and remove the
+first sharp attention jump; this diagnostic does not establish a complete
+EVAL-01 pass.
 
 ## Milestone
 
@@ -250,11 +267,11 @@ EVAL-01 by a wide margin on an
 authenticated complete pair; the existing Q4 fallback is lower precision for
 the sensitive families and the prior all-Q4 V0 control is worse on the
 source-logit probe. TASK-020's proxy winner was
-explicitly not bit-identical to this QW38 artifact. No alternate QW38 policy
-has a screened artifact and complete passing core gate. An explicit,
-capacity-screened policy amendment (for example selective higher precision
-for the MLP down family) needs a new artifact identity, source/component
-regressions and the same full 216-case gate. Do not relax thresholds or reuse
+explicitly not bit-identical to this QW38 artifact. At the time of this blocked
+report, no alternate QW38 policy had a screened artifact and complete passing
+core gate. The later RoPE-corrected Q4_K artifact passes the frozen development
+screen but still requires source/component regressions and the same full
+216-case gate. Do not relax thresholds or reuse
 the rejected report as acceptance evidence. The language-v2 L12 amendment
 requires new fixture and paired-run identities before it can supply acceptance
 evidence; the language-v1 L12 conflict remains part of the historical report.

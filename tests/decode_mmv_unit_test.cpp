@@ -403,6 +403,80 @@ void test_zero_and_extreme(Stream const& stream) {
   }
 }
 
+// A one-hot contraction exposes each independently constructed BF16 weight,
+// without tolerance hiding subnormal errors or reduction-order differences.
+void test_q4k_exact_operands(Stream const& stream) {
+  constexpr std::uint32_t n = 8, k = 256;
+  qw38::format::PackedMatrix packed;
+  packed.layout = PhysicalLayoutId::CudaQ4KCandidateV2;
+  packed.quantizer = LogicalQuantizerId::Q4KCandidateV2;
+  packed.logical_n = packed.padded_n = n;
+  packed.logical_k = packed.padded_k = k;
+  packed.codes.resize(n * k / 2);
+  packed.scales.resize(n * 16);
+  constexpr std::uint16_t d_bits[n] = {0, 1, 2, 0x3ff, 0x400, 0x1400, 0x2400, 0x3400};
+  constexpr std::uint16_t m_bits[n] = {0, 3, 1, 0x201, 0x3ff, 0x1000, 0x2000, 0x3000};
+  auto exact_half = [](std::uint16_t h) {
+    auto const e = (h >> 10) & 31;
+    return e == 0 ? std::ldexp(static_cast<float>(h & 1023), -24)
+                  : std::ldexp(static_cast<float>(1024 + (h & 1023)), e - 25);
+  };
+  std::vector<float> expected(n * k);
+  for (unsigned row = 0; row < n; ++row) {
+    auto* meta = packed.scales.data() + row * 16;
+    qw38::format::store_u16_le(meta, d_bits[row]);
+    qw38::format::store_u16_le(meta + 2, m_bits[row]);
+    std::array<unsigned, 8> scales{}, minima{};
+    for (unsigned g = 0; g < 8; ++g) {
+      scales[g] = (g * 9 + row * 13) % 64;
+      minima[g] = (63 - g * 7 + row * 3) % 64;
+    }
+    for (unsigned g = 0; g < 4; ++g) {
+      meta[4 + g] = static_cast<std::byte>(scales[g] | ((scales[g + 4] >> 4) << 6));
+      meta[8 + g] = static_cast<std::byte>(minima[g] | ((minima[g + 4] >> 4) << 6));
+      meta[12 + g] = static_cast<std::byte>((scales[g + 4] & 15) | ((minima[g + 4] & 15) << 4));
+    }
+    for (unsigned col = 0; col < k; ++col) {
+      unsigned const code = (col + 5 * row) % 16;
+      packed.codes[row * k / 2 + col / 2] |= static_cast<std::byte>(code << (4 * (col % 2)));
+      float const d = exact_half(d_bits[row]) * scales[col / 32];
+      float const m = exact_half(m_bits[row]) * minima[col / 32];
+      volatile float const product = d * static_cast<float>(code);
+      expected[row * k + col] = qw38::format::bf16_to_fp32(
+          qw38::format::fp32_to_bf16_rne(product - m));
+    }
+  }
+  auto dc = upload_vec(packed.codes, stream);
+  auto ds = upload_vec(packed.scales, stream);
+  auto dy = DeviceBuffer::allocate(n * sizeof(float));
+  if (!dc || !ds || !dy) { fail("q4k operands setup"); return; }
+  auto desc = desc_from_packed(packed, DecodeEpilogue::StoreFp32);
+  desc.codes.pointer = dc->data();
+  desc.scales.pointer = ds->data();
+  bind_output(desc, dy->data());
+  for (unsigned col = 0; col < k; ++col) {
+    std::vector<std::uint16_t> x(k, 0);
+    x[col] = 0x3f80;
+    auto dx = upload_vec(x, stream);
+    if (!dx) { fail("q4k operands input"); return; }
+    bind_input(desc, dx->data());
+    auto launched = launch_decode_mmv(desc, stream);
+    if (!launched) { fail("q4k operands launch: " + qw38::cuda::error_message(launched.error())); return; }
+    auto got = download_vec<float>(*dy, n, stream);
+    if (!got) { fail("q4k operands download"); return; }
+    for (unsigned row = 0; row < n; ++row) {
+      expect((*got)[row] == expected[row * k + col],
+             "q4k exact BF16 operand row=" + std::to_string(row) + " col=" + std::to_string(col));
+    }
+  }
+  auto bad = desc;
+  bad.quantizer = kDecodeQuantizerQ4G64V0;
+  expect(!launch_decode_mmv(bad, stream), "q4k mismatched legacy quantizer rejects");
+  bad = desc;
+  bad.scales.bytes /= 2;
+  expect(!launch_decode_mmv(bad, stream), "q4k truncated metadata rejects");
+}
+
 }  // namespace
 
 int main() {
@@ -414,6 +488,7 @@ int main() {
   test_launch_validation(*stream);
   test_padding_and_epilogues(*stream);
   test_zero_and_extreme(*stream);
+  test_q4k_exact_operands(*stream);
   if (g_failures != 0) {
     std::cerr << g_failures << " decode_mmv unit failures\n";
     return 1;

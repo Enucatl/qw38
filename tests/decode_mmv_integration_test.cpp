@@ -196,6 +196,53 @@ void candidate_grouped_decode(Stream const& stream) {
   }
 }
 
+void q4k_mlp(Stream const& stream) {
+  constexpr std::uint32_t n = 20, k = 512;
+  auto gate = quantize_bf16(LogicalQuantizerId::Q4KCandidateV2, n, k, bf16_matrix(n, k, 0.45f, 1));
+  auto up = quantize_bf16(LogicalQuantizerId::Q4KCandidateV2, n, k, bf16_matrix(n, k, 0.55f, 4));
+  if (!gate || !up) { fail("q4k MLP quantize"); return; }
+  auto pg = pack_cuda_v0(LogicalQuantizerId::Q4KCandidateV2, PhysicalLayoutId::CudaQ4KCandidateV2, *gate);
+  auto pu = pack_cuda_v0(LogicalQuantizerId::Q4KCandidateV2, PhysicalLayoutId::CudaQ4KCandidateV2, *up);
+  if (!pg || !pu) { fail("q4k MLP pack"); return; }
+  auto x = bf16_vec(k, 0.18f);
+  compare_cuda(*pg, x, DecodeEpilogue::StoreFp32, stream, "q4k gate FP32");
+  compare_cuda(*pu, x, DecodeEpilogue::StoreBf16, stream, "q4k up BF16");
+  auto rg = reference_gemv_packed(*pg, x);
+  auto ru = reference_gemv_packed(*pu, x);
+  auto cg = upload_vec(pg->codes, stream), sg = upload_vec(pg->scales, stream);
+  auto cu = upload_vec(pu->codes, stream), su = upload_vec(pu->scales, stream);
+  auto dx = upload_vec(x, stream);
+  auto dy = DeviceBuffer::allocate(n * 2);
+  if (!rg || !ru || !cg || !sg || !cu || !su || !dx || !dy) { fail("q4k MLP setup"); return; }
+  DecodeMmvPairedDesc d;
+  d.a = desc_from_packed(*pg, DecodeEpilogue::SwigluStoreBf16);
+  d.b = desc_from_packed(*pu, DecodeEpilogue::SwigluStoreBf16);
+  d.a.codes.pointer = cg->data(); d.a.scales.pointer = sg->data();
+  d.b.codes.pointer = cu->data(); d.b.scales.pointer = su->data();
+  bind_input(d.a, dx->data()); d.b.input = d.a.input;
+  bind_output(d.a, dy->data());
+  auto st = launch_decode_mmv_paired(d, stream);
+  if (!st) { fail("q4k fused SwiGLU: " + qw38::cuda::error_message(st.error())); return; }
+  auto got = download_vec<std::uint16_t>(*dy, n, stream);
+  if (!got) { fail("q4k fused SwiGLU download"); return; }
+  for (unsigned i = 0; i < n; ++i) {
+    float const g = (*rg)[i];
+    float const e = std::exp(g >= 0 ? -g : g);
+    float const sigmoid = g >= 0 ? 1.0f / (1.0f + e) : e / (1.0f + e);
+    (*rg)[i] = (g * sigmoid) * (*ru)[i];
+  }
+  expect_bf16_close(*got, *rg, "q4k fused gate/up/SwiGLU");
+
+  // Exercise the existing full-width down direct-input dispatch and residual add.
+  constexpr std::uint32_t down_k = qw38::cuda::kDecodeMaxK;
+  auto down = quantize_bf16(LogicalQuantizerId::Q4KCandidateV2, n, down_k,
+                            bf16_matrix(n, down_k, 0.35f, 9));
+  if (!down) { fail("q4k down quantize"); return; }
+  auto pd = pack_cuda_v0(LogicalQuantizerId::Q4KCandidateV2, PhysicalLayoutId::CudaQ4KCandidateV2, *down);
+  if (!pd) { fail("q4k down pack"); return; }
+  compare_cuda(*pd, bf16_vec(down_k, 0.2f), DecodeEpilogue::ResidualAddFp32, stream, "q4k down residual");
+}
+
 void mlp_paired(Stream const& stream) {
   auto n = static_cast<std::uint32_t>(kIntermediate);
   auto k = static_cast<std::uint32_t>(kHidden);
@@ -460,6 +507,7 @@ int main() {
     return 1;
   }
   candidate_grouped_decode(*stream);
+  q4k_mlp(*stream);
 
   auto qkv_n = static_cast<std::uint32_t>(kQkvWidth);
   auto z_n = static_cast<std::uint32_t>(kZWidth);

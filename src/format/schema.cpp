@@ -976,7 +976,15 @@ std::expected<void, FormatError> validate_mapping_for_tensor(
           FormatErrorCode::InvalidShape, offset, "tensor.shape.padded",
           "padded N must divide 8 and padded K must divide 256"));
     }
-    if (tensor.layout == PhysicalLayoutId::CudaQ4G64V0 ||
+    if (tensor.layout == PhysicalLayoutId::CudaQ4KCandidateV2) {
+      if (m.group_size != kQ4KGroupSize ||
+          m.packed_bytes_per_tile_row != kQ4PackedBytesPerTileRow ||
+          tensor.shape.logical[1] % kQ4KGroupSize != 0) {
+        return std::unexpected(make_error(
+            FormatErrorCode::InvalidMapping, offset, "tensor.mapping",
+            "Q4_K mapping requires complete 256-weight blocks and 128 code bytes"));
+      }
+    } else if (tensor.layout == PhysicalLayoutId::CudaQ4G64V0 ||
         tensor.layout == PhysicalLayoutId::CudaQ4G64CandidateV1) {
       if (m.group_size != kQ4GroupSize ||
           m.packed_bytes_per_tile_row != kQ4PackedBytesPerTileRow) {
@@ -1052,6 +1060,18 @@ std::expected<void, FormatError> validate_mapping_for_tensor(
 std::expected<void, FormatError> validate_quantizer_layout(
     TensorRecord const& tensor, std::uint64_t offset) {
   switch (tensor.quantizer) {
+    case LogicalQuantizerId::Q4KCandidateV2:
+      if (tensor.storage != StorageClass::Int4Grouped) {
+        return std::unexpected(make_error(
+            FormatErrorCode::InvalidStorageQuantizerPair, offset,
+            "tensor.storage", "Q4_K requires int4 grouped storage"));
+      }
+      if (tensor.layout != PhysicalLayoutId::CudaQ4KCandidateV2) {
+        return std::unexpected(make_error(
+            FormatErrorCode::InvalidQuantizerLayoutPair, offset, "tensor.layout",
+            "Q4_K requires cuda_q4k_candidate_v2"));
+      }
+      return {};
     case LogicalQuantizerId::Q4G64V0:
     case LogicalQuantizerId::Q4G64CandidateV1:
       if (tensor.storage != StorageClass::Int4Grouped) {
@@ -1204,7 +1224,8 @@ std::expected<void, FormatError> validate_precision(
                                       "precision.id", "unknown precision policy"));
   }
   if (policy.id != PrecisionPolicyId::V0 &&
-      policy.id != PrecisionPolicyId::CandidateV1) {
+      policy.id != PrecisionPolicyId::CandidateV1 &&
+      policy.id != PrecisionPolicyId::CandidateV2) {
     return std::unexpected(make_error(FormatErrorCode::InvalidPrecisionPolicy,
                                       offset, "precision.id",
                                       "only precision policy V0 is defined"));
@@ -1515,6 +1536,12 @@ PrecisionPolicyRecord candidate_v1_precision_policy() {
   return policy;
 }
 
+PrecisionPolicyRecord candidate_v2_precision_policy() {
+  auto policy = v0_precision_policy();
+  policy.id = PrecisionPolicyId::CandidateV2;
+  return policy;
+}
+
 std::array<StateAllocation, 3> v0_language_state_schema() {
   StateAllocation gdn{};
   gdn.kind = StateKind::GdnS;
@@ -1617,7 +1644,8 @@ std::expected<std::uint64_t, FormatError> expected_payload_bytes(
       return std::unexpected(rows.error());
     }
     std::uint64_t packed = 0;
-    if (tensor.layout == PhysicalLayoutId::CudaQ4G64V0 ||
+    if (tensor.layout == PhysicalLayoutId::CudaQ4KCandidateV2 ||
+        tensor.layout == PhysicalLayoutId::CudaQ4G64V0 ||
         tensor.layout == PhysicalLayoutId::CudaQ4G64CandidateV1) {
       packed = kQ4PackedBytesPerTileRow;
     } else if (tensor.layout == PhysicalLayoutId::CudaQ8G32V0 ||
@@ -1659,7 +1687,9 @@ std::expected<std::uint64_t, FormatError> expected_scale_bytes(
                                       "quantized tensors are rank-2"));
   }
   std::uint64_t group = 0;
-  if (tensor.quantizer == LogicalQuantizerId::Q4G64V0 ||
+  if (tensor.quantizer == LogicalQuantizerId::Q4KCandidateV2) {
+    group = kQ4KGroupSize;
+  } else if (tensor.quantizer == LogicalQuantizerId::Q4G64V0 ||
       tensor.quantizer == LogicalQuantizerId::Q4G64CandidateV1) {
     group = kQ4GroupSize;
   } else if (tensor.quantizer == LogicalQuantizerId::Q8G32V0 ||
@@ -1681,7 +1711,9 @@ std::expected<std::uint64_t, FormatError> expected_scale_bytes(
   if (!count) {
     return std::unexpected(count.error());
   }
-  return checked_mul(*count, kFp16Size, offset, "tensor.scales");
+  auto const bytes = tensor.quantizer == LogicalQuantizerId::Q4KCandidateV2
+                         ? kQ4KMetadataBytes : kFp16Size;
+  return checked_mul(*count, bytes, offset, "tensor.scales");
 }
 
 static std::expected<void, FormatError>
@@ -2446,6 +2478,13 @@ static std::expected<void, FormatError> validate_schema_at_offsets(
   for (std::size_t i = 0; i < schema.tensors.size(); ++i) {
     auto const tensor_offset =
         record_offset(&SchemaRecordOffsets::tensors, i);
+    if (schema.tensors[i].quantizer == LogicalQuantizerId::Q4KCandidateV2 &&
+        schema.precision.id != PrecisionPolicyId::CandidateV2) {
+      return std::unexpected(make_error(
+          FormatErrorCode::InvalidPrecisionPolicy, tensor_offset,
+          schema.tensors[i].logical_name + ".tensor.quantizer",
+          "Q4_K requires candidate V2 precision policy"));
+    }
     if (schema.precision.id == PrecisionPolicyId::V0 &&
         (schema.tensors[i].quantizer == LogicalQuantizerId::Q4G64CandidateV1 ||
          schema.tensors[i].quantizer == LogicalQuantizerId::Q8G32CandidateV1)) {

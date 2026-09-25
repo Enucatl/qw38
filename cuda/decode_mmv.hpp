@@ -28,11 +28,13 @@ inline constexpr std::uint16_t kDecodeLayoutQ8G32V0 = 0x0202;
 inline constexpr std::uint16_t kDecodeLayoutBf16DenseTileV0 = 0x0203;
 inline constexpr std::uint16_t kDecodeLayoutQ4G64CandidateV1 = 0x020B;
 inline constexpr std::uint16_t kDecodeLayoutQ8G32CandidateV1 = 0x020C;
+inline constexpr std::uint16_t kDecodeLayoutQ4KCandidateV2 = 0x020D;
 inline constexpr std::uint16_t kDecodeQuantizerNone = 0x0100;
 inline constexpr std::uint16_t kDecodeQuantizerQ4G64V0 = 0x0101;
 inline constexpr std::uint16_t kDecodeQuantizerQ8G32V0 = 0x0102;
 inline constexpr std::uint16_t kDecodeQuantizerQ4G64CandidateV1 = 0x0103;
 inline constexpr std::uint16_t kDecodeQuantizerQ8G32CandidateV1 = 0x0104;
+inline constexpr std::uint16_t kDecodeQuantizerQ4KCandidateV2 = 0x0105;
 
 enum class DecodeActivationPolicy : std::uint8_t { Bf16 = 1 };
 
@@ -115,6 +117,7 @@ struct DecodeMmvDesc {
   std::uint32_t padded_n{};
   std::uint32_t padded_k{};
   DecodeOperandView codes{};
+  // Q4_K uses this FP16-backed span for opaque 16-byte superblock metadata.
   DecodeOperandView scales{};
   DecodeOperandView input{};
   DecodeOperandView output{};
@@ -158,7 +161,8 @@ struct DecodeMmvRangeDesc {
   std::uint64_t const nk =
       static_cast<std::uint64_t>(padded_n) * static_cast<std::uint64_t>(padded_k);
   if (layout == kDecodeLayoutQ4G64V0 ||
-      layout == kDecodeLayoutQ4G64CandidateV1) {
+      layout == kDecodeLayoutQ4G64CandidateV1 ||
+      layout == kDecodeLayoutQ4KCandidateV2) {
     return nk / 2u;
   }
   if (layout == kDecodeLayoutQ8G32V0 ||
@@ -174,6 +178,9 @@ struct DecodeMmvRangeDesc {
 [[nodiscard]] constexpr std::uint64_t decode_scale_bytes(
     std::uint16_t layout, std::uint32_t padded_n, std::uint32_t padded_k) noexcept {
   std::uint64_t const rows = padded_n;
+  if (layout == kDecodeLayoutQ4KCandidateV2) {
+    return rows * (static_cast<std::uint64_t>(padded_k) / 256u) * 16u;
+  }
   if (layout == kDecodeLayoutQ4G64V0 ||
       layout == kDecodeLayoutQ4G64CandidateV1) {
     return rows * (static_cast<std::uint64_t>(padded_k) / 64u) * 2u;

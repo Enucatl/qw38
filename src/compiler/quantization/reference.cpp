@@ -64,7 +64,8 @@ WeightFormat select_weight_format(TensorFamily family,
   if (policy == WeightFormatPolicy::IdentityBf16) {
     return fmt;
   }
-  if (policy == WeightFormatPolicy::CandidateV1) {
+  if (policy == WeightFormatPolicy::CandidateV1 ||
+      policy == WeightFormatPolicy::CandidateV2) {
     bool const q8 = family == TensorFamily::LmHead ||
                     family == TensorFamily::LinearAttnInProjQkv ||
                     family == TensorFamily::LinearAttnInProjZ ||
@@ -84,8 +85,12 @@ WeightFormat select_weight_format(TensorFamily family,
                     family == TensorFamily::MlpDownProj;
     if (q4) {
       fmt.storage = StorageClass::Int4Grouped;
-      fmt.quantizer = LogicalQuantizerId::Q4G64CandidateV1;
-      fmt.layout = PhysicalLayoutId::CudaQ4G64CandidateV1;
+      fmt.quantizer = policy == WeightFormatPolicy::CandidateV2
+                          ? LogicalQuantizerId::Q4KCandidateV2
+                          : LogicalQuantizerId::Q4G64CandidateV1;
+      fmt.layout = policy == WeightFormatPolicy::CandidateV2
+                       ? PhysicalLayoutId::CudaQ4KCandidateV2
+                       : PhysicalLayoutId::CudaQ4G64CandidateV1;
       return fmt;
     }
     // Inactive MTP weights keep their V0 representation until activation.
@@ -118,6 +123,37 @@ std::expected<std::vector<std::uint16_t>, CompilerError> dequantize_to_bf16(
                                    "code count must equal N*K"));
   }
   auto const groups_row = k / logical.group_size;
+  if (logical.quantizer == LogicalQuantizerId::Q4KCandidateV2) {
+    if (logical.group_size != 256 || !logical.scales.empty() ||
+        logical.q4k_metadata.size() != n * groups_row * 16) {
+      return std::unexpected(ref_err(CompilerErrorCode::ShapeMismatch,
+                                     "Q4_K metadata geometry is invalid"));
+    }
+    std::vector<std::uint16_t> out(static_cast<std::size_t>(n * k));
+    for (std::size_t b = 0; b < n * groups_row; ++b) {
+      auto const* m = logical.q4k_metadata.data() + b * 16;
+      float const d = fp16_to_fp32(m[0] | (m[1] << 8));
+      float const dmin = fp16_to_fp32(m[2] | (m[3] << 8));
+      auto const* s = m + 4;
+      for (unsigned g = 0; g < 8; ++g) {
+        unsigned const sc = g < 4 ? s[g] & 63
+            : (s[g + 4] & 15) | ((s[g - 4] >> 6) << 4);
+        unsigned const mn = g < 4 ? s[g + 4] & 63
+            : (s[g + 4] >> 4) | ((s[g] >> 6) << 4);
+        for (unsigned i = 0; i < 32; ++i) {
+          auto const index = b * 256 + g * 32 + i;
+          auto const code = logical.codes[index];
+          if (code < 0 || code > 15) {
+            return std::unexpected(ref_err(CompilerErrorCode::Unrepresentable,
+                                           "Q4_K code outside 0..15"));
+          }
+          float const decoded = (d * sc) * code - dmin * mn;
+          out[index] = fp32_to_bf16_rne(decoded);
+        }
+      }
+    }
+    return out;
+  }
   if (logical.scales.size() != n * groups_row) {
     return std::unexpected(ref_err(CompilerErrorCode::ShapeMismatch,
                                    "scale count must equal N*(K/group)"));

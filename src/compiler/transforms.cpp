@@ -202,14 +202,14 @@ std::array<std::byte, kRopeFreqs * 4> generate_rope_inv_freq() {
   // independently of the host libm. These bytes are part of the compiler's
   // revisioned artifact contract, not a platform-specific pow result.
   constexpr std::array<std::uint32_t, kRopeFreqs> kBits{
-      0x3f800000u, 0x3f5e8d27u, 0x3f41791du, 0x3f2831b4u,
-      0x3f1237d7u, 0x3efe3a16u, 0x3edd028bu, 0x3ec02211u,
-      0x3ea7077au, 0x3e913494u, 0x3e7c7751u, 0x3e5b7aacu,
-      0x3e3ecd65u, 0x3e25df51u, 0x3e10331eu, 0x3dfab7abu,
-      0x3dd9f583u, 0x3dbd7b15u, 0x3da4b936u, 0x3d8f336fu,
-      0x3d78fb1fu, 0x3d58730du, 0x3d3c2b1du, 0x3d239523u,
-      0x3d0e3586u, 0x3cf741a7u, 0x3cd6f343u, 0x3cbadd79u,
-      0x3ca27317u, 0x3c8d3960u, 0x3c758b3eu, 0x3c557622u};
+      0x3f800000u, 0x3f1ab32bu, 0x3ebaf81au, 0x3e61f836u,
+      0x3e088d77u, 0x3da50957u, 0x3d47763fu, 0x3cf11176u,
+      0x3c91ad39u, 0x3c301052u, 0x3bd4ca14u, 0x3b80967du,
+      0x3b1b690du, 0x3abbd3ecu, 0x3a6301e2u, 0x3a092e02u,
+      0x39a5cb5fu, 0x394860c1u, 0x38f22ce3u, 0x3892587fu,
+      0x3830df51u, 0x37d5c442u, 0x37812dacu, 0x371c1fc4u,
+      0x36bcb0c1u, 0x36640cc6u, 0x3609cf4bu, 0x35a68e4cu,
+      0x35494c56u, 0x34f3499cu, 0x3493048eu, 0x3431af44u};
   std::array<std::byte, kRopeFreqs * 4> out{};
   for (std::uint32_t j = 0; j < kRopeFreqs; ++j) {
     auto const bits = kBits[j];

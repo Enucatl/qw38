@@ -66,10 +66,11 @@ inline constexpr char const kProductionCompilerIdent[] = "qw38-v0";
 inline constexpr char const kCandidateCompilerIdent[] =
     "qw38-candidate-v1-policy-2ef01bff2b40095f08aedad3b84c50317ffec66e940019342bd12abcda50110e-cal-8ac4a9cab7181c7f7008f95b52420f0d76775524ac64868d0351411c2c2021a4";
 inline constexpr std::uint32_t kCompilerMajor = 0;
+inline constexpr char const kQ4KCandidateCompilerIdent[] =
+    "qw38-candidate-v2-q4k-llama-e6ab7c1a4-no-imatrix-bf16-operands";
 inline constexpr std::uint32_t kCompilerMinor = 1;
-// Patch 1 freezes generated RoPE FP32 bytes rather than delegating rounding to
-// the host math library.
-inline constexpr std::uint32_t kCompilerPatch = 1;
+// Patch 2 corrects the frozen RoPE frequencies to theta^(-2j/64).
+inline constexpr std::uint32_t kCompilerPatch = 2;
 
 [[nodiscard]] constexpr bool is_full_attention_layer(std::uint32_t layer) noexcept {
   return layer < kLayers && (layer % kFullInterval) == (kFullInterval - 1);

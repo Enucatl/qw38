@@ -24,7 +24,7 @@ inline constexpr std::uint16_t kBf16PosInf = 0x7F80;
       bits = sign;
     } else {
       std::uint32_t m = man;
-      std::uint32_t e = 127 - 15;
+      std::uint32_t e = 127 - 14;
       while ((m & 0x400u) == 0) {
         m <<= 1;
         --e;

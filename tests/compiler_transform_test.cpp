@@ -1,6 +1,7 @@
 #include "compiler/compiler.hpp"
 
 #include <array>
+#include <cmath>
 #include <cstdint>
 #include <cstring>
 #include <iostream>
@@ -141,16 +142,16 @@ int main() {
   // to the current identity-compiler revision; a numerical-convention change
   // must advance that revision and replace this complete payload deliberately.
   constexpr std::array<std::uint32_t, kRopeFreqs> kRopeBits{
-      0x3f800000u, 0x3f5e8d27u, 0x3f41791du, 0x3f2831b4u,
-      0x3f1237d7u, 0x3efe3a16u, 0x3edd028bu, 0x3ec02211u,
-      0x3ea7077au, 0x3e913494u, 0x3e7c7751u, 0x3e5b7aacu,
-      0x3e3ecd65u, 0x3e25df51u, 0x3e10331eu, 0x3dfab7abu,
-      0x3dd9f583u, 0x3dbd7b15u, 0x3da4b936u, 0x3d8f336fu,
-      0x3d78fb1fu, 0x3d58730du, 0x3d3c2b1du, 0x3d239523u,
-      0x3d0e3586u, 0x3cf741a7u, 0x3cd6f343u, 0x3cbadd79u,
-      0x3ca27317u, 0x3c8d3960u, 0x3c758b3eu, 0x3c557622u};
+      0x3f800000u, 0x3f1ab32bu, 0x3ebaf81au, 0x3e61f836u,
+      0x3e088d77u, 0x3da50957u, 0x3d47763fu, 0x3cf11176u,
+      0x3c91ad39u, 0x3c301052u, 0x3bd4ca14u, 0x3b80967du,
+      0x3b1b690du, 0x3abbd3ecu, 0x3a6301e2u, 0x3a092e02u,
+      0x39a5cb5fu, 0x394860c1u, 0x38f22ce3u, 0x3892587fu,
+      0x3830df51u, 0x37d5c442u, 0x37812dacu, 0x371c1fc4u,
+      0x36bcb0c1u, 0x36640cc6u, 0x3609cf4bu, 0x35a68e4cu,
+      0x35494c56u, 0x34f3499cu, 0x3493048eu, 0x3431af44u};
   qw38::format::CompilerRevision const kRopeGoldenRevision{
-      .ident = "qw38-bf16-identity", .major = 0, .minor = 1, .patch = 1};
+      .ident = "qw38-bf16-identity", .major = 0, .minor = 1, .patch = 2};
   qw38::format::CompilerRevision const kCurrentRevision{
       .ident = qw38::compiler::kCompilerIdent,
       .major = qw38::compiler::kCompilerMajor,
@@ -169,6 +170,13 @@ int main() {
     std::uint32_t bits = 0;
     std::memcpy(&bits, rope.data() + j * 4, 4);
     expect(bits == kRopeBits[j], "RoPE FP32 golden word");
+    float value = 0.0f;
+    std::memcpy(&value, &bits, 4);
+    auto const formula = static_cast<float>(
+        std::pow(10000000.0, -static_cast<double>(j) / 32.0));
+    expect(std::abs(value - formula) <=
+               std::numeric_limits<float>::epsilon() * formula,
+           "RoPE payload follows model theta and rotary dimension");
   }
   float prev = 1.0f;
   for (std::uint32_t j = 1; j < kRopeFreqs; ++j) {

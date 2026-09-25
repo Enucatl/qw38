@@ -195,12 +195,12 @@ int main(int argc, char** argv) {
   auto identity = std::ofstream(options.output / "candidate_identity.json", std::ios::trunc);
   if (!identity) return 1;
   std::array<std::uint64_t, 4> storage_counts{};
-  std::array<std::uint64_t, 5> quantizer_counts{};
+  std::array<std::uint64_t, 6> quantizer_counts{};
   for (auto const& tensor : schema.tensors) {
     auto const storage = static_cast<std::uint16_t>(tensor.storage);
     auto const quantizer = static_cast<std::uint16_t>(tensor.quantizer);
     if (storage >= 1 && storage <= storage_counts.size()) ++storage_counts[storage - 1];
-    if (quantizer >= 0x0100 && quantizer <= 0x0104) ++quantizer_counts[quantizer - 0x0100];
+    if (quantizer >= 0x0100 && quantizer <= 0x0105) ++quantizer_counts[quantizer - 0x0100];
   }
   identity << "{\"manifest_digest\":\"" << hex(schema.integrity.back().digest)
            << "\",\"compiler\":{\"ident\":\"" << schema.compiler.ident
@@ -222,6 +222,7 @@ int main(int argc, char** argv) {
            << ",\"q8_g32_v0\":" << quantizer_counts[2]
            << ",\"q4_g64_candidate_v1\":" << quantizer_counts[3]
            << ",\"q8_g32_candidate_v1\":" << quantizer_counts[4]
+           << ",\"q4_k_candidate_v2\":" << quantizer_counts[5]
            << "},\"decode_dispatch\":{\"activation_policy\":\"bf16\","
               "\"quantized_kernel\":\"grouped_gemv\","
               "\"fallback\":null}}\n";

@@ -1,4 +1,5 @@
 #include "compiler/quantization/quantizer.hpp"
+#include "compiler/quantization/q4k.hpp"
 
 #include "format/floatcvt.hpp"
 #include "format/layout.hpp"
@@ -28,6 +29,8 @@ CompilerError qerr(CompilerErrorCode code, std::string_view detail) {
 
 std::uint32_t quantizer_group_size(LogicalQuantizerId id) noexcept {
   switch (id) {
+    case LogicalQuantizerId::Q4KCandidateV2:
+      return 256;
     case LogicalQuantizerId::Q4G64V0:
     case LogicalQuantizerId::Q4G64CandidateV1:
       return qw38::format::kQ4GroupSize;
@@ -42,6 +45,8 @@ std::uint32_t quantizer_group_size(LogicalQuantizerId id) noexcept {
 
 int quantizer_qmax(LogicalQuantizerId id) noexcept {
   switch (id) {
+    case LogicalQuantizerId::Q4KCandidateV2:
+      return 15;
     case LogicalQuantizerId::Q4G64V0:
     case LogicalQuantizerId::Q4G64CandidateV1:
       return 7;
@@ -71,7 +76,7 @@ std::expected<std::uint16_t, CompilerError> quantize_group_into(
     std::span<std::int8_t> codes) {
   auto const group = quantizer_group_size(quantizer);
   auto const qmax = quantizer_qmax(quantizer);
-  if (group == 0 || qmax <= 0) {
+  if (group == 0 || qmax <= 0 || quantizer == LogicalQuantizerId::Q4KCandidateV2) {
     return std::unexpected(qerr(CompilerErrorCode::Internal,
                                 "logical quantizer id is not Q4G64 or Q8G32"));
   }
@@ -161,6 +166,17 @@ std::expected<LogicalWeightCodes, CompilerError> quantize_fp32(
   out.group_size = group;
   out.qmax = qmax;
   out.codes.resize(static_cast<std::size_t>(need));
+  if (quantizer == LogicalQuantizerId::Q4KCandidateV2) {
+    out.q4k_metadata.resize(static_cast<std::size_t>(need / 256 * 16));
+    for (std::size_t b = 0; b < need / 256; ++b) {
+      auto result = quantize_q4k_block(
+          std::span<float const, 256>{weights.data() + b * 256, 256},
+          std::span<std::int8_t, 256>{out.codes.data() + b * 256, 256},
+          std::span<std::uint8_t, 16>{out.q4k_metadata.data() + b * 16, 16});
+      if (!result) return std::unexpected(result.error());
+    }
+    return out;
+  }
   auto const groups_per_row = k / group;
   out.scales.resize(static_cast<std::size_t>(n * groups_per_row));
   for (std::uint64_t row = 0; row < n; ++row) {

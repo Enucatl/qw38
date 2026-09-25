@@ -179,7 +179,16 @@ commands and evidence, and the intended delivery steps. Luna:
 1. records the command evidence and review result in the Completion Report;
 2. changes the ledger row and any task-file status from `IN_PROGRESS` to `DONE`;
 3. pauses for the main thread to check those edits; then
-4. stages only task files, checks the staged diff, creates exactly one commit
+4. as part of delivery, the main thread removes task-specific cache folders
+   for tasks whose ledger status is `DONE`, including the task just completed
+   and earlier completed tasks. For a ledger ID such as `TASK-018`, match only
+   `.cache/task018` and `.cache/task018-*` directories. First ensure the
+   Completion Report preserves any required evidence and no live process is
+   using the folders.
+   Keep caches for `TODO`, `IN_PROGRESS`, and `BLOCKED` tasks, along with shared
+   caches that are not task-specific. If permissions prevent removal, report
+   the remaining path and size rather than broadening the cleanup.
+5. stages only task files, checks the staged diff, creates exactly one commit
    for the task, and pushes the current branch to its configured upstream.
 
 Luna may edit only task documentation and ledger status; it must not change

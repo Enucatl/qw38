@@ -221,6 +221,64 @@ int main() {
   std::vector<SyntheticTensor> fixture{embed, head, dense, conv, vec};
 
   {
+    std::size_t mlp_count = 0;
+    std::uint64_t added_bytes = 0;
+    for (auto const& e : expand_identity_table()) {
+      auto old = select_weight_format(e.family, e.layout, WeightFormatPolicy::CandidateV1);
+      auto next = select_weight_format(e.family, e.layout, WeightFormatPolicy::CandidateV2);
+      if (next.quantizer == LogicalQuantizerId::Q4KCandidateV2) {
+        ++mlp_count;
+        added_bytes += e.shape.dims[0] * e.shape.dims[1] / 256 * 8;
+        expect(old.quantizer == LogicalQuantizerId::Q4G64CandidateV1,
+               "Q4_K replaces only candidate MLP Q4G64");
+      } else {
+        expect(old.quantizer == next.quantizer && old.layout == next.layout &&
+                   old.storage == next.storage, "Q4_K policy preserves every other family");
+      }
+    }
+    expect(mlp_count == 192 && added_bytes == 510ULL * 1024 * 1024,
+           "Q4_K policy adds exactly 510 MiB over 192 matrices");
+    auto mlp = small_matrix(find_expected(TensorFamily::MlpDownProj), 16, 512, 6);
+    auto q4k_fixture = fixture;
+    q4k_fixture.push_back(mlp);
+    qw38::format::CompilerRevision rev{
+        .ident = qw38::compiler::kQ4KCandidateCompilerIdent,
+        .major = 0, .minor = 1, .patch = 1};
+    auto const path = dir.path() / "q4k.qw38";
+    auto compiled = compile_synthetic(path, hash_seed(0x11), hash_seed(0x22),
+        hash_seed(0x33), rev, q4k_fixture, WeightFormatPolicy::CandidateV2);
+    expect(static_cast<bool>(compiled), "Q4_K synthetic artifact compiles");
+    auto artifact = Artifact::open(path);
+    expect(static_cast<bool>(artifact), "reader accepts Q4_K artifact");
+    if (artifact) {
+      expect(artifact->precision().id == qw38::format::PrecisionPolicyId::CandidateV2,
+             "Q4_K artifact carries new precision policy");
+      auto p = artifact->payload(mlp.expected.name);
+      auto s = artifact->scales(mlp.expected.name);
+      expect(p && s, "Q4_K artifact spans present");
+      if (p && s) {
+        expect(static_cast<bool>(verify_quantized_tensor(mlp.expected.name,
+            LogicalQuantizerId::Q4KCandidateV2, PhysicalLayoutId::CudaQ4KCandidateV2,
+            16, 512, mlp.bytes, *p, *s)), "Q4_K independently verifies against BF16 source");
+        std::vector<std::byte> corrupt(p->begin(), p->end());
+        corrupt[17] ^= std::byte{1};
+        expect(!verify_quantized_tensor(mlp.expected.name,
+            LogicalQuantizerId::Q4KCandidateV2, PhysicalLayoutId::CudaQ4KCandidateV2,
+            16, 512, mlp.bytes, corrupt, *s), "Q4_K verification rejects changed code");
+        std::vector<std::byte> bad_meta(s->begin(), s->end());
+        bad_meta[9] ^= std::byte{1};
+        expect(!verify_quantized_tensor(mlp.expected.name,
+            LogicalQuantizerId::Q4KCandidateV2, PhysicalLayoutId::CudaQ4KCandidateV2,
+            16, 512, mlp.bytes, *p, bad_meta), "Q4_K verification rejects changed scale metadata");
+      }
+    }
+    rev.ident = qw38::compiler::kCandidateCompilerIdent;
+    expect(!compile_synthetic(dir.path() / "q4k-wrong-id.qw38", hash_seed(1),
+        hash_seed(2), hash_seed(3), rev, q4k_fixture, WeightFormatPolicy::CandidateV2),
+        "Q4_K compiler rejects old policy identity");
+  }
+
+  {
     auto mlp = small_matrix(find_expected(TensorFamily::MlpDownProj), 8, 256, 6);
     auto candidate_fixture = fixture;
     candidate_fixture.push_back(mlp);

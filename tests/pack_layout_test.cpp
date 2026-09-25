@@ -186,6 +186,85 @@ std::vector<std::byte> golden_q8_scales(LogicalWeightCodes const& m) {
 }  // namespace
 
 int main() {
+  // Exhaustively cover both signs of FP16 subnormals and the normal boundary.
+  for (std::uint16_t h = 1; h <= 0x400; ++h) {
+    auto const expected = std::ldexp(static_cast<float>(h), -24);
+    expect(qw38::format::fp16_to_fp32(h) == expected,
+           "FP16 positive subnormal has the correct exponent");
+    expect(qw38::format::fp16_to_fp32(h | 0x8000u) == -expected,
+           "FP16 negative subnormal has the correct exponent");
+  }
+  for (auto const n : {5u, 16u}) {
+    constexpr auto quantizer = LogicalQuantizerId::Q4KCandidateV2;
+    constexpr auto layout = PhysicalLayoutId::CudaQ4KCandidateV2;
+    LogicalWeightCodes m;
+    m.quantizer = quantizer;
+    m.n = n;
+    m.k = 512;
+    m.group_size = 256;
+    m.qmax = 15;
+    m.codes.resize(n * 512);
+    m.q4k_metadata.resize(n * 2 * 16);
+    for (std::size_t i = 0; i < m.codes.size(); ++i) {
+      m.codes[i] = static_cast<std::int8_t>((i + i / 256) % 16);
+    }
+    for (std::size_t b = 0; b < n * 2; ++b) {
+      m.q4k_metadata[b * 16] = 1;  // smallest FP16 subnormal d
+      m.q4k_metadata[b * 16 + 2] = 2;
+      for (std::size_t i = 4; i < 16; ++i) {
+        m.q4k_metadata[b * 16 + i] = static_cast<std::uint8_t>(b * 17 + i);
+      }
+    }
+    auto packed = pack_cuda_v0(quantizer, layout, m);
+    expect(packed.has_value(), "Q4_K pack");
+    if (!packed) continue;
+    expect(packed->codes == golden_q4_codes(m), "Q4_K independent unsigned code packing");
+    expect(packed->scales.size() == dense_pad_n(n) * 2 * 16,
+           "Q4_K requires 16 metadata bytes per tile row");
+    for (std::size_t row = 0; row < n; ++row) {
+      for (std::size_t block = 0; block < 2; ++block) {
+        auto const physical = ((row / 8 * 2 + block) * 8 + row % 8) * 16;
+        for (std::size_t i = 0; i < 16; ++i) {
+          expect(packed->scales[physical + i] ==
+                     static_cast<std::byte>(m.q4k_metadata[(row * 2 + block) * 16 + i]),
+                 "Q4_K metadata independent tile coordinates");
+        }
+      }
+    }
+    auto unpacked = qw38::format::unpack_cuda_v0(
+        quantizer, layout, n, 512, packed->codes, packed->scales);
+    expect(unpacked && unpacked->codes == m.codes && unpacked->scales.empty() &&
+               unpacked->q4k_metadata == m.q4k_metadata && unpacked->group_size == 256 &&
+               unpacked->qmax == 15,
+           "Q4_K independent unpack preserves codes and all metadata bits");
+    auto invalid = packed->scales;
+    invalid[1] = std::byte{0x7c};
+    expect(!qw38::format::validate_cuda_v0(quantizer, layout, n, 512,
+                                         packed->codes, invalid),
+           "Q4_K infinite superblock scale rejected");
+    invalid[1] = std::byte{0x80};
+    expect(!qw38::format::validate_cuda_v0(quantizer, layout, n, 512,
+                                         packed->codes, invalid),
+           "Q4_K negative superblock scale rejected");
+    if (n == 5) {
+      invalid = packed->scales;
+      invalid.back() = std::byte{1};
+      expect(!qw38::format::validate_cuda_v0(quantizer, layout, n, 512,
+                                           packed->codes, invalid),
+             "Q4_K nonzero padding metadata rejected");
+      auto codes = packed->codes;
+      codes.back() = std::byte{1};
+      expect(!qw38::format::validate_cuda_v0(quantizer, layout, n, 512,
+                                           codes, packed->scales),
+             "Q4_K nonzero padding code rejected");
+    }
+    for (auto const bad : {-1, 16}) {
+      m.codes[0] = static_cast<std::int8_t>(bad);
+      expect(!pack_cuda_v0(quantizer, layout, m), "Q4_K rejects codes outside 0..15");
+    }
+    expect(!quantizer_layout_pair_ok(quantizer, PhysicalLayoutId::CudaQ4G64CandidateV1),
+           "Q4_K cannot reinterpret Q4G64 layout");
+  }
   for (auto const& [quantizer, layout] : {
            std::pair{LogicalQuantizerId::Q4G64CandidateV1,
                      PhysicalLayoutId::CudaQ4G64CandidateV1},

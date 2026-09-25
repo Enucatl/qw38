@@ -14,7 +14,7 @@ namespace {
 
 void usage() {
   std::cerr << "Usage: qw38-compile --checkpoint DIR --output FILE "
-               "[--format identity|production|candidate] "
+               "[--format identity|production|candidate|candidate-q4k] "
                "[--verify-reconstruction|--verify-only]\n";
 }
 
@@ -55,6 +55,9 @@ int main(int argc, char** argv) {
       } else if (mode == "candidate") {
         options.format_policy = qw38::compiler::WeightFormatPolicy::CandidateV1;
         options.revision.ident = qw38::compiler::kCandidateCompilerIdent;
+      } else if (mode == "candidate-q4k") {
+        options.format_policy = qw38::compiler::WeightFormatPolicy::CandidateV2;
+        options.revision.ident = qw38::compiler::kQ4KCandidateCompilerIdent;
       } else {
         std::cerr << "unknown format: " << mode << '\n';
         usage();
@@ -88,7 +91,8 @@ int main(int argc, char** argv) {
               << " peak_rss_bytes="
               << qw38::compiler::current_peak_rss_bytes()
               << " policy="
-              << (options.format_policy ==
+              << (options.format_policy == qw38::compiler::WeightFormatPolicy::CandidateV2
+                      ? "candidate-q4k" : options.format_policy ==
                           qw38::compiler::WeightFormatPolicy::CandidateV1
                       ? "candidate"
                       : options.format_policy ==
@@ -125,7 +129,8 @@ int main(int argc, char** argv) {
             << result->identity.compiler.minor << '.'
             << result->identity.compiler.patch
             << " policy="
-            << (result->format_policy ==
+            << (result->format_policy == qw38::compiler::WeightFormatPolicy::CandidateV2
+                    ? "candidate-q4k" : result->format_policy ==
                         qw38::compiler::WeightFormatPolicy::IdentityBf16
                     ? "identity"
                     : result->format_policy ==

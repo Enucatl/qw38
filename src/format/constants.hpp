@@ -42,6 +42,8 @@ inline constexpr std::uint64_t kFp32Size = 4;
 inline constexpr std::uint32_t kDenseTileRows = 8;
 inline constexpr std::uint32_t kDenseTileK = 256;
 inline constexpr std::uint32_t kQ4GroupSize = 64;
+inline constexpr std::uint32_t kQ4KGroupSize = 256;
+inline constexpr std::uint32_t kQ4KMetadataBytes = 16;
 inline constexpr std::uint32_t kQ8GroupSize = 32;
 inline constexpr std::uint32_t kQ4PackedBytesPerTileRow = 128;
 inline constexpr std::uint32_t kQ8PackedBytesPerTileRow = 256;
@@ -63,6 +65,7 @@ enum class LogicalQuantizerId : std::uint16_t {
   Q8G32V0 = 0x0102,
   Q4G64CandidateV1 = 0x0103,
   Q8G32CandidateV1 = 0x0104,
+  Q4KCandidateV2 = 0x0105,
 };
 
 enum class PhysicalLayoutId : std::uint16_t {
@@ -78,6 +81,7 @@ enum class PhysicalLayoutId : std::uint16_t {
   CudaBf16KvCacheV0 = 0x0209,
   CudaQ4G64CandidateV1 = 0x020B,
   CudaQ8G32CandidateV1 = 0x020C,
+  CudaQ4KCandidateV2 = 0x020D,
 };
 
 enum class SemanticNodeKind : std::uint16_t {
@@ -92,6 +96,7 @@ enum class SemanticNodeKind : std::uint16_t {
 enum class PrecisionPolicyId : std::uint16_t {
   V0 = 0x0401,
   CandidateV1 = 0x0402,
+  CandidateV2 = 0x0403,
 };
 
 enum class SemanticScope : std::uint16_t {

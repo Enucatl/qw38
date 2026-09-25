@@ -47,6 +47,9 @@ bool quantizer_layout_pair_ok(LogicalQuantizerId quantizer,
   if (quantizer == LogicalQuantizerId::Q8G32CandidateV1) {
     return layout == PhysicalLayoutId::CudaQ8G32CandidateV1;
   }
+  if (quantizer == LogicalQuantizerId::Q4KCandidateV2) {
+    return layout == PhysicalLayoutId::CudaQ4KCandidateV2;
+  }
   if (quantizer == LogicalQuantizerId::None) {
     return layout == PhysicalLayoutId::CudaBf16DenseTileV0 ||
            layout == PhysicalLayoutId::CudaBf16RowMajorV0 ||
@@ -88,7 +91,15 @@ std::expected<PackedMatrix, FormatError> pack_cuda_v0(
   }
   std::uint32_t packed_row = 0;
   std::uint32_t groups_in_tile = 0;
-  if (layout == PhysicalLayoutId::CudaQ4G64V0 ||
+  bool const q4k = layout == PhysicalLayoutId::CudaQ4KCandidateV2;
+  if (q4k) {
+    if (logical.group_size != kQ4KGroupSize) {
+      return std::unexpected(pack_err(FormatErrorCode::InvalidMapping, "pack",
+                                      "Q4_K superblock size must be 256"));
+    }
+    packed_row = kQ4PackedBytesPerTileRow;
+    groups_in_tile = 1;
+  } else if (layout == PhysicalLayoutId::CudaQ4G64V0 ||
       layout == PhysicalLayoutId::CudaQ4G64CandidateV1) {
     if (logical.group_size != kQ4GroupSize) {
       return std::unexpected(pack_err(FormatErrorCode::InvalidMapping, "pack",
@@ -112,7 +123,10 @@ std::expected<PackedMatrix, FormatError> pack_cuda_v0(
                                     "code count must equal N*K"));
   }
   auto const groups_row = logical.k / logical.group_size;
-  if (logical.scales.size() != logical.n * groups_row) {
+  if (q4k ? (!logical.scales.empty() ||
+             logical.q4k_metadata.size() != logical.n * groups_row * kQ4KMetadataBytes)
+          : (logical.scales.size() != logical.n * groups_row ||
+             !logical.q4k_metadata.empty())) {
     return std::unexpected(pack_err(FormatErrorCode::InvalidSpan, "pack.scales",
                                     "scale count must equal N*(K/group)"));
   }
@@ -138,8 +152,8 @@ std::expected<PackedMatrix, FormatError> pack_cuda_v0(
   if (!code_n) {
     return std::unexpected(code_n.error());
   }
-  auto scale_n =
-      checked_mul(*rows, groups_in_tile * kFp16Size, 0, "pack.scales");
+  auto const metadata_row = q4k ? kQ4KMetadataBytes : groups_in_tile * kFp16Size;
+  auto scale_n = checked_mul(*rows, metadata_row, 0, "pack.scales");
   if (!scale_n) {
     return std::unexpected(scale_n.error());
   }
@@ -163,8 +177,14 @@ std::expected<PackedMatrix, FormatError> pack_cuda_v0(
             ((tn * tiles_k + tk) * kDenseTileRows + r);
         auto const code_base = tile_row_index * packed_row;
         auto const scale_base =
-            tile_row_index * groups_in_tile * kFp16Size;
-        for (std::uint32_t g = 0; g < groups_in_tile; ++g) {
+            tile_row_index * metadata_row;
+        if (q4k && row < logical.n) {
+          std::memcpy(out.scales.data() + scale_base,
+                      logical.q4k_metadata.data() +
+                          (row * groups_row + tk) * kQ4KMetadataBytes,
+                      kQ4KMetadataBytes);
+        }
+        for (std::uint32_t g = 0; !q4k && g < groups_in_tile; ++g) {
           auto const col0 = tk * kDenseTileK + g * logical.group_size;
           if (row < logical.n && col0 < logical.k) {
             auto const lg = col0 / logical.group_size;
@@ -173,7 +193,7 @@ std::expected<PackedMatrix, FormatError> pack_cuda_v0(
             store_u16_le(out.scales.data() + scale_base + g * kFp16Size, sb);
           }
         }
-        if (layout == PhysicalLayoutId::CudaQ4G64V0 ||
+        if (q4k || layout == PhysicalLayoutId::CudaQ4G64V0 ||
             layout == PhysicalLayoutId::CudaQ4G64CandidateV1) {
           for (std::uint32_t c = 0; c < kDenseTileK; c += 2) {
             auto const col0 = tk * kDenseTileK + c;
@@ -186,9 +206,12 @@ std::expected<PackedMatrix, FormatError> pack_cuda_v0(
               b = logical.codes[static_cast<std::size_t>(row * logical.k +
                                                          col0 + 1)];
             }
-            auto const lo = q4_nibble(a, &err);
-            auto const hi = q4_nibble(b, &err);
-            if (a < -7 || a > 7 || b < -7 || b > 7) {
+            auto const lo = q4k ? static_cast<std::uint8_t>(a) : q4_nibble(a, &err);
+            auto const hi = q4k ? static_cast<std::uint8_t>(b) : q4_nibble(b, &err);
+            if (q4k && (a < 0 || a > 15 || b < 0 || b > 15)) {
+              fail_once(pack_err(FormatErrorCode::InvalidSpan, "pack.q4k",
+                                 "Q4_K codes must be unsigned 0..15"));
+            } else if (!q4k && (a < -7 || a > 7 || b < -7 || b > 7)) {
               fail_once(err);
             }
             out.codes[static_cast<std::size_t>(code_base + c / 2)] =

@@ -376,6 +376,15 @@ reference evidence; historical partial outputs remain diagnostic only.
 If quality fails, diagnose and amend the candidate with the unchanged gate;
 do not push an unaccepted quantizer into production-prefill integration.
 
+The [Q4_K MLP candidate screen](q4k-candidate.md) preserves the existing Quartz
+runtime precision and changes exactly 192 matrices. Its original artifact
+improved development NLL by 0.005765 nats/token over Q4G64 but remained
++0.139444 above the comparator. [Layer-3 numerical attribution](task022-numerical-attribution.md)
+found an incorrect compiler RoPE table; the corrected compiler-patch-2 artifact
+scores +0.001487 above the comparator on the same eight-window screen and
+clears the frozen development promotion bound. The complete language-v2 gate
+and remaining TASK-022 evidence are pending, so TASK-022 remains blocked.
+
 ### TASK-023 — Production prefill projections and workspace
 
 Integrate the selected native block-scaled GEMMs, or the measured fallback,
@@ -557,7 +566,7 @@ TASK-001 → 002 → 003 → 004 → 005 → 006
 | ---- | ------- | -------- | ------------------ |
 | TASK-017 | Resolved: stale compiler executable reported a graph-binding failure. | Current compiler source already assigns retained MTP layer bindings index 0; rebuilding produced both production and BF16 identity artifacts. | Completed primary-language decode and independent BF16/source validation; see [`TASK-017`](tasks/TASK-017.md). |
 | TASK-018 | Resolved: authority and sampler reproducibility findings were corrected and independently reviewed. | Fresh Sol high review of commit `bc3e33823b2a638004a00d30e15260990861a76` returned PASS with no findings or evidence requests. | TASK-020 materializes calibration/development token manifests before fitting; TASK-022/026 rebind preserved evaluation inputs to the reconciled policy identity before acceptance. |
-| TASK-022 | Selected Q4G64/Q8G32 candidate fails the language-v1 EVAL-01 core quality gate; the language-v1 L12 scorer also required the immutable llama comparator's 10/12 to become 12/12. A language-v2 prompt and capitalization amendment is selected but has no complete paired gate. | Complete 216-case language-v1 pair at `.cache/evaluation/qw38-language-v1/paired/llama-20260924T231919Z-512992-candidate-20260925T000444Z-521240/summary.json`: aggregate NLL delta +0.144261 versus +0.03, C92 9/92 versus llama 41/92, L12 llama 10/12; isolated language-v2 L06 probes `.cache/task022/l06-probe.json` and `.cache/task022/l06-quartz-probe/summary.json`; source-logit diagnosis `.cache/task022/oracle-probe/summary.json`. | Select and version an evidence-backed, capacity-feasible precision amendment, rebuild and validate its artifact, then rerun the complete language-v2 core gate and finish remaining TASK-022 evidence before activating TASK-023. |
+| TASK-022 | The original Q4G64/Q8G32 artifact fails the language-v1 EVAL-01 core gate; its L12 scorer also required the immutable llama comparator's 10/12 to become 12/12. A language-v2 amendment is selected but has no complete paired gate. | Historical 216-case pair at `.cache/evaluation/qw38-language-v1/paired/llama-20260924T231919Z-512992-candidate-20260925T000444Z-521240/summary.json`: NLL delta +0.144261, C92 9/92 versus llama 41/92, L12 llama 10/12. The RoPE-corrected Q4_K artifact passes the frozen eight-window development bound at +0.001487 versus comparator; see `.cache/task022/rope-fixed-development-report.json` and `task022-numerical-attribution.md`. | Run the complete language-v2 core gate on the corrected artifact, finish remaining TASK-022 evidence, and activate TASK-023 only after acceptance. |
 
 ## Preserved evidence from the former TASK-018
 

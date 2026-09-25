@@ -58,6 +58,10 @@ inline constexpr float kAbs = qw38::cuda::decode_mmv_tol::kFp32Abs;
 inline constexpr float kRel = qw38::cuda::decode_mmv_tol::kFp32Rel;
 inline constexpr float kBf16Abs = qw38::cuda::decode_mmv_tol::kBf16StoreAbs;
 
+static_assert(static_cast<std::uint16_t>(PhysicalLayoutId::CudaQ4KCandidateV2) ==
+              qw38::cuda::kDecodeLayoutQ4KCandidateV2);
+static_assert(static_cast<std::uint16_t>(LogicalQuantizerId::Q4KCandidateV2) ==
+              qw38::cuda::kDecodeQuantizerQ4KCandidateV2);
 static_assert(static_cast<std::uint16_t>(PhysicalLayoutId::CudaQ4G64V0) ==
               kDecodeLayoutQ4G64V0);
 static_assert(static_cast<std::uint16_t>(PhysicalLayoutId::CudaQ8G32V0) ==
@@ -108,7 +112,8 @@ inline DecodeMmvDesc desc_from_packed(PackedMatrix const& packed,
   d.padded_n = static_cast<std::uint32_t>(packed.padded_n);
   d.padded_k = static_cast<std::uint32_t>(packed.padded_k);
   DecodeDtype const dtype =
-      (d.layout == kDecodeLayoutQ4G64V0 ||
+      (d.layout == qw38::cuda::kDecodeLayoutQ4KCandidateV2 ||
+       d.layout == kDecodeLayoutQ4G64V0 ||
        d.layout == qw38::cuda::kDecodeLayoutQ4G64CandidateV1)
           ? DecodeDtype::Q4
           : ((d.layout == kDecodeLayoutQ8G32V0 ||
@@ -118,12 +123,10 @@ inline DecodeMmvDesc desc_from_packed(PackedMatrix const& packed,
       nullptr, dtype, d.layout, d.n, d.k, d.padded_n, d.padded_k,
       packed.codes.size(), 16);
   if (!packed.scales.empty()) {
-    std::uint32_t const group =
-        (d.layout == kDecodeLayoutQ4G64V0 ||
-         d.layout == qw38::cuda::kDecodeLayoutQ4G64CandidateV1) ? 64u : 32u;
+    auto const units_per_row = static_cast<std::uint32_t>(packed.scales.size() / d.padded_n / 2u);
     d.scales = decode_matrix_view(
-        nullptr, DecodeDtype::Fp16, d.layout, d.padded_n, d.padded_k / group,
-        d.padded_n, d.padded_k / group, packed.scales.size(), 2);
+        nullptr, DecodeDtype::Fp16, d.layout, d.padded_n, units_per_row,
+        d.padded_n, units_per_row, packed.scales.size(), 2);
   }
   d.epilogue = epi;
   return d;

@@ -95,14 +95,16 @@ std::expected<void, FormatError> validate_cuda_v0(
       (layout != PhysicalLayoutId::CudaQ4G64V0 &&
        layout != PhysicalLayoutId::CudaQ8G32V0 &&
        layout != PhysicalLayoutId::CudaQ4G64CandidateV1 &&
-       layout != PhysicalLayoutId::CudaQ8G32CandidateV1)) {
+       layout != PhysicalLayoutId::CudaQ8G32CandidateV1 &&
+       layout != PhysicalLayoutId::CudaQ4KCandidateV2)) {
     return std::unexpected(unpack_err(
         FormatErrorCode::InvalidQuantizerLayoutPair, "quantized.payload",
         "logical quantizer and physical layout disagree"));
   }
-  auto const is_q4 = layout == PhysicalLayoutId::CudaQ4G64V0 ||
+  bool const q4k = layout == PhysicalLayoutId::CudaQ4KCandidateV2;
+  auto const is_q4 = q4k || layout == PhysicalLayoutId::CudaQ4G64V0 ||
                      layout == PhysicalLayoutId::CudaQ4G64CandidateV1;
-  auto const group = is_q4 ? kQ4GroupSize : kQ8GroupSize;
+  auto const group = q4k ? kQ4KGroupSize : (is_q4 ? kQ4GroupSize : kQ8GroupSize);
   auto const packed_row =
       is_q4 ? kQ4PackedBytesPerTileRow : kQ8PackedBytesPerTileRow;
   if (n == 0 || k == 0 || k % group != 0) {
@@ -117,8 +119,8 @@ std::expected<void, FormatError> validate_cuda_v0(
   auto const tiles_k = padded_k / kDenseTileK;
   auto const groups_in_tile = kDenseTileK / group;
   auto const want_codes = tiles_n * tiles_k * kDenseTileRows * packed_row;
-  auto const want_scales =
-      tiles_n * tiles_k * kDenseTileRows * groups_in_tile * kFp16Size;
+  auto const metadata_row = q4k ? kQ4KMetadataBytes : groups_in_tile * kFp16Size;
+  auto const want_scales = tiles_n * tiles_k * kDenseTileRows * metadata_row;
   if (codes.size() != want_codes) {
     return std::unexpected(unpack_err(
         FormatErrorCode::InvalidSpan, "quantized.codes",
@@ -131,8 +133,8 @@ std::expected<void, FormatError> validate_cuda_v0(
   }
 
   bool const has_padding = n != padded_n || k != padded_k;
-  if (!has_padding) {
-    if (is_q4) {
+  if (!has_padding && !q4k) {
+    if (is_q4 && !q4k) {
       auto const bad = first_forbidden_q4(codes);
       if (bad != codes.size()) {
         return std::unexpected(make_error(
@@ -142,7 +144,7 @@ std::expected<void, FormatError> validate_cuda_v0(
       }
     } else if (auto const* bad =
                    std::memchr(codes.data(), 0x80, codes.size());
-               bad != nullptr) {
+               !is_q4 && bad != nullptr) {
       auto const offset = static_cast<std::byte const*>(bad) - codes.data();
       return std::unexpected(make_error(
           FormatErrorCode::InvalidQuantizedPayload,
@@ -175,7 +177,7 @@ std::expected<void, FormatError> validate_cuda_v0(
                       "quantized.codes.padding",
                       "Q4 padded coordinates must encode zero"));
                 }
-              } else if (nibble == 0x08u) {
+              } else if (!q4k && nibble == 0x08u) {
                 return std::unexpected(make_error(
                     FormatErrorCode::InvalidQuantizedPayload,
                     codes_file_offset + code_base + byte_i,
@@ -205,8 +207,27 @@ std::expected<void, FormatError> validate_cuda_v0(
           }
         }
 
-        auto const scale_base =
-            tile_row * groups_in_tile * kFp16Size;
+        auto const scale_base = tile_row * metadata_row;
+        if (q4k) {
+          for (std::uint32_t b = 0; row >= n && b < kQ4KMetadataBytes; ++b) {
+            if (scales[scale_base + b] != std::byte{0}) {
+              return std::unexpected(make_error(
+                  FormatErrorCode::InvalidQuantizedPayload,
+                  scales_file_offset + scale_base + b, "quantized.scales.padding",
+                  "padded Q4_K metadata must be zero"));
+            }
+          }
+          for (std::uint32_t b = 0; row < n && b < 4; b += 2) {
+            auto const bits = load_u16_le(scales.data() + scale_base + b);
+            if ((bits & 0x8000u) != 0 || (bits & 0x7C00u) == 0x7C00u) {
+              return std::unexpected(make_error(
+                  FormatErrorCode::InvalidQuantizedPayload,
+                  scales_file_offset + scale_base + b, "quantized.scales",
+                  "Q4_K superblock scales must be nonnegative finite FP16"));
+            }
+          }
+          continue;
+        }
         for (std::uint32_t g = 0; g < groups_in_tile; ++g) {
           auto const scale_i = scale_base + g * kFp16Size;
           auto const bits =
@@ -250,14 +271,19 @@ std::expected<LogicalWeightCodes, FormatError> unpack_cuda_v0(
       (layout != PhysicalLayoutId::CudaQ4G64V0 &&
        layout != PhysicalLayoutId::CudaQ8G32V0 &&
        layout != PhysicalLayoutId::CudaQ4G64CandidateV1 &&
-       layout != PhysicalLayoutId::CudaQ8G32CandidateV1)) {
+       layout != PhysicalLayoutId::CudaQ8G32CandidateV1 &&
+       layout != PhysicalLayoutId::CudaQ4KCandidateV2)) {
     return std::unexpected(unpack_err(
         FormatErrorCode::InvalidQuantizerLayoutPair, "unpack",
         "logical quantizer and physical layout disagree"));
   }
   std::uint32_t group = 0;
   std::uint32_t packed_row = 0;
-  if (layout == PhysicalLayoutId::CudaQ4G64V0 ||
+  bool const q4k = layout == PhysicalLayoutId::CudaQ4KCandidateV2;
+  if (q4k) {
+    group = kQ4KGroupSize;
+    packed_row = kQ4PackedBytesPerTileRow;
+  } else if (layout == PhysicalLayoutId::CudaQ4G64V0 ||
       layout == PhysicalLayoutId::CudaQ4G64CandidateV1) {
     group = kQ4GroupSize;
     packed_row = kQ4PackedBytesPerTileRow;
@@ -275,8 +301,8 @@ std::expected<LogicalWeightCodes, FormatError> unpack_cuda_v0(
   auto const tiles_k = padded_k / kDenseTileK;
   auto const groups_in_tile = kDenseTileK / group;
   auto const want_codes = tiles_n * tiles_k * kDenseTileRows * packed_row;
-  auto const want_scales =
-      tiles_n * tiles_k * kDenseTileRows * groups_in_tile * kFp16Size;
+  auto const want_scales = tiles_n * tiles_k * kDenseTileRows *
+      (q4k ? kQ4KMetadataBytes : groups_in_tile * kFp16Size);
   if (codes.size() != want_codes) {
     return std::unexpected(unpack_err(FormatErrorCode::InvalidSpan, "unpack.codes",
                                       "packed code length does not match layout"));
@@ -291,10 +317,14 @@ std::expected<LogicalWeightCodes, FormatError> unpack_cuda_v0(
   out.n = n;
   out.k = k;
   out.group_size = group;
-  out.qmax = qmax_of(quantizer);
+  out.qmax = q4k ? 15 : qmax_of(quantizer);
   out.codes.resize(static_cast<std::size_t>(n * k));
   auto const groups_row = k / group;
-  out.scales.resize(static_cast<std::size_t>(n * groups_row));
+  if (q4k) {
+    out.q4k_metadata.resize(static_cast<std::size_t>(n * groups_row * kQ4KMetadataBytes));
+  } else {
+    out.scales.resize(static_cast<std::size_t>(n * groups_row));
+  }
 
   for (std::uint64_t row = 0; row < n; ++row) {
     auto const tn = row / kDenseTileRows;
@@ -306,8 +336,14 @@ std::expected<LogicalWeightCodes, FormatError> unpack_cuda_v0(
           static_cast<std::uint32_t>((col0 % kDenseTileK) / group);
       auto const scale_index =
           ((tn * tiles_k + tk) * kDenseTileRows + r) * groups_in_tile + g_in_tile;
-      out.scales[static_cast<std::size_t>(row * groups_row + g)] =
-          load_u16_le(scales.data() + scale_index * kFp16Size);
+      if (q4k) {
+        std::memcpy(out.q4k_metadata.data() + (row * groups_row + g) * kQ4KMetadataBytes,
+                    scales.data() + scale_index * kQ4KMetadataBytes,
+                    kQ4KMetadataBytes);
+      } else {
+        out.scales[static_cast<std::size_t>(row * groups_row + g)] =
+            load_u16_le(scales.data() + scale_index * kFp16Size);
+      }
 
       for (std::uint32_t i = 0; i < group; ++i) {
         auto const col = col0 + i;
@@ -315,13 +351,14 @@ std::expected<LogicalWeightCodes, FormatError> unpack_cuda_v0(
         auto const tile_row =
             (tn * tiles_k + tk) * kDenseTileRows + r;
         std::int8_t decoded = 0;
-        if (layout == PhysicalLayoutId::CudaQ4G64V0 ||
+        if (q4k || layout == PhysicalLayoutId::CudaQ4G64V0 ||
             layout == PhysicalLayoutId::CudaQ4G64CandidateV1) {
           auto const byte_i = c_in_tile / 2;
           auto const raw = static_cast<std::uint8_t>(
               codes[static_cast<std::size_t>(tile_row * packed_row + byte_i)]);
           auto const nib = (c_in_tile % 2u == 0) ? (raw & 0x0Fu) : (raw >> 4);
-          auto got = decode_q4_nibble(nib);
+          auto got = q4k ? std::expected<std::int8_t, FormatError>(nib)
+                         : decode_q4_nibble(nib);
           if (!got) {
             return std::unexpected(got.error());
           }
