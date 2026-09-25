@@ -239,7 +239,7 @@ an achieved performance target.
 | TASK-019 | SM120 quantization and kernel feasibility | M7 | TASK-018 | Real-shape NVFP4/MXFP4/Q4 comparison, native instruction evidence, conversion costs and memory budget | DONE |
 | TASK-020 | Calibrated precision policy and candidate selection | M7 | TASK-019 | Weight/activation error ablations, family policy, quality screening and provisional format/layout decision | DONE |
 | TASK-021 | Native quantized artifact and compiler | M8 | TASK-020 | Versioned quantizer/scales/layout, calibrated source-to-artifact path and independent reconstruction | DONE |
-| TASK-022 | Candidate decode and core quality gate | M8 | TASK-021 | Same-weight native/GEMV dispatch, full-model decode, continuation and complete 54-case EVAL-01 core evidence | BLOCKED |
+| TASK-022 | Candidate decode and core quality gate | M8 | TASK-021 | Eligible same-weight native/GEMV dispatch or measured Q4_K/Q8 fallback, full-model decode, continuation and complete 54-case EVAL-01 core evidence | DONE |
 | TASK-023 | Production prefill projections and workspace | M8 | TASK-022 | Native GEMMs, activation quantization/reuse, bounded chunks and precision-correct epilogues | TODO |
 | TASK-024 | GDN prefill algorithm and layer integration | M8 | TASK-023 | Measured serial/chunkwise recurrence choice, FIR/history and validated complete GDN layer | TODO |
 | TASK-025 | Causal attention prefill and layer integration | M8 | TASK-024 | Tiled attention, GQA/cache/position correctness and validated complete attention layer | TODO |
@@ -376,9 +376,11 @@ production decode and GEMM consumers can bind the same declared representation.
 ### TASK-022 — Candidate decode and core quality gate
 
 Integrate the selected weights into all primary-language decode layers and the
-head. Compare native small-M W4A4 with same-weight W4A16 GEMV and retain the
-measured choice per family/shape, with bounded scratch and no hot-path weight
-repacking. Preserve FP32 residual/state arithmetic, complete-token commits,
+head. Compare native small-M W4A4 with same-weight W4A16 GEMV when both consume
+the selected format. For the selected Q4_K MLP and Q8 attention/GDN/head
+artifact, record native W4A4 as ineligible and retain measured BF16-activation
+GEMV per family/shape, with bounded scratch and no hot-path weight repacking.
+Preserve FP32 residual/state arithmetic, complete-token commits,
 poison/reset/restore semantics and FP32 output logits. Record activation policy
 as part of dispatch identity; a kernel switch can change numerical behavior.
 
@@ -396,8 +398,16 @@ improved development NLL by 0.005765 nats/token over Q4G64 but remained
 +0.139444 above the comparator. [Layer-3 numerical attribution](task022-numerical-attribution.md)
 found an incorrect compiler RoPE table; the corrected compiler-patch-2 artifact
 scores +0.001487 above the comparator on the same eight-window screen and
-clears the frozen development promotion bound. The complete language-v2 gate
-and remaining TASK-022 evidence are pending, so TASK-022 remains blocked.
+clears the frozen development promotion bound. Its complete language-v2
+54-case core passes every measured quality criterion: aggregate NLL delta is
++0.001365 nats/token, C92 is 8/15 in both arms, L12 is 12/12 in both arms,
+and retrieval is 6/6 per horizon in both arms. The paired result is
+PASS after the repository owner's no-material-failures P100 review was bound
+to the saved outputs and rescored. The user accepted the measured Q4_K/Q8
+BF16-activation GEMV fallback and recorded same-weight native W4A4 as
+ineligible for this artifact. Independent Astra review passed on pass 2 with
+no findings, gaps or requests. TASK-022 is DONE; see its
+[task record](tasks/TASK-022.md) for run identities and retained evidence.
 
 ### TASK-023 — Production prefill projections and workspace
 
@@ -595,7 +605,7 @@ TASK-001 → 002 → 003 → 004 → 005 → 006
 | ---- | ------- | -------- | ------------------ |
 | TASK-017 | Resolved: stale compiler executable reported a graph-binding failure. | Current compiler source already assigns retained MTP layer bindings index 0; rebuilding produced both production and BF16 identity artifacts. | Completed primary-language decode and independent BF16/source validation; see [`TASK-017`](tasks/TASK-017.md). |
 | TASK-018 | Resolved: authority and sampler reproducibility findings were corrected and independently reviewed. | Fresh Sol high review of commit `bc3e33823b2a638004a00d30e15260990861a76` returned PASS with no findings or evidence requests. | TASK-020 materializes calibration/development token manifests before fitting; TASK-022/026 rebind preserved evaluation inputs to the reconciled policy identity before acceptance. |
-| TASK-022 | The original Q4G64/Q8G32 artifact fails the language-v1 EVAL-01 core gate; its L12 scorer also required the immutable llama comparator's 10/12 to become 12/12. A language-v2 amendment is selected but has no complete paired gate. | Historical 216-case pair at `.cache/evaluation/qw38-language-v1/paired/llama-20260924T231919Z-512992-candidate-20260925T000444Z-521240/summary.json`: NLL delta +0.144261, C92 9/92 versus llama 41/92, L12 llama 10/12. The RoPE-corrected Q4_K artifact passes the frozen eight-window development bound at +0.001487 versus comparator; see `.cache/task022/rope-fixed-development-report.json` and `task022-numerical-attribution.md`. | Run the complete 54-case language-v2 core gate on the corrected artifact, finish remaining TASK-022 evidence, and activate TASK-023 only after acceptance. |
+| TASK-022 | Resolved: corrected CandidateV2 passed the 54-case language-v2 core, including the repository owner's output-bound P100 review; independent Astra review passed on pass 2. The user accepted measured Q4_K/Q8 GEMV where no same-weight native W4A4 consumer exists. | The reviewed pair at `.cache/evaluation/qw38-language-v2/paired/llama-20260925T103522Z-694370-candidate-v2-core54-20260925T135734Z-740788-reviewed/summary.json` reports overall PASS, NLL +0.001365, C92 8/15 in both arms, L12 12/12 in both arms, both retrieval horizons 6/6, P100 review PASS, and state replay PASS. The original language-v1 failure remains historical evidence; the optional full-216 report remains inconclusive for P100 and is not acceptance evidence. See [`TASK-022`](tasks/TASK-022.md). | Completed; TASK-023 may proceed according to its dependency. |
 
 ## Preserved evidence from the former TASK-018
 

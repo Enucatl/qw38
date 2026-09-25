@@ -1026,8 +1026,8 @@ def main() -> int:
         "llama_correct": c92_llama,
         "v0_correct": c92_v0,
         "loss_llama_minus_v0": c92_loss,
-        "llama_accuracy_micro": c92_llama / 92,
-        "v0_accuracy_micro": c92_v0 / 92,
+        "llama_accuracy_micro": c92_llama / len(c92_rows),
+        "v0_accuracy_micro": c92_v0 / len(c92_rows),
         "llama_pass_v0_fail": {
             "count": len(all_llama_pass_v0_fail),
             "ids": all_llama_pass_v0_fail,
@@ -1175,7 +1175,7 @@ def main() -> int:
             "32768": {
                 "status": "DEFERRED",
                 "cases_frozen": frozen_32768,
-                "reason": "execution assigned to TASK-022 after production prefill",
+                "reason": "execution assigned to TASK-026 after production prefill",
             },
         },
         "greedy": {
