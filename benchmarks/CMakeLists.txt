@@ -18,6 +18,13 @@ target_compile_options(qw38_bench_decode_mmv PRIVATE
 )
 add_custom_target(qw38_decode_mmv_bench DEPENDS qw38_bench_decode_mmv)
 
+add_executable(qw38_bench_prefill EXCLUDE_FROM_ALL prefill_bench.cpp)
+target_link_libraries(qw38_bench_prefill PRIVATE qw38_runtime)
+target_compile_features(qw38_bench_prefill PRIVATE cxx_std_23)
+target_compile_options(qw38_bench_prefill PRIVATE
+  $<$<COMPILE_LANGUAGE:CXX>:-Wall -Wextra -Wpedantic>
+)
+
 add_executable(qw38_bench_mlp EXCLUDE_FROM_ALL mlp_bench.cpp)
 target_link_libraries(qw38_bench_mlp PRIVATE qw38_runtime)
 target_compile_features(qw38_bench_mlp PRIVATE cxx_std_23)

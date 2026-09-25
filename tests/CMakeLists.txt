@@ -341,6 +341,19 @@ add_test(NAME decode_mmv_unit COMMAND qw38_decode_mmv_unit_test)
 add_test(NAME decode_mmv_reference COMMAND qw38_decode_mmv_reference_test)
 add_test(NAME decode_mmv_integration COMMAND qw38_decode_mmv_integration_test)
 
+add_executable(qw38_prefill_projection_test prefill_projection_test.cpp)
+target_link_libraries(qw38_prefill_projection_test PRIVATE qw38_cuda qw38_compiler)
+target_compile_features(qw38_prefill_projection_test PRIVATE cxx_std_23)
+add_test(NAME prefill_projection COMMAND qw38_prefill_projection_test)
+set_tests_properties(prefill_projection PROPERTIES LABELS "cuda;gpu;prefill")
+
+add_executable(qw38_prefill_artifact_integration_test prefill_artifact_integration_test.cpp)
+target_link_libraries(qw38_prefill_artifact_integration_test PRIVATE
+  qw38_runtime qw38_compiler qw38_reference)
+target_compile_features(qw38_prefill_artifact_integration_test PRIVATE cxx_std_23)
+add_test(NAME prefill_artifact_integration COMMAND qw38_prefill_artifact_integration_test)
+set_tests_properties(prefill_artifact_integration PROPERTIES LABELS "cuda;gpu;prefill;extended")
+
 set_tests_properties(
   decode_mmv_unit decode_mmv_reference decode_mmv_integration
   PROPERTIES
