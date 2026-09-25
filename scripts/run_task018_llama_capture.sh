@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -u
 
-fixture_dir=".cache/evaluation/qw38-language-v1"
+fixture_dir=".cache/evaluation/qw38-language-v2"
 job_dir="$fixture_dir/source_capture_job"
 attempt_id="llama-$(date -u +%Y%m%dT%H%M%SZ)-$$"
 attempt_dir="$job_dir/attempts/$attempt_id"
@@ -29,7 +29,7 @@ record = {
     "attempt_id": attempt_id,
     "command": [
         "uv", "run", "--script", "scripts/task018_capture_llama.py",
-        "--fixtures", ".cache/evaluation/qw38-language-v1",
+        "--fixtures", ".cache/evaluation/qw38-language-v2",
         "--model", "models/Qwen3.8-27B-Q4_K_M.gguf",
         "--attempt-dir", str(Path(result).parent), "--port", "18108",
     ],

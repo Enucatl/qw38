@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 set -u
 
-fixture_dir=".cache/evaluation/qw38-language-v1"
-run_dir="$fixture_dir/runs/v0-$(date -u +%Y%m%dT%H%M%SZ)-$$"
+fixture_dir=".cache/evaluation/qw38-language-v2"
+run_prefix="${QW38_EVAL_RUN_PREFIX:-v0}"
+run_dir="$fixture_dir/runs/$run_prefix-$(date -u +%Y%m%dT%H%M%SZ)-$$"
 mkdir -p "$run_dir"
 mkdir -p "$fixture_dir/source_capture_job"
 exec 9>"$fixture_dir/source_capture_job/v0-evaluation.lock"
@@ -17,8 +18,9 @@ if [ -n "$active" ]; then
 fi
 started_utc="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 started_epoch="$(date +%s)"
-binary=".cache/task018-build/src/qw38-evaluate"
-artifact="build/pinned-debug/qwen-v0.qw38"
+binary="${QW38_EVAL_BINARY:-.cache/task018-build/src/qw38-evaluate}"
+artifact="${QW38_EVAL_ARTIFACT:-build/pinned-debug/qwen-v0.qw38}"
+state_binary="${QW38_STATE_REPLAY_BINARY:-.cache/task018-build/src/qw38-state-replay}"
 uv run --script scripts/task018_prepare_core.py \
   --fixtures "$fixture_dir" --output "$run_dir/core.tsv" >"$run_dir/prepare.log" 2>&1
 prepare_code=$?
@@ -32,7 +34,7 @@ if [ "$prepare_code" -eq 0 ]; then
   state_code=NOT_RUN
   if [ "$exit_code" -eq 0 ]; then
     docker run --rm --gpus all -v /home/user/qw38:/repo -w /repo \
-      qw38-dev:cuda13.4.1-pinned .cache/task018-build/src/qw38-state-replay \
+      qw38-dev:cuda13.4.1-pinned "$state_binary" \
       --artifact "$artifact" \
       --prompt "$fixture_dir/tokens/case_000.prompt.u32le" \
       --interleave-prompt "$fixture_dir/tokens/recNu3MXkvWUzHZr9.prompt.u32le" \
@@ -49,7 +51,7 @@ fi
 ended_utc="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 elapsed_seconds=$(($(date +%s) - started_epoch))
 python3 - "$run_dir/result.json.tmp" "$run_dir/result.json" \
-  "$started_utc" "$ended_utc" "$elapsed_seconds" "$exit_code" "$binary" "$artifact" "$state_code" "$eval_code" <<'PY'
+  "$started_utc" "$ended_utc" "$elapsed_seconds" "$exit_code" "$binary" "$artifact" "$state_binary" "$state_code" "$eval_code" <<'PY'
 import hashlib
 import json
 import os
@@ -58,7 +60,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-tmp, result, started, ended, elapsed, code, binary, artifact, state_code, eval_code = sys.argv[1:]
+tmp, result, started, ended, elapsed, code, binary, artifact, state_binary, state_code, eval_code = sys.argv[1:]
 def sha(path):
     h = hashlib.sha256()
     with open(path, "rb") as stream:
@@ -122,10 +124,10 @@ record = {
     "log": str(Path(result).parent / "run.log"),
     "state_replay_exit": int(state_code) if state_code != "NOT_RUN" else "NOT_RUN",
     "state_replay_log": str(Path(result).parent / "state-replay.log"),
-    "state_replay_binary_sha256": sha(".cache/task018-build/src/qw38-state-replay") if state_code != "NOT_RUN" else None,
+    "state_replay_binary_sha256": sha(state_binary) if state_code != "NOT_RUN" else None,
     "state_replay_result_sha256": sha(Path(result).parent / "state-replay.json") if (Path(result).parent / "state-replay.json").is_file() else None,
-    "state_replay_prompt_sha256": sha(".cache/evaluation/qw38-language-v1/tokens/case_000.prompt.u32le") if state_code != "NOT_RUN" else None,
-    "state_replay_interleave_sha256": sha(".cache/evaluation/qw38-language-v1/tokens/recNu3MXkvWUzHZr9.prompt.u32le") if state_code != "NOT_RUN" else None,
+    "state_replay_prompt_sha256": sha(".cache/evaluation/qw38-language-v2/tokens/case_000.prompt.u32le") if state_code != "NOT_RUN" else None,
+    "state_replay_interleave_sha256": sha(".cache/evaluation/qw38-language-v2/tokens/recNu3MXkvWUzHZr9.prompt.u32le") if state_code != "NOT_RUN" else None,
 }
 Path(tmp).write_text(json.dumps(record, indent=2, sort_keys=True) + "\n")
 os.replace(tmp, result)

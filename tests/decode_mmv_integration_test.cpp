@@ -5,6 +5,7 @@
 
 #include <cstring>
 #include <string>
+#include <utility>
 
 using qw38::compiler::kHeadDim;
 using qw38::compiler::kHidden;
@@ -166,6 +167,33 @@ void q4_and_bf16_control(std::uint32_t n, std::uint32_t k, DecodeEpilogue epi,
     return;
   }
   compare_cuda(*q4, x, epi, stream, std::string(tag) + " q4");
+}
+
+void candidate_grouped_decode(Stream const& stream) {
+  for (auto const& [quantizer, layout] : {
+           std::pair{LogicalQuantizerId::Q4G64CandidateV1,
+                     PhysicalLayoutId::CudaQ4G64CandidateV1},
+           std::pair{LogicalQuantizerId::Q8G32CandidateV1,
+                     PhysicalLayoutId::CudaQ8G32CandidateV1}}) {
+    constexpr std::uint32_t n = 20;
+    constexpr std::uint32_t k = 192;
+    auto src = bf16_matrix(n, k, 0.7f);
+    auto logical = quantize_bf16(quantizer, n, k, src);
+    if (!logical) {
+      fail("candidate quantize");
+      return;
+    }
+    auto packed = pack_cuda_v0(quantizer, layout, *logical);
+    if (!packed) {
+      fail("candidate pack");
+      return;
+    }
+    auto x = bf16_vec(k, 0.2f);
+    auto const tag = quantizer == LogicalQuantizerId::Q4G64CandidateV1
+                         ? "candidate-q4" : "candidate-q8";
+    compare_cuda(*packed, x, DecodeEpilogue::StoreFp32, stream, tag);
+    compare_cuda(*packed, x, DecodeEpilogue::ResidualAddFp32, stream, tag);
+  }
 }
 
 void mlp_paired(Stream const& stream) {
@@ -431,6 +459,7 @@ int main() {
     fail("stream");
     return 1;
   }
+  candidate_grouped_decode(*stream);
 
   auto qkv_n = static_cast<std::uint32_t>(kQkvWidth);
   auto z_n = static_cast<std::uint32_t>(kZWidth);

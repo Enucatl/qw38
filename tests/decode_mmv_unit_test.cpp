@@ -7,6 +7,7 @@
 #include <string>
 
 using qw38::cuda::DecodeEpilogue;
+using qw38::cuda::DecodeActivationPolicy;
 using qw38::cuda::DecodeMmvDesc;
 using qw38::cuda::DecodeMmvPairedDesc;
 using qw38::cuda::DecodeMmvRangeDesc;
@@ -103,6 +104,11 @@ void test_launch_validation(Stream const& stream) {
   expect(!bad_codes && bad_codes.error().code == ErrorCode::InvalidArgument,
          "code length mismatch rejects");
   d.codes.bytes = decode_code_bytes(kDecodeLayoutQ4G64V0, 8, 256);
+
+  auto bad_activation = d;
+  bad_activation.activation_policy = static_cast<DecodeActivationPolicy>(0);
+  expect(!launch_decode_mmv(bad_activation, stream),
+         "undeclared activation policy rejects");
 
   expect(decode_pad_n(kDecodeMaxN) == kDecodeMaxN,
          "maximum supported N pads exactly");

@@ -31,9 +31,13 @@ def _final_answer_line(text: str) -> str | None:
 
 
 def grade_l12(text: str, expected: str) -> Grade:
-    """Grade an L12 anchor after trimming ASCII edge whitespace only."""
+    """Grade L12 words without case while preserving exact output formats."""
     actual = text.strip(ASCII_WS)
-    return Grade(True, actual, actual == expected, None)
+    if expected.isascii() and expected.isalpha():
+        correct = actual.isascii() and actual.casefold() == expected.casefold()
+    else:
+        correct = actual == expected
+    return Grade(True, actual, correct, None)
 
 
 def grade_retrieval(text: str, expected: str) -> Grade:

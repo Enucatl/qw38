@@ -1,0 +1,14 @@
+{
+  "schema": "qw38-eval-policy-rebind-v1",
+  "fixture_manifest_sha256": "f08823bc1b7f50646b0daaf6eea801452c03b0a42d32d60ddc43d69365764b1e",
+  "previous_policy_sha256": "a6e405af57cb732ea3061ff9ac7d747fec439ba0435f19c57eab2d7ad0cf019b",
+  "effective_policy_sha256": "c6e38ae56b7ad180381ddb44d45e4d804fbba007a535a6fb49e9900b11a0b716",
+  "prompts_sha256": "479616b2aefae98b88ec944843a64e1f44a2659c58d2fda241256a53fac56569",
+  "teacher_refs_sha256": "57faf60a5fb77a5d91b048e1f8becae0b548c5030bc76cafdc13cc798e4c1d76",
+  "teacher_probabilities_sha256": "1781535511d82d66642cacd0d4386d75d5d6d8039c44827b7f094ec705a0627c",
+  "scoring_sha256": "4defcfe55a118d0f2dd01a8b5f83994c3a9b00b77018af59118764b79f32d2cd",
+  "metrics_sha256": "e580e3d17a13ab661e0b969d38ddafac08cf2197611566dbf3fa10c09118146f",
+  "previous_policy_commit": "8281c7b",
+  "reconciled_policy_commit": "bc3e33823b2a638004a00d30e15260990861a76d",
+  "decision": "OVERALL-01 changes candidate/task ownership and wording while retaining EVAL-01 fixture identities, scoring rules, thresholds, uncertainty, and required core coverage. The original capture and run manifests remain immutable and retain the previous policy identity."
+}

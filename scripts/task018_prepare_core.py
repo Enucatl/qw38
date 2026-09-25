@@ -25,7 +25,7 @@ def prepare(fixtures: Path, output: Path) -> dict[str, Any]:
     """Write all P100/C92/L12/R512/R4096 cases in frozen order."""
     root = fixtures.resolve()
     manifest = json.loads((root / "manifest.json").read_text(encoding="utf-8"))
-    if manifest["suite"] != "qw38-language-v1":
+    if manifest["suite"] != "qw38-language-v2":
         raise ValueError("unexpected fixture suite")
     if manifest["reference_capture"]["status"] != "COMPLETE":
         raise ValueError("complete teacher references are required")

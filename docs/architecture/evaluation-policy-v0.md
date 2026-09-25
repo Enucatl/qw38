@@ -1,7 +1,8 @@
 # EVAL-01 / PERF-01 — Evaluation and benchmark policy for Architecture V0
 
 **Decision date:** 2026-09-23. **Status:** selected implementation policy.
-**Suites:** `qw38-language-v1`, `qw38-performance-v1`.
+**Suites:** `qw38-language-v2` (current), `qw38-language-v1` (historical),
+`qw38-performance-v1`.
 **Historical owners:** implementation TASK-018 (quality), TASK-023
 (performance), as recorded when EVAL-01/PERF-01 were first selected.
 OVERALL-01 assigns candidate core acceptance to TASK-022, production-prefill
@@ -39,6 +40,15 @@ the additional llama.cpp performance comparison requested by the user.
 Evaluation changes require a new suite/policy version and an explicit decision;
 results cannot be used to loosen the current suite after inspecting candidate
 failures.
+
+**2026-09-25 language-v2 amendment:** L06 now asks `Translate the Italian word
+'cane' into English. Reply with one word.` The language-v1 prompt was
+`Translate cane from Italian into English. Reply with one word.` L12 alphabetic
+word answers are now graded without regard to capitalization. This changes the
+L06 rendered/tokenized prompt identity and the L12 grader. Its fixed answer
+remains `dog`; all other prompts, keys and thresholds are unchanged. Existing
+language-v1 runs retain their original suite identity and cannot be relabeled
+as language-v2 evidence.
 
 ## OVERALL-01 ownership and authority
 
@@ -147,8 +157,10 @@ COMPSEC checks code understanding; it is not executable code-generation pass@1.
 ### L12: basic language and answer-format anchors
 
 Use the following exact user strings with no system message. Generate at most
-32 tokens. Score by exact UTF-8 equality after removing leading/trailing ASCII
-whitespace. No case folding, Unicode normalization, or removal of explanations.
+32 tokens. Remove leading/trailing ASCII whitespace. Compare alphabetic
+single-word answers (L01–L03 and L05–L06) without regard to capitalization;
+keep exact UTF-8 equality for numeric, comma-separated and JSON answers. Do
+not normalize Unicode or remove explanations.
 
 | ID | User prompt | Expected answer |
 | --- | --- | --- |
@@ -157,7 +169,7 @@ whitespace. No case folding, Unicode normalization, or removal of explanations.
 | L03 | `Text: Mira put the key in the green box. What color is the box? Reply with one word.` | `green` |
 | L04 | `Testo: Luca ha tre libri. Quanti libri ha Luca? Rispondi con una cifra.` | `3` |
 | L05 | `Translate cat into Italian. Reply with one word.` | `gatto` |
-| L06 | `Translate cane from Italian into English. Reply with one word.` | `dog` |
+| L06 | `Translate the Italian word 'cane' into English. Reply with one word.` | `dog` |
 | L07 | `Write the numbers 3, 1, 2 in ascending order, separated by commas with no spaces.` | `1,2,3` |
 | L08 | `Reply with a JSON object containing only the key ok with boolean value true. Use no spaces or markdown.` | `{"ok":true}` |
 | L09 | `What is 17 multiplied by 23? Reply with digits only.` | `391` |

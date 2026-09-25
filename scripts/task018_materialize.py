@@ -7,7 +7,7 @@
 #   "transformers==5.17.0",
 # ]
 # ///
-"""Materialize the immutable qw38-language-v1 input inventory."""
+"""Materialize the versioned qw38-language-v2 input inventory."""
 
 from __future__ import annotations
 
@@ -60,7 +60,11 @@ L12 = [
         "3",
     ),
     ("L05", "Translate cat into Italian. Reply with one word.", "gatto"),
-    ("L06", "Translate cane from Italian into English. Reply with one word.", "dog"),
+    (
+        "L06",
+        "Translate the Italian word 'cane' into English. Reply with one word.",
+        "dog",
+    ),
     (
         "L07",
         "Write the numbers 3, 1, 2 in ascending order, separated by commas with no spaces.",
@@ -437,8 +441,8 @@ def main() -> int:
     )
     eos = generation_config["eos_token_id"]
     manifest = {
-        "suite": "qw38-language-v1",
-        "fixture_version": "1.0.0",
+        "suite": "qw38-language-v2",
+        "fixture_version": "2.0.0",
         "policy_path": str(POLICY),
         "policy_sha256": sha256(POLICY.read_bytes()),
         "ds4_revision": "c238077a87186381bf626cc531bccffe1fef79e7",
@@ -520,7 +524,7 @@ def main() -> int:
         "scoring_implementation": {
             "path": "scripts/task018_scoring.py",
             "sha256": sha256(Path("scripts/task018_scoring.py").read_bytes()),
-            "grader_version": "qw38-language-v1-eval01",
+            "grader_version": "qw38-language-v2-eval01",
         },
         "materializer_implementation": {
             "path": "scripts/task018_materialize.py",

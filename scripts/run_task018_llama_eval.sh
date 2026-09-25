@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -u
 
-fixture_dir=".cache/evaluation/qw38-language-v1"
+fixture_dir=".cache/evaluation/qw38-language-v2"
 run_dir="$fixture_dir/runs/llama-$(date -u +%Y%m%dT%H%M%SZ)-$$"
 mkdir -p "$run_dir"
 started_utc="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
@@ -25,7 +25,7 @@ tmp, result, started, ended, elapsed, code = sys.argv[1:]
 record = {
     "command": [
         "uv", "run", "--script", "scripts/task018_run_llama.py",
-        "--fixtures", ".cache/evaluation/qw38-language-v1",
+        "--fixtures", ".cache/evaluation/qw38-language-v2",
         "--output", str(Path(result).parent),
         "--model", "models/Qwen3.8-27B-Q4_K_M.gguf", "--port", "18111",
     ],

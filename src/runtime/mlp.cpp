@@ -28,8 +28,10 @@ using qw38::cuda::decode_pad_n;
 using qw38::cuda::decode_scale_bytes;
 using qw38::cuda::kDecodeLayoutBf16DenseTileV0;
 using qw38::cuda::kDecodeLayoutQ4G64V0;
+using qw38::cuda::kDecodeLayoutQ4G64CandidateV1;
 using qw38::cuda::kDecodeQuantizerNone;
 using qw38::cuda::kDecodeQuantizerQ4G64V0;
+using qw38::cuda::kDecodeQuantizerQ4G64CandidateV1;
 using qw38::format::ArithmeticDtype;
 using qw38::format::PhysicalLayoutId;
 using qw38::format::StorageClass;
@@ -75,12 +77,16 @@ std::expected<void, Error> require_alignment(
 
 bool layout_ok(PhysicalLayoutId layout) noexcept {
   return layout == PhysicalLayoutId::CudaQ4G64V0 ||
+         layout == PhysicalLayoutId::CudaQ4G64CandidateV1 ||
          layout == PhysicalLayoutId::CudaBf16DenseTileV0;
 }
 
 std::uint16_t quantizer_for(PhysicalLayoutId layout) noexcept {
   if (layout == PhysicalLayoutId::CudaQ4G64V0) {
     return kDecodeQuantizerQ4G64V0;
+  }
+  if (layout == PhysicalLayoutId::CudaQ4G64CandidateV1) {
+    return kDecodeQuantizerQ4G64CandidateV1;
   }
   return kDecodeQuantizerNone;
 }
@@ -141,7 +147,8 @@ std::expected<MlpWeightBinding, Error> bind_weight(ConstTensorView codes,
     return std::unexpected(
         arg_error(field, "layout must be cuda_q4g64_v0 or cuda_bf16_dense_tile_v0"));
   }
-  bool const q4 = codes.layout == PhysicalLayoutId::CudaQ4G64V0;
+  bool const q4 = codes.layout == PhysicalLayoutId::CudaQ4G64V0 ||
+                  codes.layout == PhysicalLayoutId::CudaQ4G64CandidateV1;
   if (q4) {
     if (codes.storage != StorageClass::Int4Grouped) {
       return std::unexpected(arg_error(field, "Q4 payload storage must be int4_grouped"));
@@ -311,7 +318,8 @@ DecodeMmvDesc mmv_from_weight(MlpWeightBinding const& w) {
   d.padded_n = w.padded_n;
   d.padded_k = w.padded_k;
   DecodeDtype const dtype =
-      w.layout == qw38::cuda::kDecodeLayoutQ4G64V0 ? DecodeDtype::Q4
+      (w.layout == kDecodeLayoutQ4G64V0 ||
+       w.layout == kDecodeLayoutQ4G64CandidateV1) ? DecodeDtype::Q4
                                                    : DecodeDtype::Bf16;
   d.codes = decode_matrix_view(const_cast<void*>(w.codes.pointer), dtype,
                                w.layout, w.n, w.k,

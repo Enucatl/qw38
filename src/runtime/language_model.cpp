@@ -165,7 +165,8 @@ std::expected<LanguageModelPlan, Error> LanguageModelPlan::bind(
     plan.device_logits_ = static_cast<float*>(logits->region[0].tensor.pointer);
 
     auto const layout = static_cast<std::uint16_t>((*head)->layout);
-    bool const q8 = layout == qw38::cuda::kDecodeLayoutQ8G32V0 &&
+    bool const q8 = (layout == qw38::cuda::kDecodeLayoutQ8G32V0 ||
+                     layout == qw38::cuda::kDecodeLayoutQ8G32CandidateV1) &&
                     (*head)->storage == StorageClass::Int8Grouped;
     bool const bf16 = layout == qw38::cuda::kDecodeLayoutBf16DenseTileV0 &&
                       (*head)->storage == StorageClass::Bf16;

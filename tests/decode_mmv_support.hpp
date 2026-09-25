@@ -108,16 +108,19 @@ inline DecodeMmvDesc desc_from_packed(PackedMatrix const& packed,
   d.padded_n = static_cast<std::uint32_t>(packed.padded_n);
   d.padded_k = static_cast<std::uint32_t>(packed.padded_k);
   DecodeDtype const dtype =
-      d.layout == kDecodeLayoutQ4G64V0
+      (d.layout == kDecodeLayoutQ4G64V0 ||
+       d.layout == qw38::cuda::kDecodeLayoutQ4G64CandidateV1)
           ? DecodeDtype::Q4
-          : (d.layout == kDecodeLayoutQ8G32V0 ? DecodeDtype::Q8
+          : ((d.layout == kDecodeLayoutQ8G32V0 ||
+              d.layout == qw38::cuda::kDecodeLayoutQ8G32CandidateV1) ? DecodeDtype::Q8
                                                : DecodeDtype::Bf16);
   d.codes = decode_matrix_view(
       nullptr, dtype, d.layout, d.n, d.k, d.padded_n, d.padded_k,
       packed.codes.size(), 16);
   if (!packed.scales.empty()) {
     std::uint32_t const group =
-        d.layout == kDecodeLayoutQ4G64V0 ? 64u : 32u;
+        (d.layout == kDecodeLayoutQ4G64V0 ||
+         d.layout == qw38::cuda::kDecodeLayoutQ4G64CandidateV1) ? 64u : 32u;
     d.scales = decode_matrix_view(
         nullptr, DecodeDtype::Fp16, d.layout, d.padded_n, d.padded_k / group,
         d.padded_n, d.padded_k / group, packed.scales.size(), 2);

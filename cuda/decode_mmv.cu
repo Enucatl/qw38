@@ -227,8 +227,14 @@ bool layout_quantizer_ok(std::uint16_t layout, std::uint16_t quantizer) noexcept
   if (layout == kDecodeLayoutQ4G64V0) {
     return quantizer == kDecodeQuantizerQ4G64V0;
   }
+  if (layout == kDecodeLayoutQ4G64CandidateV1) {
+    return quantizer == kDecodeQuantizerQ4G64CandidateV1;
+  }
   if (layout == kDecodeLayoutQ8G32V0) {
     return quantizer == kDecodeQuantizerQ8G32V0;
+  }
+  if (layout == kDecodeLayoutQ8G32CandidateV1) {
+    return quantizer == kDecodeQuantizerQ8G32CandidateV1;
   }
   if (layout == kDecodeLayoutBf16DenseTileV0) {
     return quantizer == kDecodeQuantizerNone;
@@ -237,10 +243,12 @@ bool layout_quantizer_ok(std::uint16_t layout, std::uint16_t quantizer) noexcept
 }
 
 DecodeDtype weight_dtype(std::uint16_t layout) noexcept {
-  if (layout == kDecodeLayoutQ4G64V0) {
+  if (layout == kDecodeLayoutQ4G64V0 ||
+      layout == kDecodeLayoutQ4G64CandidateV1) {
     return DecodeDtype::Q4;
   }
-  if (layout == kDecodeLayoutQ8G32V0) {
+  if (layout == kDecodeLayoutQ8G32V0 ||
+      layout == kDecodeLayoutQ8G32CandidateV1) {
     return DecodeDtype::Q8;
   }
   return DecodeDtype::Bf16;
@@ -306,10 +314,12 @@ std::expected<void, Error> validate_non_overlap(DecodeMmvDesc const& d,
 }
 
 std::uint32_t group_size(std::uint16_t layout) noexcept {
-  if (layout == kDecodeLayoutQ4G64V0) {
+  if (layout == kDecodeLayoutQ4G64V0 ||
+      layout == kDecodeLayoutQ4G64CandidateV1) {
     return 64;
   }
-  if (layout == kDecodeLayoutQ8G32V0) {
+  if (layout == kDecodeLayoutQ8G32V0 ||
+      layout == kDecodeLayoutQ8G32CandidateV1) {
     return 32;
   }
   return 1;
@@ -320,6 +330,10 @@ std::expected<void, Error> validate_geometry(DecodeMmvDesc const& d,
   if (!layout_quantizer_ok(d.layout, d.quantizer)) {
     return std::unexpected(make_error(ErrorCode::InvalidArgument, op,
                                       "layout/quantizer version mismatch"));
+  }
+  if (d.activation_policy != DecodeActivationPolicy::Bf16) {
+    return std::unexpected(make_error(ErrorCode::InvalidArgument, op,
+                                      "unsupported decode activation policy"));
   }
   if (d.n == 0 || d.k == 0) {
     return std::unexpected(
@@ -455,6 +469,7 @@ std::expected<void, Error> validate_paired_side(DecodeMmvPairedDesc const& d,
     return st;
   }
   if (d.b.layout != d.a.layout || d.b.quantizer != d.a.quantizer ||
+      d.b.activation_policy != d.a.activation_policy ||
       d.b.n != d.a.n || d.b.k != d.a.k ||
       d.b.padded_n != d.a.padded_n || d.b.padded_k != d.a.padded_k ||
       d.b.epilogue != d.a.epilogue || d.b.input.pointer != d.a.input.pointer ||
@@ -507,7 +522,8 @@ std::expected<void, Error> launch_layout(DecodeMmvDesc const& a,
                                          DecodeMmvDesc const* b,
                                          Stream const& stream,
                                          std::string_view op) {
-  if (a.layout == kDecodeLayoutQ4G64V0) {
+  if (a.layout == kDecodeLayoutQ4G64V0 ||
+      a.layout == kDecodeLayoutQ4G64CandidateV1) {
     if constexpr (!Paired) {
       // The full-width MLP down projection would reserve 34 KiB per block.
       if (a.k == kDecodeMaxK) {
@@ -516,7 +532,8 @@ std::expected<void, Error> launch_layout(DecodeMmvDesc const& a,
     }
     return launch_kind<WeightKind::Q4, Paired>(a, b, stream, op);
   }
-  if (a.layout == kDecodeLayoutQ8G32V0) {
+  if (a.layout == kDecodeLayoutQ8G32V0 ||
+      a.layout == kDecodeLayoutQ8G32CandidateV1) {
     return launch_kind<WeightKind::Q8, Paired>(a, b, stream, op);
   }
   return launch_kind<WeightKind::Bf16, Paired>(a, b, stream, op);
@@ -585,7 +602,8 @@ __global__ void decode_mmv_ranges_kernel(
 std::expected<void, Error> validate_range_side(DecodeMmvDesc const& d,
                                                DecodeMmvDesc const& first,
                                                std::string_view field) {
-  if (d.layout != first.layout || d.quantizer != first.quantizer) {
+  if (d.layout != first.layout || d.quantizer != first.quantizer ||
+      d.activation_policy != first.activation_policy) {
     return std::unexpected(make_error(ErrorCode::InvalidArgument, field,
                                       "ranged projections must share one layout family"));
   }
@@ -729,10 +747,12 @@ std::expected<void, Error> launch_decode_mmv_ranges(DecodeMmvRangeDesc const& de
       }
     }
   }
-  if (first.layout == kDecodeLayoutQ4G64V0) {
+  if (first.layout == kDecodeLayoutQ4G64V0 ||
+      first.layout == kDecodeLayoutQ4G64CandidateV1) {
     return launch_range_kind<WeightKind::Q4>(desc.ranges, stream);
   }
-  if (first.layout == kDecodeLayoutQ8G32V0) {
+  if (first.layout == kDecodeLayoutQ8G32V0 ||
+      first.layout == kDecodeLayoutQ8G32CandidateV1) {
     return launch_range_kind<WeightKind::Q8>(desc.ranges, stream);
   }
   return launch_range_kind<WeightKind::Bf16>(desc.ranges, stream);

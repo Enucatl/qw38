@@ -228,7 +228,7 @@ an achieved performance target.
 | TASK-019 | SM120 quantization and kernel feasibility | M7 | TASK-018 | Real-shape NVFP4/MXFP4/Q4 comparison, native instruction evidence, conversion costs and memory budget | DONE |
 | TASK-020 | Calibrated precision policy and candidate selection | M7 | TASK-019 | Weight/activation error ablations, family policy, quality screening and provisional format/layout decision | DONE |
 | TASK-021 | Native quantized artifact and compiler | M8 | TASK-020 | Versioned quantizer/scales/layout, calibrated source-to-artifact path and independent reconstruction | DONE |
-| TASK-022 | Candidate decode and core quality gate | M8 | TASK-021 | Same-weight native/GEMV dispatch, full-model decode, continuation and complete EVAL-01 core evidence | TODO |
+| TASK-022 | Candidate decode and core quality gate | M8 | TASK-021 | Same-weight native/GEMV dispatch, full-model decode, continuation and complete EVAL-01 core evidence | BLOCKED |
 | TASK-023 | Production prefill projections and workspace | M8 | TASK-022 | Native GEMMs, activation quantization/reuse, bounded chunks and precision-correct epilogues | TODO |
 | TASK-024 | GDN prefill algorithm and layer integration | M8 | TASK-023 | Measured serial/chunkwise recurrence choice, FIR/history and validated complete GDN layer | TODO |
 | TASK-025 | Causal attention prefill and layer integration | M8 | TASK-024 | Tiled attention, GQA/cache/position correctness and validated complete attention layer | TODO |
@@ -557,6 +557,7 @@ TASK-001 → 002 → 003 → 004 → 005 → 006
 | ---- | ------- | -------- | ------------------ |
 | TASK-017 | Resolved: stale compiler executable reported a graph-binding failure. | Current compiler source already assigns retained MTP layer bindings index 0; rebuilding produced both production and BF16 identity artifacts. | Completed primary-language decode and independent BF16/source validation; see [`TASK-017`](tasks/TASK-017.md). |
 | TASK-018 | Resolved: authority and sampler reproducibility findings were corrected and independently reviewed. | Fresh Sol high review of commit `bc3e33823b2a638004a00d30e15260990861a76` returned PASS with no findings or evidence requests. | TASK-020 materializes calibration/development token manifests before fitting; TASK-022/026 rebind preserved evaluation inputs to the reconciled policy identity before acceptance. |
+| TASK-022 | Selected Q4G64/Q8G32 candidate fails the language-v1 EVAL-01 core quality gate; the language-v1 L12 scorer also required the immutable llama comparator's 10/12 to become 12/12. A language-v2 prompt and capitalization amendment is selected but has no complete paired gate. | Complete 216-case language-v1 pair at `.cache/evaluation/qw38-language-v1/paired/llama-20260924T231919Z-512992-candidate-20260925T000444Z-521240/summary.json`: aggregate NLL delta +0.144261 versus +0.03, C92 9/92 versus llama 41/92, L12 llama 10/12; isolated language-v2 L06 probes `.cache/task022/l06-probe.json` and `.cache/task022/l06-quartz-probe/summary.json`; source-logit diagnosis `.cache/task022/oracle-probe/summary.json`. | Select and version an evidence-backed, capacity-feasible precision amendment, rebuild and validate its artifact, then rerun the complete language-v2 core gate and finish remaining TASK-022 evidence before activating TASK-023. |
 
 ## Preserved evidence from the former TASK-018
 

@@ -17,10 +17,13 @@ from scripts.task018_scoring import (
 
 
 def test_l12_trims_ascii_whitespace_only() -> None:
-    """L12 preserves case and non-ASCII whitespace semantics."""
+    """L12 ignores word case but preserves format and ASCII edge trimming."""
     assert grade_l12(" \tblue\n", "blue").correct
-    assert not grade_l12("Blue", "blue").correct
+    assert grade_l12("Blue", "blue").correct
+    assert grade_l12("Gatto", "gatto").correct
     assert not grade_l12("\u00a0blue\u00a0", "blue").correct
+    assert not grade_l12('{"OK":true}', '{"ok":true}').correct
+    assert not grade_l12("1, 2, 3", "1,2,3").correct
 
 
 def test_retrieval_is_exact_after_ascii_edge_trim() -> None:
@@ -123,6 +126,16 @@ def test_paired_bootstrap_is_deterministic_and_case_weighted() -> None:
         paired_case_bootstrap(rows + [rows[0]], metric_group="test", replicates=10)
 
 
+def test_report_bootstrap_accuracy_uses_the_paired_sampler() -> None:
+    """The report's C92 aggregate invokes its accuracy adapter successfully."""
+    from scripts.task018_pair_report import bootstrap_accuracy
+
+    rows = [CaseMetric("a", "C92", 1.0, 1.0, 1, 1, 0)]
+    result = bootstrap_accuracy(rows, "C92/all")
+    assert result["accuracy_loss_low_95"] == 1.0
+    assert result["accuracy_loss_high_95"] == 1.0
+
+
 def test_pair_report_rejects_alignment_mask_hash_and_replay_failures(
     tmp_path: Path,
 ) -> None:
@@ -168,6 +181,55 @@ def test_pair_report_rejects_alignment_mask_hash_and_replay_failures(
         json.loads((invalid_dir / "result.json").read_text())["status"]
         == "INCONCLUSIVE"
     )
+
+
+def test_policy_rebind_preserves_fixture_identity(tmp_path: Path) -> None:
+    """Rebinding requires the exact old fixture and current policy bytes."""
+    import hashlib
+    import json
+
+    import pytest
+
+    from scripts.task018_pair_report import validate_policy_rebind
+
+    policy = tmp_path / "policy.md"
+    policy.write_text("reconciled policy\n")
+    old = "0" * 64
+    manifest = {
+        "policy_path": str(policy),
+        "policy_sha256": old,
+        "files": {"prompts.jsonl": {"sha256": "1" * 64}},
+        "reference_capture": {"source_refs_jsonl": {"sha256": "2" * 64}},
+        "teacher_probability_capture": {"sha256": "3" * 64},
+        "scoring_implementation": {"sha256": "4" * 64},
+        "metrics_implementation": {"sha256": "5" * 64},
+    }
+    (tmp_path / "manifest.json").write_text(json.dumps(manifest))
+    rebind = {
+        "schema": "qw38-eval-policy-rebind-v1",
+        "fixture_manifest_sha256": hashlib.sha256(
+            (tmp_path / "manifest.json").read_bytes()
+        ).hexdigest(),
+        "previous_policy_sha256": old,
+        "effective_policy_sha256": hashlib.sha256(policy.read_bytes()).hexdigest(),
+        "prompts_sha256": "1" * 64,
+        "teacher_refs_sha256": "2" * 64,
+        "teacher_probabilities_sha256": "3" * 64,
+        "scoring_sha256": "4" * 64,
+        "metrics_sha256": "5" * 64,
+    }
+    path = tmp_path / "rebind.json"
+    path.write_text(json.dumps(rebind))
+    assert validate_policy_rebind(tmp_path, manifest, path) == (
+        rebind["effective_policy_sha256"],
+        hashlib.sha256(path.read_bytes()).hexdigest(),
+    )
+    rebind["teacher_refs_sha256"] = "9" * 64
+    path.write_text(json.dumps(rebind))
+    with pytest.raises(ValueError, match="policy rebind does not match"):
+        validate_policy_rebind(tmp_path, manifest, path)
+    with pytest.raises(ValueError, match="policy hash differs"):
+        validate_policy_rebind(tmp_path, manifest, None)
 
 
 def test_fixed_answer_targets_and_basic_correctness_gate(tmp_path: Path) -> None:

@@ -148,7 +148,7 @@ def main() -> int:
         ) from exc
     manifest_path = root / "manifest.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    if manifest["suite"] != "qw38-language-v1":
+    if manifest["suite"] != "qw38-language-v2":
         raise SystemExit("unexpected fixture suite")
     if manifest["reference_capture"]["status"] == "COMPLETE":
         raise SystemExit("teacher references already frozen; refusing to overwrite")

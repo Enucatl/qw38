@@ -70,6 +70,41 @@ def require_hash(path: Path, expected: str, label: str) -> None:
         raise ValueError(f"{label} hash differs from frozen identity")
 
 
+def validate_policy_rebind(
+    root: Path, manifest: dict[str, Any], rebind_path: Path | None
+) -> tuple[str, str | None]:
+    """Bind preserved fixture bytes to the reconciled policy identity."""
+    current = sha(Path(manifest["policy_path"]))
+    previous = manifest["policy_sha256"]
+    if current == previous:
+        if rebind_path is not None:
+            raise ValueError("policy rebind is unnecessary for matching identity")
+        return current, None
+    if rebind_path is None:
+        raise ValueError("policy hash differs from frozen identity")
+    rebind = json.loads(rebind_path.read_text(encoding="utf-8"))
+    required = {
+        "schema": "qw38-eval-policy-rebind-v1",
+        "fixture_manifest_sha256": sha(root / "manifest.json"),
+        "previous_policy_sha256": previous,
+        "effective_policy_sha256": current,
+        "prompts_sha256": manifest["files"]["prompts.jsonl"]["sha256"],
+        "teacher_refs_sha256": manifest["reference_capture"]["source_refs_jsonl"][
+            "sha256"
+        ],
+        "teacher_probabilities_sha256": manifest["teacher_probability_capture"][
+            "sha256"
+        ],
+        "scoring_sha256": manifest["scoring_implementation"]["sha256"],
+        "metrics_sha256": manifest["metrics_implementation"]["sha256"],
+    }
+    if any(rebind.get(key) != value for key, value in required.items()):
+        raise ValueError(
+            "policy rebind does not match preserved fixture and code identities"
+        )
+    return current, sha(rebind_path)
+
+
 def require_mask(mask: bytes, targets: int, case_id: str) -> None:
     if len(mask) != targets or mask != bytes([1]) * targets:
         raise ValueError(f"loss mask count differs: {case_id}")
@@ -130,13 +165,14 @@ def validate_lineage(
     vrows: dict[str, dict[str, Any]],
     refs: dict[str, dict[str, Any]],
     probs: dict[str, dict[str, Any]],
+    effective_policy_sha256: str,
 ) -> dict[str, Any]:
     """Reject stale or mixed run outputs before any paired score is computed."""
     fixture_hash = sha(root / "manifest.json")
     require_fresh_llama_generation(lm)
-    if manifest["suite"] != "qw38-language-v1":
+    if manifest["suite"] != "qw38-language-v2":
         raise ValueError("unexpected suite")
-    require_hash(Path(manifest["policy_path"]), manifest["policy_sha256"], "policy")
+    require_hash(Path(manifest["policy_path"]), effective_policy_sha256, "policy")
     for key in ("scoring_implementation", "metrics_implementation"):
         require_hash(Path(manifest[key]["path"]), manifest[key]["sha256"], key)
     require_hash(
@@ -248,7 +284,7 @@ def validate_lineage(
             )
             if fixed[cid]["expected"] != case["details"]["expected"]:
                 raise ValueError(f"L12 answer key differs: {cid}")
-        if Path(fields[2]) != target or Path(fields[3]) != mask:
+        if Path(fields[2]).resolve() != target or Path(fields[3]).resolve() != mask:
             raise ValueError(f"V0 target/mask path differs from frozen case: {cid}")
         require_hash(target, target_hash, f"target {cid}")
         require_hash(mask, mask_hash, f"loss mask {cid}")
@@ -296,7 +332,7 @@ def validate_lineage(
         )
     replay_path = v0 / "state-replay.json"
     require_hash(
-        Path(".cache/task018-build/src/qw38-state-replay"),
+        Path(vm["binary"]).with_name("qw38-state-replay"),
         vm["state_replay_binary_sha256"],
         "V0 replay binary",
     )
@@ -544,6 +580,7 @@ def main() -> int:
     parser.add_argument("--llama-run", type=Path, required=True)
     parser.add_argument("--v0-run", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--policy-rebind", type=Path)
     parser.add_argument(
         "--reviews", type=Path, help="completed human P100 review JSONL"
     )
@@ -583,6 +620,9 @@ def main() -> int:
     if set(lrows) != {c["id"] for c in cases} or set(vrows) != set(lrows):
         raise ValueError("paired arm IDs differ from frozen core")
     manifest = json.loads((root / "manifest.json").read_text())
+    effective_policy_sha256, rebind_sha256 = validate_policy_rebind(
+        root, manifest, args.policy_rebind
+    )
     if (
         manifest["teacher_probability_capture"].get("n_probs") != 20
         or manifest["teacher_probability_capture"].get(
@@ -610,7 +650,18 @@ def main() -> int:
             "teacher references/probabilities are not exactly the frozen 192 P100/C92 cases"
         )
     replay = validate_lineage(
-        root, llama, v0, manifest, cases, lm, vm, lrows, vrows, refs, probs
+        root,
+        llama,
+        v0,
+        manifest,
+        cases,
+        lm,
+        vm,
+        lrows,
+        vrows,
+        refs,
+        probs,
+        effective_policy_sha256,
     )
     tokenizer_dir = Path(manifest["tokenizer"]["checkpoint"])
     for name, metadata in manifest["tokenizer"]["files"].items():
@@ -938,7 +989,7 @@ def main() -> int:
     c92_v0 = sum(r["v0_answer"]["correct"] for r in c92_rows)
     c92_ci = bootstrap_accuracy(
         [x for rows in c92_by_source.values() for x in rows],
-        metric_group="TASK018-C92/all",
+        "TASK018-C92/all",
     )
     c92_loss = (c92_llama - c92_v0) / len(c92_rows)
     all_llama_pass_v0_fail = sorted(
@@ -1003,6 +1054,9 @@ def main() -> int:
         overall_status = "INCONCLUSIVE"
     else:
         overall_status = "PASS"
+    candidate_policy = vm["artifact_identity"]["precision_policy_id"]
+    candidate_name = "QW38 CandidateV1" if candidate_policy == 0x0402 else "QW38 V0"
+    task_name = "TASK-022" if candidate_policy == 0x0402 else "TASK-018"
     text_outputs = [
         {"id": row["id"], "llama": row["llama_text_file"], "v0": row["v0_text_file"]}
         for row in per_case
@@ -1011,11 +1065,11 @@ def main() -> int:
         "pair_report_driver_sha256": sha(Path(__file__).resolve()),
         "mode": "language-only",
         "mtp_enabled": False,
-        "roles": {"comparator": "Q4_K_M llama.cpp", "candidate": "QW38 V0"},
+        "roles": {"comparator": "Q4_K_M llama.cpp", "candidate": candidate_name},
         "schedule": {
             "core_cases": "all 216 P100/C92/L12/R512/R4096 cases once; reset at document boundaries",
             "target_alignment": "same frozen Q4_K_M teacher IDs for P100/C92; frozen fixed keys for L12/R",
-            "retrieval_32768": "frozen now; execution deferred to TASK-022",
+            "retrieval_32768": "frozen now; execution assigned to TASK-026",
         },
         "precision": {
             "teacher_probability": "llama.cpp REST top-20 selected target logprobs only",
@@ -1024,7 +1078,9 @@ def main() -> int:
         },
         "raw_generated_text": text_outputs,
         "suite": manifest["suite"],
-        "policy_sha256": manifest["policy_sha256"],
+        "policy_sha256": effective_policy_sha256,
+        "capture_policy_sha256": manifest["policy_sha256"],
+        "policy_rebind_sha256": rebind_sha256,
         "fixture_manifest_sha256": sha(root / "manifest.json"),
         "llama_run_manifest_sha256": sha(llama / "run_manifest.json"),
         "v0_result_sha256": sha(v0 / "result.json"),
@@ -1152,18 +1208,18 @@ def main() -> int:
         encoding="utf-8",
     )
     (output / "report.md").write_text(
-        "# TASK-018 paired run\n\n"
+        f"# {task_name} paired run\n\n"
         f"Status: **{overall_status}**.\n\n"
-        "Mode: `language-only`; MTP enabled: `false`. Comparator: Q4_K_M llama.cpp. Candidate: QW38 V0. "
+        f"Mode: `language-only`; MTP enabled: `false`. Comparator: Q4_K_M llama.cpp. Candidate: {candidate_name}. "
         "Schedule: all 216 core cases once, using frozen teacher IDs for P100/C92 and fixed keys for L12/R; "
-        "R32768 execution is deferred to TASK-022. Precision: teacher top-20 selected target logprobs; candidate FP32 full-vocabulary logits.\n\n"
+        "R32768 execution is assigned to TASK-026. Precision: teacher top-20 selected target logprobs; candidate FP32 full-vocabulary logits.\n\n"
         f"Core coverage: {len(per_case)}/216. Teacher-forced NLL: {nll_total[2]} aligned P100/C92 tokens; "
-        f"V0 minus llama = {nll_point:.6f} nats/token. Full-vocabulary KL is unavailable.\n\n"
-        f"C92: llama {c92_llama}/{len(c92_rows)}, V0 {c92_v0}/{len(c92_rows)}; R/L fixed-key grades and per-case details are in `cases.jsonl`.\n\n"
+        f"Candidate minus llama = {nll_point:.6f} nats/token. Full-vocabulary KL is unavailable.\n\n"
+        f"C92: llama {c92_llama}/{len(c92_rows)}, candidate {c92_v0}/{len(c92_rows)}; R/L fixed-key grades and per-case details are in `cases.jsonl`.\n\n"
         f"P100 output review: {qualitative_status}; rows are in `p100-review.jsonl`.\n\n"
         "## Generated text\n\n"
         + "\n".join(
-            f"- [{row['id']} llama]({row['llama_text_file']}) · [{row['id']} V0]({row['v0_text_file']})"
+            f"- [{row['id']} llama]({row['llama_text_file']}) · [{row['id']} candidate]({row['v0_text_file']})"
             for row in per_case
         )
         + "\n",
@@ -1173,13 +1229,15 @@ def main() -> int:
         "pair_report_driver_sha256": sha(Path(__file__).resolve()),
         "mode": "language-only",
         "mtp_enabled": False,
-        "roles": {"comparator": "Q4_K_M llama.cpp", "candidate": "QW38 V0"},
+        "roles": {"comparator": "Q4_K_M llama.cpp", "candidate": candidate_name},
         "schedule": summary["schedule"],
         "precision": summary["precision"],
         "raw_generated_text": text_outputs,
         "suite": manifest["suite"],
         "fixture_manifest_sha256": sha(root / "manifest.json"),
-        "policy_sha256": manifest["policy_sha256"],
+        "policy_sha256": effective_policy_sha256,
+        "capture_policy_sha256": manifest["policy_sha256"],
+        "policy_rebind_sha256": rebind_sha256,
         "llama_run_manifest_sha256": sha(llama / "run_manifest.json"),
         "v0_result_sha256": sha(v0 / "result.json"),
         "paired_summary_sha256": sha(output / "summary.json"),

@@ -36,8 +36,11 @@ using qw38::cuda::decode_pad_n;
 using qw38::cuda::decode_scale_bytes;
 using qw38::cuda::kDecodeLayoutBf16DenseTileV0;
 using qw38::cuda::kDecodeLayoutQ4G64V0;
+using qw38::cuda::kDecodeLayoutQ4G64CandidateV1;
 using qw38::cuda::kDecodeQuantizerNone;
 using qw38::cuda::kDecodeQuantizerQ4G64V0;
+using qw38::cuda::kDecodeQuantizerQ4G64CandidateV1;
+using qw38::cuda::kDecodeQuantizerQ8G32CandidateV1;
 using qw38::format::ArithmeticDtype;
 using qw38::format::PhysicalLayoutId;
 using qw38::format::StorageClass;
@@ -195,12 +198,20 @@ std::expected<void, Error> validate_gdn_state_view(TensorView const& s) {
 
 bool q4_or_bf16_tile(PhysicalLayoutId layout) noexcept {
   return layout == PhysicalLayoutId::CudaQ4G64V0 ||
+         layout == PhysicalLayoutId::CudaQ4G64CandidateV1 ||
+         layout == PhysicalLayoutId::CudaQ8G32CandidateV1 ||
          layout == PhysicalLayoutId::CudaBf16DenseTileV0;
 }
 
 std::uint16_t quantizer_for(PhysicalLayoutId layout) noexcept {
   if (layout == PhysicalLayoutId::CudaQ4G64V0) {
     return kDecodeQuantizerQ4G64V0;
+  }
+  if (layout == PhysicalLayoutId::CudaQ4G64CandidateV1) {
+    return kDecodeQuantizerQ4G64CandidateV1;
+  }
+  if (layout == PhysicalLayoutId::CudaQ8G32CandidateV1) {
+    return kDecodeQuantizerQ8G32CandidateV1;
   }
   return kDecodeQuantizerNone;
 }
@@ -225,10 +236,16 @@ std::expected<GdnWeightBinding, Error> bind_q4_or_bf16(ConstTensorView codes,
     return std::unexpected(
         arg_error(field, "layout must be cuda_q4g64_v0 or cuda_bf16_dense_tile_v0"));
   }
-  bool const q4 = codes.layout == PhysicalLayoutId::CudaQ4G64V0;
+  bool const q4 = codes.layout == PhysicalLayoutId::CudaQ4G64V0 ||
+                  codes.layout == PhysicalLayoutId::CudaQ4G64CandidateV1;
+  bool const q8 = codes.layout == PhysicalLayoutId::CudaQ8G32CandidateV1;
   if (q4) {
     if (codes.storage != StorageClass::Int4Grouped) {
       return std::unexpected(arg_error(field, "Q4 payload storage must be int4_grouped"));
+    }
+  } else if (q8) {
+    if (codes.storage != StorageClass::Int8Grouped) {
+      return std::unexpected(arg_error(field, "Q8 payload storage must be int8_grouped"));
     }
   } else if (codes.storage != StorageClass::Bf16) {
     return std::unexpected(arg_error(field, "BF16 payload storage must be bf16"));
@@ -316,8 +333,10 @@ DecodeMmvDesc mmv_from_weight(GdnWeightBinding const& w) {
   d.padded_n = w.padded_n;
   d.padded_k = w.padded_k;
   DecodeDtype const dtype =
-      w.layout == qw38::cuda::kDecodeLayoutQ4G64V0 ? DecodeDtype::Q4
-                                                   : DecodeDtype::Bf16;
+      (w.layout == kDecodeLayoutQ4G64V0 ||
+       w.layout == kDecodeLayoutQ4G64CandidateV1) ? DecodeDtype::Q4
+      : w.layout == qw38::cuda::kDecodeLayoutQ8G32CandidateV1 ? DecodeDtype::Q8
+                                                                 : DecodeDtype::Bf16;
   d.codes = decode_matrix_view(const_cast<void*>(w.codes.pointer), dtype,
                                w.layout, w.n, w.k,
                                w.padded_n, w.padded_k, w.codes_bytes, 16);
@@ -325,7 +344,8 @@ DecodeMmvDesc mmv_from_weight(GdnWeightBinding const& w) {
     d.scales = decode_matrix_view(
         const_cast<void*>(w.scales.pointer), DecodeDtype::Fp16, w.layout,
         w.padded_n,
-        w.padded_k / 64u, w.padded_n, w.padded_k / 64u,
+        w.padded_k / (dtype == DecodeDtype::Q8 ? 32u : 64u), w.padded_n,
+        w.padded_k / (dtype == DecodeDtype::Q8 ? 32u : 64u),
         w.scales_bytes, 2);
   }
   return d;

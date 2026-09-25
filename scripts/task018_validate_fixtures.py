@@ -175,7 +175,7 @@ def validate(
     sidecar = (root / "manifest.sha256").read_text().split()[0]
     if sha256_file(manifest_path) != sidecar:
         raise ValueError("manifest SHA-256 sidecar mismatch")
-    if manifest["suite"] != "qw38-language-v1":
+    if manifest["suite"] != "qw38-language-v2":
         raise ValueError("unexpected suite identity")
     repo_root = Path(__file__).resolve().parents[1]
     if manifest["policy_sha256"] != sha256_file(repo_root / manifest["policy_path"]):
