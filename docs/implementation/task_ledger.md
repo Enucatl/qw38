@@ -64,6 +64,16 @@ historical and is not relabeled as a 54-case result.
 - `docs/implementation/technology-baseline.md`
 - `docs/implementation/code-standards.md`
 
+## Performance protocol amendment — 2026-09-26
+
+By explicit user instruction, TASK-027 and later performance benchmarks use one
+run per workload/engine, zero warmups and no repetition statistics. Reuse a
+request's prompt phase for the prefill/TTFT row and capture profiling in the same
+run, with instrumentation and first-use costs labeled. Report observed times,
+throughputs, ratios and memory; median/p99/bootstrap requirements are superseded.
+See the [PERF-01 amendment](../architecture/evaluation-policy-v0.md#single-run-performance-amendment--2026-09-26).
+Correctness and quality criteria remain unchanged; execute applicable checks once.
+
 ## Execution policy
 
 - Execute tasks sequentially; accept every listed prerequisite before starting a task.
@@ -123,7 +133,7 @@ this replan.
 ### Quality, memory, and workload together
 
 - Select from quality-passing, capacity-feasible candidates using prefill,
-  populated decode, TTFT, total request latency, p99, and peak memory. Publish
+  populated decode, TTFT, total request latency and peak memory. Publish
   each required PERF-01 row. A large-GEMM TFLOPS result or a decode-only win is
   insufficient; no workload mixture has been supplied to justify hiding losses
   in a weighted average. Freeze any additional regression budgets in TASK-018
@@ -191,7 +201,7 @@ Final PERF-01 rows remain prefill and complete requests at T = 256, 4096,
 continuation. Include cold load separately from warm steady-state results.
 Keep Q4_K_M llama.cpp as the external comparison and label the unfinished
 existing QW38 result as a development control. Preserve per-row parity targets,
-confidence intervals, and the distinction between a completed measurement and
+single-run observations, and the distinction between a completed measurement and
 an achieved performance target.
 
 ## Milestones
@@ -245,7 +255,7 @@ an achieved performance target.
 | TASK-024 | GDN prefill algorithm and layer integration | M8 | TASK-023 | Measured serial/chunkwise recurrence choice, FIR/history and validated complete GDN layer | DONE |
 | TASK-025 | Causal attention prefill and layer integration | M8 | TASK-024 | Tiled attention, GQA/cache/position correctness and validated complete attention layer | DONE |
 | TASK-026 | Full-model prefill, handoff and quality gate | M8 | TASK-025 | End-to-end candidate, core suite plus fixed 32768 retrieval, chunk/dispatch boundary validation | DONE |
-| TASK-027 | Matched whole-request performance baseline | M9 | TASK-026 | PERF-01 comparison, cold/warm costs, peak memory and bottleneck-ranked gap report | TODO |
+| TASK-027 | Matched whole-request performance baseline | M9 | TASK-026 | PERF-01 comparison, cold/warm costs, peak memory and bottleneck-ranked gap report | DONE |
 | TASK-028 | Conversion-minimized native FP4 path | M10 | TASK-027 | Real-family NVFP4/MXFP4 path with GPU activation conversion, native prefill/decode comparison, quality, capacity and complete-request evidence | TODO |
 | TASK-029 | Precision and representation refinement | M10 | TASK-028 | Targeted head/family/activation/view tradeoffs with complete quality and request evidence | TODO |
 | TASK-030 | Scheduling, dispatch and fusion refinement | M10 | TASK-029 | Measured chunk/crossover, normalization/quantization/epilogue and launch-overhead decisions | TODO |
@@ -495,7 +505,7 @@ required on the final binary under EVAL-01.
 
 Run all PERF-01 rows against its pinned llama.cpp comparator after TASK-026
 quality acceptance. Report prompt ingestion, TTFT, populated decode, total
-request, p99 and confidence intervals, cold load and peak resident/transient
+request, observed per-row ratios, cold load and peak resident/transient
 memory. Separate final-logit generation from multi-row evaluation timings.
 Attribute time to quantization/packing, projections, GDN, attention, head,
 launches, synchronization and transfers; avoid double-counting host waits as

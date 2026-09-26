@@ -2,7 +2,7 @@
 
 ## Status
 
-TODO
+DONE
 
 ## Milestone
 
@@ -47,7 +47,7 @@ TASK-026 supplies accepted production prefill, decode, handoff and mandatory lon
 
 Run all PERF-01 rows against its pinned llama.cpp comparator after TASK-026
 quality acceptance. Report prompt ingestion, TTFT, populated decode, total
-request, p99 and confidence intervals, cold load and peak resident/transient
+request, observed per-row ratios, cold load and peak resident/transient
 memory. Separate final-logit generation from multi-row evaluation timings.
 Attribute time to quantization/packing, projections, GDN, attention, head,
 launches, synchronization and transfers; avoid double-counting host waits as
@@ -77,7 +77,12 @@ result. Partial or invalid evidence cannot establish quality acceptance.
 
 ## Tuning defaults
 
-Follow PERF-01: at least five warmups and 20 timed repetitions from identical restored input state, median/p99 and paired confidence intervals. Report per-row parity target ratio >= 1.00; demonstrated/unmet/uncertain depends on the paired interval. Profiling runs are separate from primary timing runs.
+Follow PERF-01's explicit 2026-09-26 user amendment: one run per workload and
+engine, zero warmups/repetitions, no median/p99/bootstrap intervals. Derive the
+prefill row from the complete request's prompt phase. Capture profiles and
+allocation peaks in those same runs, label instrumentation and first-use
+costs, and report observed ratios against the 1.00 target. Numerical tests run
+once; the accepted TASK-026 runtime/quality context remains fixed.
 
 ## Expected files/modules
 
@@ -87,11 +92,11 @@ Separate benchmark harness/public-API adapter, result records, raw timing/memory
 
 ### Unit and contract checks
 
-Where harness code changes: statistics/units, restored-state identity, timing-boundary accounting, missing-input/identity validation and report completeness.
+Where harness code changes: units, fresh/populated-state identity, timing-boundary accounting, missing-input/identity validation and report completeness.
 
 ### Reference and numerical checks
 
-Check accepted behavior and replay identities before/after timing. Do not substitute benchmark completion for quality acceptance.
+Check accepted runtime/artifact identities and output validity before/after timing. Do not substitute benchmark completion for quality acceptance.
 
 ### Integration checks
 
@@ -103,11 +108,11 @@ Required: all PERF-01 prefill, populated decode and complete-request rows, cold 
 
 ## Acceptance criteria
 
-- [ ] All mandatory matched candidate/llama.cpp rows and raw samples are present with valid identities and effective settings.
-- [ ] Required warmups/repetitions, median/p99, paired intervals and per-row parity status are reported.
-- [ ] TTFT, prefill, decode, total request, cold setup and generation/evaluation boundaries are distinct.
-- [ ] Peak memory and component profiles support a ranked bottleneck/gap report without double counting.
-- [ ] Quality context remains valid; measured speed gaps are explicit and do not block authorized refinement.
+- [x] All mandatory matched candidate/llama.cpp rows and raw samples are present with valid identities and effective settings.
+- [x] Exactly one execution per workload/engine is recorded, with no warmups or repetition statistics; observed per-row ratios are reported.
+- [x] TTFT, prefill, decode, total request, cold setup and generation/evaluation boundaries are distinct.
+- [x] Peak memory and component profiles support a ranked bottleneck/gap report without double counting.
+- [x] Quality context remains valid; measured speed gaps are explicit and do not block authorized refinement.
 
 ## Architecture blocker rule
 
@@ -117,26 +122,93 @@ Missing required comparison or quality evidence prevents completion. A speed gap
 
 ### Result
 
-TODO — no execution or acceptance evidence recorded for this revised task.
+Complete single-run matched baseline recorded. All nine rows have one observation
+per engine; every llama/QW38 latency ratio is below 1.00. Speed gaps are reported
+for downstream refinement and do not block completion. The user-authorized
+2026-09-26 performance protocol amendment remains in force: zero warmups,
+profiling in the measured run, and no repetition statistics.
 
 ### Changes made
 
-Record the concrete changes or measured keep decision, including decision and artifact/layout identities.
+Added the separate request benchmark adapter, preparation/build and profiling
+scripts, harness/profile checks, and PERF-01 single-run policy amendment. No
+production runtime code changed. Candidate evaluator SHA-256:
+`ab7479715a658fb9072322f87dba4390aa0f1bcda2a38aeaf6052b0da7577c1c`;
+accepted artifact manifest SHA-256:
+`41c1f5e673bb24eb2fb283aa6044dbccdebecc7cd85f847815b3c02a6763fc43`.
+The GGUF conversion provenance is unavailable beyond its model name and
+matching structural metadata; no model payload was hashed. This comparison does
+not establish a new Pareto quality claim.
 
 ### Tests run
 
-Record exact commands, outcomes, reference tolerances, covered boundaries and
-limits. Do not infer runtime correctness from documentation checks.
+`bash scripts/task027_build.sh` completed, including public-API tokenizer
+mapping/encoding validation for 248,077 source entries, 243 UNUSED padding IDs,
+and consumed/special IDs. During the build,
+`uv run --with pytest pytest -q tests/test_task027_benchmark.py` passed (3).
+`uv run --with pytest pytest -q tests/test_task027_profiles.py` passed (1).
+The benchmark checks cover harness contracts; the profile check covers trace
+allocation accounting and kernel categorization. The accepted TASK-026 quality
+context was retained, not rerun.
+Build/test log: `.codex-wake-run/4658d72adb49.log`; profile test log:
+`.codex-wake-run/cf98efecba0b.log`.
 
 ### Benchmark results
 
-Record raw evidence paths, timing boundaries, quality context, memory and
-uncertainty, or the reason a benchmark is not required by this task.
+Exact commands: `uv run --script scripts/task027_benchmark.py run`,
+`uv run --script scripts/task027_benchmark.py summarize`, and
+`uv run --script scripts/task027_profiles.py` (12 traces analyzed).
+`git diff --check` passed. Twelve profiled executions (one per workload/engine,
+zero warmups) produced nine matched rows. Timings include Nsight instrumentation
+and first-use costs; prefill rows reuse each request's prompt phase. The summary
+reports TTFT, decode tail, total request and cold setup separately. Ratios
+(llama/QW38) by row: decode-512 0.464792; decode-4096 0.456136; decode-32768
+0.357077; prefill-256 0.317430; request-256 0.451515; prefill-4096 0.209919;
+request-4096 0.307713; prefill-32768 0.059353; request-32768 0.067548.
+
+The largest gap is 32K prefill: QW38 208,460.004 ms vs llama.cpp 12,372.765 ms;
+request totals are 214,376.765 ms vs 14,480.757 ms. The QW38 attention scan
+kernel accounts for 177,872.02 ms. At decode T=4096, projections account for
+3,192.76 ms GPU work of 4,281.50 ms host time; at T=32768, attention rises to
+2,138.30 ms and projections to 3,240.44 ms. Request-32768 trace records
+1,852,200 `cudaLaunchKernel` and 987,621 `cudaLaunchKernelExC` calls. CPU wait
+and overlapping kernel totals are not added to wall/GPU time.
+
+At T=32768, tracked allocation peaks are 24,196,583,696 bytes (QW38) and
+21,837,146,883 bytes (llama.cpp); sampled resident growth is separately
+24,769,462,272 and 21,911,044,096 bytes. The latter is a post-run point sample,
+not an exact process residency peak. QW38 retained 8,317,239,296 free bytes,
+above the 2 GiB reserve. Timings are single observations with no median, p99,
+confidence interval or repeated-run inference. Request-256 differed in 77 of
+128 output positions and decode-512 in 4; other output positions matched.
+
+Complete raw evidence, twelve JSONL captures, logs, Nsight reports/SQLite,
+manifest, summary, profiles, token inputs, pinned llama headers and benchmark
+binary are preserved under
+`.cache/evaluation/qw38-language-v2/task027-support/`. The manifest records
+commands, source/binary/image/input identities, effective settings, GPU and
+hardware context. The capture ran on the pinned CUDA 13.4.1 candidate
+container, GCC 14.2.0, native sm_120, RTX 5090, driver 590.48.01, 32607 MiB,
+with the existing 400 W limit. The comparator image revision is
+`e6ab7c1a41054a888ada952eab4c886444c2f5ad`. OS page cache was not evicted, so
+cold setup is fresh-process load/upload with cache-order dependence. The earlier
+repeated capture was canceled per the user amendment; partial results are
+excluded.
+
+### Roles and review
+
+Implementation and evidence collection: main-thread GPT-6. Independent review:
+gpt-6-astra high, pass 1, PASS with no findings, acceptance/evidence gaps or
+targeted evidence requests. Review record:
+`.cache/evaluation/qw38-language-v2/task027-support/astra-review.txt`.
+Documentation and delivery: gpt-6-luna medium.
 
 ### Architecture blocker
 
-Record none or the complete ledger-defined blocker report.
+None.
 
 ### Follow-up observations
 
-Record remaining coverage and performance gaps and their downstream owners.
+Long-context attention and conversion/projection costs are the largest measured
+gaps. Follow-up ownership remains with planned TASK-028–032; no downstream task
+was started here.

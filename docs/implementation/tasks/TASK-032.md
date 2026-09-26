@@ -101,7 +101,7 @@ Complete 54-case EVAL-01 core, the fixed `R-32768-s0-d0.1` retrieval case, selec
 
 ## Benchmark required
 
-All mandatory PERF-01 rows with raw paired samples, median/p99/intervals, cold/warm separation, full memory accounting and final per-row parity/gap status.
+All mandatory PERF-01 rows with one raw observation per engine/row, no repetition statistics, load/first-use boundaries, full memory accounting and final per-row parity/gap status.
 
 ## Acceptance criteria
 

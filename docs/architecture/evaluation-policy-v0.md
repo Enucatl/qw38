@@ -537,6 +537,32 @@ authorize an unmeasured precision change.
 
 ## PERF-01: matching the local llama.cpp benchmark
 
+### Single-run performance amendment — 2026-09-26
+
+The user directed: "Shorten all tests to just one run, no repetitions, these
+will be the performance benchmarks." This governs performance measurement in
+TASK-027 and subsequent refinement tasks until the user requests a change.
+Use exactly one measured execution per workload and engine, with no warmups,
+repeat trials, benchmark replay, bootstrap, median, p99 or confidence intervals.
+Report observed latency, throughput and per-row ratios; these are the accepted
+performance benchmarks for locating the largest gaps. Numerical correctness
+and EVAL-01 quality criteria are unchanged; run applicable checks once.
+
+Compatible measurements may share one execution: a complete request's prompt
+phase supplies the prefill/TTFT row. Populated decode still needs one prompt
+population outside its 128-step timer. A request still produces 128 outputs
+with exactly 127 subsequent decode calls. Do not repeat prompt ingestion solely
+to initialize graphs or workspace; report first-use costs within the single
+execution and keep model load/session creation separate. Capture required
+profiling/allocation evidence in the same execution and label instrumentation
+overhead, rather than adding another inference run. Historical repeated samples
+remain historical and are not pooled into the new single-run benchmarks.
+
+This amendment supersedes repetition, uncertainty, separate profiling-run and
+warm steady-state requirements elsewhere in performance documents and task
+contracts. It does not weaken model/token identity, residency, timing-boundary,
+capacity, output-policy or measurement-completeness requirements.
+
 Select `models/Qwen3.8-27B-Q4_K_M.gguf` as the required **black-box performance
 comparator**. The local file exists and is 18,973,870,432 bytes; availability
 does not establish that its tokenizer/checkpoint matches or that a usable CUDA
@@ -598,26 +624,21 @@ there are exactly **127 subsequent decode calls**, reported separately as
 `127 / decode_time`. A populated-decode row has 128 explicit input steps and
 must not be mistaken for the complete request's 127-step decode tail.
 
-Tokenization, loading, upload, graph construction, warmup, and reset/restore are
-outside steady-state windows and reported separately. Synchronize before and
-after timed GPU work; primary latency is host monotonic elapsed time including
-launch/readout overhead. GPU-event durations are separately labeled diagnostics.
-Prefill excludes intermediate vocabulary projections when they are not requested.
-Do not use an HTTP endpoint for one engine and direct inference for the other.
+Tokenization, model loading/upload, CUDA/session creation and populated-decode
+prompt setup are outside their measured workload windows and reported
+separately. First-use graph/workspace costs remain inside the single execution.
+Synchronize before and after timed GPU work; primary latency is host monotonic
+elapsed time including launch/readout and same-run profiling overhead.
+GPU durations are separately labeled diagnostics. Prefill excludes intermediate
+vocabulary projections when they are not requested. Do not use an HTTP endpoint
+for one engine and direct inference for the other.
 
-Use at least five untimed warmup runs and twenty measured repetitions per row
-per engine, with identical incoming state per repetition. Pair trials by index,
-alternate which engine's block runs first, and record run order and thermal
-conditions. Reuse engine-specific snapshots or replay outside the timer; do not
-transfer state bytes between engines. Report every raw sample, median and p99
-(nearest rank; with 20 samples p99 is the maximum and has limited precision).
-Measure peak resident GPU memory and total model/state/scratch use separately.
-
-For paired 95% intervals on ratios of medians, bootstrap 10000 paired trial
-indices using the EVAL-01 resampler with group `perf/<row-id>`. Throughput is
-computed from the same work count and measured time, not averages over unequal
-work. Missing runs, errors, offload, identity mismatches or unavailable model
-support cannot become zero-speed baselines or infinite speedups.
+Run each workload once per engine on fresh state; alternate engine order across
+workloads and record thermal conditions. Report the raw observation, individual
+decode-step times, memory categories and allocation peaks. No percentile or
+confidence estimate is made from a single run. Missing runs, errors, offload,
+identity mismatches or unavailable model support cannot become zero-speed
+baselines or infinite speedups.
 
 The stock `llama-bench` is useful supplemental evidence, but its inspected
 `test_prompt`/`test_gen` feed synthetic/random token IDs and its combined `-pg`
@@ -632,13 +653,10 @@ semantics, and never divide its combined pp+tg throughput by QW38 decode speed.
 ### Target, quality context, and task completion
 
 For each matched row publish QW38/llama throughput or llama/QW38 latency so
-values above one always favor QW38. The parity target is **ratio >= 1.00 for
-every required row's median**, while EVAL-01 quality passes. Mark the target
-demonstrated only when the lower paired 95% bound is also at least 1.00;
-mark it unmet when the upper bound is below 1.00; otherwise mark it uncertain.
-Also publish p99 and memory ratios; they are required evidence, with no new
-tail-latency or memory parity threshold. Do not hide individual losses behind
-one geometric mean.
+values above one favor QW38. Report whether the observed ratio meets 1.00,
+with the existing accepted quality context. Also publish observed memory
+ratios. These single-run observations locate performance gaps; they make no
+statistical parity claim. Do not hide individual losses behind an average.
 
 TASK-027 must deliver the complete matched baseline and gap report even if the
 candidate is slower. **Missing comparison evidence blocks TASK-027; missing speed parity
