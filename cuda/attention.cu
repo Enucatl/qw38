@@ -1,6 +1,8 @@
 #include "cuda/attention.hpp"
 #include "cuda/prefill.hpp"
 
+#include <mma.h>
+
 #include <array>
 #include <cstddef>
 #include <cmath>
@@ -226,19 +228,19 @@ __global__ void attention_scan_kernel(
     }
     __syncthreads();
 
-    // One thread computes each score.  This preserves a simple, explicit
-    // FP32 dot-product definition while the 128-thread block performs staging.
-    if (tid < kAttnSubtileKeys) {
-      std::uint64_t const token = segment_begin + sub + tid;
+    // Each warp reduces one dot product; all four warps cover the key tile.
+    for (std::uint32_t key = tid / 32u; key < kAttnSubtileKeys; key += 4u) {
+      std::uint64_t const token = segment_begin + sub + key;
+      float score = 0.0f;
       if (token < populated && token < capacity) {
-        float score = 0.0f;
-        for (std::uint32_t d = 0; d < kAttnHeadDim; ++d) {
-          score += q_shared[d] * bf16_to_fp32(tile[tid * kAttnHeadDim + d]);
+        for (std::uint32_t d = tid % 32u; d < kAttnHeadDim; d += 32u) {
+          score += q_shared[d] * bf16_to_fp32(tile[key * kAttnHeadDim + d]);
         }
-        scores[tid] = score * kAttnScale;
-      } else {
-        scores[tid] = -INFINITY;
       }
+      score = warp_sum(score);
+      if (tid % 32u == 0)
+        scores[key] = token < populated && token < capacity
+            ? score * kAttnScale : -INFINITY;
     }
     __syncthreads();
 
@@ -467,7 +469,7 @@ __global__ void attention_prefill_scan_kernel(
     std::uint16_t const* kv, std::uint32_t attn_layer,
     std::uint64_t capacity, std::uint64_t first_position,
     std::uint32_t valid_tokens, std::uint16_t* y) {
-  constexpr std::uint32_t K = kAttnPrefillKeyTile;
+  constexpr std::uint32_t K = kAttnPrefillKeyTileControl;
   __shared__ float qs[Q * kAttnHeadDim];
   __shared__ float num[Q * kAttnHeadDim];
   __shared__ std::uint16_t tile[K * kAttnHeadDim];
@@ -557,6 +559,123 @@ __global__ void attention_prefill_scan_kernel(
       y[off] = fp32_to_bf16_rne(value);
     }
   }
+}
+
+constexpr int kPrefillThreads = 256;
+constexpr std::size_t kPrefillSharedBytes =
+    (kAttnPrefillQueryTile + kAttnPrefillKeyTile) * kAttnHeadDim * 2u +
+    (kAttnPrefillQueryTile * kAttnPrefillKeyTile +
+     3u * kAttnPrefillQueryTile) * sizeof(float);
+
+__global__ void attention_prefill_mma_kernel(
+    std::uint16_t const* q, std::uint16_t const* g,
+    std::uint16_t const* kv, std::uint32_t attn_layer,
+    std::uint64_t capacity, std::uint64_t first_position,
+    std::uint32_t valid_tokens, std::uint16_t* y) {
+  namespace wmma = nvcuda::wmma;
+  constexpr int Q = kAttnPrefillQueryTile, K = kAttnPrefillKeyTile;
+  constexpr int D = kAttnHeadDim;
+  extern __shared__ __align__(32) unsigned char storage[];
+  auto* qs = reinterpret_cast<__nv_bfloat16*>(storage);
+  auto* tile = qs + Q * D;  // K and V share storage after QK completes.
+  auto* scores = reinterpret_cast<float*>(tile + K * D);
+  float* m = scores + Q * K;
+  float* l = m + Q;
+  float* rescale = l + Q;
+  int const tid = threadIdx.x, warp = tid / 32, lane = tid % 32;
+  std::uint32_t const h = blockIdx.x, row0 = blockIdx.y * Q;
+  std::size_t const head_stride = static_cast<std::size_t>(capacity) * D;
+  std::size_t const comp_stride = kAttnKvHeads * head_stride;
+  auto const* k_base = kv + attn_layer * 2u * comp_stride +
+      (h / kAttnGqaGroup) * head_stride;
+  auto const* v_base = k_base + comp_stride;
+  for (int i = tid; i < Q * D; i += kPrefillThreads) {
+    std::uint32_t const row = row0 + i / D;
+    qs[i] = __ushort_as_bfloat16(row < valid_tokens
+        ? q[(static_cast<std::size_t>(row) * kAttnQueryHeads + h) * D + i % D]
+        : 0);
+  }
+  if (tid < Q) { m[tid] = -INFINITY; l[tid] = 0.0f; }
+  // Each thread owns one value coordinate across the 32 query rows.
+  float numerator[Q]{};
+  __syncthreads();
+  std::uint64_t const last = first_position + min(valid_tokens, row0 + Q);
+  for (std::uint64_t base = 0; base < last; base += K) {
+    for (int i = tid; i < K * D; i += kPrefillThreads) {
+      std::uint64_t const token = base + i / D;
+      tile[i] = __ushort_as_bfloat16(token < last
+          ? k_base[token * D + i % D] : 0);
+    }
+    __syncthreads();
+    wmma::fragment<wmma::matrix_a, 16, 16, 16, __nv_bfloat16, wmma::row_major> a;
+    wmma::fragment<wmma::matrix_b, 16, 16, 16, __nv_bfloat16, wmma::col_major> b;
+    wmma::fragment<wmma::accumulator, 16, 16, 16, float> dot;
+    wmma::fill_fragment(dot, 0.0f);
+    for (int d = 0; d < D; d += 16) {
+      wmma::load_matrix_sync(a, qs + (warp / 4) * 16 * D + d, D);
+      wmma::load_matrix_sync(b, tile + (warp % 4) * 16 * D + d, D);
+      wmma::mma_sync(dot, a, b, dot);
+    }
+    wmma::store_matrix_sync(scores + (warp / 4) * 16 * K + (warp % 4) * 16,
+                            dot, K, wmma::mem_row_major);
+    __syncthreads();
+    // A warp owns each row's two groups of 32 scores. All reductions,
+    // probabilities and running statistics stay FP32, including masked tails.
+    for (int r = warp; r < Q; r += kPrefillThreads / 32) {
+      bool const valid = row0 + r < valid_tokens;
+      float s0 = valid && base + lane <= first_position + row0 + r
+          ? scores[r * K + lane] * kAttnScale : -INFINITY;
+      float s1 = valid && base + lane + 32 <= first_position + row0 + r
+          ? scores[r * K + lane + 32] * kAttnScale : -INFINITY;
+      float best = fmaxf(m[r], fmaxf(s0, s1));
+#pragma unroll
+      for (int off = 16; off > 0; off >>= 1)
+        best = fmaxf(best, __shfl_xor_sync(0xffffffffu, best, off));
+      float const scale = m[r] == -INFINITY ? 0.0f : expf(m[r] - best);
+      float const p0 = s0 == -INFINITY ? 0.0f : expf(s0 - best);
+      float const p1 = s1 == -INFINITY ? 0.0f : expf(s1 - best);
+      float const sum = warp_sum(p0 + p1);
+      scores[r * K + lane] = p0;
+      scores[r * K + lane + 32] = p1;
+      if (lane == 0) {
+        m[r] = best;
+        l[r] = l[r] * scale + sum;
+        rescale[r] = scale;
+      }
+    }
+    __syncthreads();
+    for (int i = tid; i < K * D; i += kPrefillThreads) {
+      std::uint64_t const token = base + i / D;
+      tile[i] = __ushort_as_bfloat16(token < last
+          ? v_base[token * D + i % D] : 0);
+    }
+    __syncthreads();
+#pragma unroll
+    for (int r = 0; r < Q; ++r) numerator[r] *= rescale[r];
+#pragma unroll 1
+    for (int key = 0; key < K; ++key) {
+      float const value = __bfloat162float(tile[key * D + tid]);
+#pragma unroll
+      for (int r = 0; r < Q; ++r)
+        numerator[r] += scores[r * K + key] * value;
+    }
+    __syncthreads();
+  }
+#pragma unroll
+  for (int r = 0; r < Q; ++r) {
+    if (row0 + r < valid_tokens) {
+      std::size_t const off = (static_cast<std::size_t>(row0 + r) *
+          kAttnQueryHeads + h) * D + tid;
+      y[off] = fp32_to_bf16_rne(numerator[r] / l[r] *
+                                sigmoid_fp32(bf16_to_fp32(g[off])));
+    }
+  }
+}
+
+std::expected<void, Error> configure_prefill_mma() {
+  return check(cudaFuncSetAttribute(attention_prefill_mma_kernel,
+      cudaFuncAttributeMaxDynamicSharedMemorySize, kPrefillSharedBytes),
+      "cudaFuncSetAttribute(attention_prefill_mma_kernel)");
 }
 
 }  // namespace
@@ -676,6 +795,7 @@ std::expected<void, Error> launch_attention_prefill_scan(
       !valid_tokens || valid_tokens > 1024u ||
       first_position >= capacity || valid_tokens > capacity - first_position ||
       (query_tile != kAttnPrefillQueryTile &&
+       query_tile != kAttnPrefillQueryTileScalar &&
        query_tile != kAttnPrefillQueryTileControl))
     return std::unexpected(make_error(ErrorCode::InvalidArgument,
                                       "attention_prefill_scan", "invalid chunk geometry or operand"));
@@ -711,8 +831,13 @@ std::expected<void, Error> launch_attention_prefill_scan(
   if (!guard) return std::unexpected(guard.error());
   dim3 const grid(kAttnQueryHeads,
                   (valid_tokens + query_tile - 1u) / query_tile);
-  if (query_tile == kAttnPrefillQueryTile)
-    attention_prefill_scan_kernel<kAttnPrefillQueryTile>
+  if (query_tile == kAttnPrefillQueryTile) {
+    if (auto st = configure_prefill_mma(); !st) return st;
+    attention_prefill_mma_kernel
+        <<<grid, kPrefillThreads, kPrefillSharedBytes, stream.native()>>>(
+            q, g, kv, attn_layer, capacity, first_position, valid_tokens, y);
+  } else if (query_tile == kAttnPrefillQueryTileScalar)
+    attention_prefill_scan_kernel<kAttnPrefillQueryTileScalar>
         <<<grid, kAttnScanThreads, 0, stream.native()>>>(
             q, g, kv, attn_layer, capacity, first_position, valid_tokens, y);
   else
@@ -725,23 +850,31 @@ std::expected<void, Error> launch_attention_prefill_scan(
 std::expected<AttentionPrefillResources, Error> attention_prefill_resources(
     std::uint32_t query_tile) {
   if (query_tile != kAttnPrefillQueryTile &&
+      query_tile != kAttnPrefillQueryTileScalar &&
       query_tile != kAttnPrefillQueryTileControl)
     return std::unexpected(make_error(ErrorCode::InvalidArgument,
                                       "attention_prefill_resources", "invalid query tile"));
   void const* kernel = query_tile == kAttnPrefillQueryTile
-      ? reinterpret_cast<void const*>(attention_prefill_scan_kernel<kAttnPrefillQueryTile>)
-      : reinterpret_cast<void const*>(attention_prefill_scan_kernel<kAttnPrefillQueryTileControl>);
+      ? reinterpret_cast<void const*>(attention_prefill_mma_kernel)
+      : query_tile == kAttnPrefillQueryTileScalar
+          ? reinterpret_cast<void const*>(attention_prefill_scan_kernel<kAttnPrefillQueryTileScalar>)
+          : reinterpret_cast<void const*>(attention_prefill_scan_kernel<kAttnPrefillQueryTileControl>);
+  bool const mma = query_tile == kAttnPrefillQueryTile;
+  if (mma) {
+    if (auto st = configure_prefill_mma(); !st) return std::unexpected(st.error());
+  }
+  std::size_t const dynamic_bytes = mma ? kPrefillSharedBytes : 0;
   cudaFuncAttributes attr{};
   auto st = check(cudaFuncGetAttributes(&attr, kernel),
                   "cudaFuncGetAttributes(attention_prefill_scan_kernel)");
   if (!st) return std::unexpected(st.error());
   int occupancy = 0;
   st = check(cudaOccupancyMaxActiveBlocksPerMultiprocessor(
-      &occupancy, kernel, kAttnScanThreads, 0),
+      &occupancy, kernel, mma ? kPrefillThreads : kAttnScanThreads, dynamic_bytes),
       "cudaOccupancyMaxActiveBlocksPerMultiprocessor(attention_prefill_scan_kernel)");
   if (!st) return std::unexpected(st.error());
   return AttentionPrefillResources{attr.numRegs,
-      static_cast<std::size_t>(attr.sharedSizeBytes),
+      static_cast<std::size_t>(attr.sharedSizeBytes) + dynamic_bytes,
       static_cast<std::size_t>(attr.localSizeBytes), occupancy};
 }
 

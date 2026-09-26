@@ -80,7 +80,7 @@ int run(char const* artifact) {
             << ",local_bytes," << resources->local_bytes
             << ",occupancy_blocks_per_sm," << resources->occupancy_blocks_per_sm
             << '\n';
-  std::cout << "control,query_tile,4,key_tile," << qw38::cuda::kAttnPrefillKeyTile
+  std::cout << "control,query_tile,4,key_tile," << qw38::cuda::kAttnPrefillKeyTileControl
             << ",registers," << control_resources->registers
             << ",shared_bytes," << control_resources->shared_bytes
             << ",local_bytes," << control_resources->local_bytes
@@ -106,10 +106,12 @@ int run(char const* artifact) {
         if (!ms) return 1;
         std::uint64_t const traffic = 2ull * kKvHeads * (prefix + m) * kHeadDim * 2u;
         std::uint64_t estimated = 0;
-        for (std::uint32_t q = 0; q < m; q += 1u)
-          estimated += 2ull * kQueryHeads * (prefix + std::min(m, q + 1u)) *
+        for (std::uint32_t q = 0; q < m; q += qw38::cuda::kAttnPrefillQueryTile)
+          estimated += 2ull * kQueryHeads *
+                       (prefix + std::min(m, q + qw38::cuda::kAttnPrefillQueryTile)) *
                        kHeadDim * 2u;
-        std::cout << "sample,complete_layer," << prefix << ',' << m << ",1," << rep
+        std::cout << "sample,complete_layer," << prefix << ',' << m << ','
+                  << qw38::cuda::kAttnPrefillQueryTile << ',' << rep
                   << ',' << *ms << ',' << traffic << ',' << estimated << '\n';
       } else {
         // A real projection/preparation pass supplies Q/g and valid appended KV.

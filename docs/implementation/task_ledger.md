@@ -365,7 +365,7 @@ an achieved performance target.
 | TASK-025 | Causal attention prefill and layer integration | M8 | TASK-024 | Tiled attention, GQA/cache/position correctness and validated complete attention layer | DONE |
 | TASK-026 | Full-model prefill, handoff and quality gate | M8 | TASK-025 | End-to-end candidate, core suite plus fixed 32768 retrieval, chunk/dispatch boundary validation | DONE |
 | TASK-027 | Matched whole-request performance baseline | M9 | TASK-026 | PERF-01 comparison, cold/warm costs, peak memory and bottleneck-ranked gap report | DONE |
-| TASK-028 | Reuse-oriented long-context attention | M10 | TASK-027 | Multi-query prefill reuse and cooperative segmented decode with bounded memory | TODO |
+| TASK-028 | Reuse-oriented long-context attention | M10 | TASK-027 | Multi-query prefill reuse and cooperative segmented decode with bounded memory | DONE |
 | TASK-029 | Integrated native NVFP4 MLP gate/up | M10 | TASK-028 | Compiler/layout, GPU packing/reuse, GEMM/GEMV and local fusion; checked fallback allowed | TODO |
 | TASK-030 | Combined validation and delivery decision | M11 | TASK-029 | Core-54, fixed long case, replay, capacity, matched performance and promotion decision | TODO |
 | TASK-031 | Retired state-refinement task | — | — | Attention moved to TASK-028; state experiments deferred | SUPERSEDED |

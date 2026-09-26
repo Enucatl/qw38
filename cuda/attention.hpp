@@ -52,9 +52,11 @@ inline constexpr int kAttnPrepBlocks = kAttnPrepQueryBlocks + kAttnPrepKvBlocks;
     std::uint16_t* q_out, std::uint16_t* g_out, std::uint16_t* kv,
     std::uint32_t attn_layer, std::uint64_t capacity, Stream const& stream);
 
-inline constexpr std::uint32_t kAttnPrefillQueryTile = 1;
+inline constexpr std::uint32_t kAttnPrefillQueryTile = 32;
+inline constexpr std::uint32_t kAttnPrefillQueryTileScalar = 1;
 inline constexpr std::uint32_t kAttnPrefillQueryTileControl = 4;
-inline constexpr std::uint32_t kAttnPrefillKeyTile = 32;
+inline constexpr std::uint32_t kAttnPrefillKeyTile = 64;
+inline constexpr std::uint32_t kAttnPrefillKeyTileControl = 32;
 
 struct AttentionPrefillResources {
   int registers{};
@@ -63,8 +65,9 @@ struct AttentionPrefillResources {
   int occupancy_blocks_per_sm{};
 };
 
-// One block per query head and query row. K and V share one key tile;
-// FP32 online statistics and numerators remain block-local.
+// One block per query head and 32 query rows. BF16 tensor-core QK, FP32
+// softmax/PV, shared K/V staging; statistics/numerators remain block-local.
+// Explicit query tiles 1 and 4 select the scalar diagnostic controls.
 [[nodiscard]] std::expected<void, Error> launch_attention_prefill_scan(
     std::uint16_t const* q, std::uint16_t const* g,
     std::uint16_t const* kv, std::uint32_t attn_layer,
