@@ -7,6 +7,11 @@
 #include <expected>
 
 namespace qw38::cuda {
+[[nodiscard]] std::expected<void, Error> launch_hidden_rms_nvfp4(
+    float const* residual, std::uint16_t const* gamma, float eps,
+    std::uint32_t n_tokens, std::uint8_t* codes, std::uint8_t* scales,
+    Stream const& stream);
+
 
 // Shape-specific language dimensions. Tuning thread counts are T-01 / T-03.
 inline constexpr std::uint32_t kHidden = 5120;

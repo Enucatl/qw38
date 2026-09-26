@@ -34,6 +34,10 @@ std::expected<qw38::cuda::PrefillWeight, Error> bind_weight(
   }
   auto const layout = static_cast<std::uint16_t>(record->layout);
   auto const quantizer = static_cast<std::uint16_t>(record->quantizer);
+  bool const nvfp4 = layout == qw38::cuda::kDecodeLayoutNvFp4V1 &&
+      quantizer == qw38::cuda::kDecodeQuantizerNvFp4V1 &&
+      record->storage == StorageClass::NvFp4 && kind == SemanticNodeKind::Mlp &&
+      (name.ends_with(".mlp.gate_proj.weight") || name.ends_with(".mlp.up_proj.weight"));
   bool const q4k = layout == qw38::cuda::kDecodeLayoutQ4KCandidateV2 &&
                    quantizer == qw38::cuda::kDecodeQuantizerQ4KCandidateV2 &&
                    record->storage == StorageClass::Int4Grouped;
@@ -46,7 +50,7 @@ std::expected<qw38::cuda::PrefillWeight, Error> bind_weight(
   bool const bf16 = layout == qw38::cuda::kDecodeLayoutBf16DenseTileV0 &&
                     quantizer == qw38::cuda::kDecodeQuantizerNone &&
                     record->storage == StorageClass::Bf16;
-  if (!q4k && !q8 && !bf16) {
+  if (!nvfp4 && !q4k && !q8 && !bf16) {
     return std::unexpected(make_error(ErrorCode::MalformedArtifact, name,
                                       "unsupported prefill weight representation"));
   }

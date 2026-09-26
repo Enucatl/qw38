@@ -1,4 +1,5 @@
 #include "cuda/prefill.hpp"
+#include "cuda/nvfp4.hpp"
 
 #include "cuda/activation.hpp"
 
@@ -141,6 +142,8 @@ __global__ void swiglu_kernel(float const* gate, float const* up,
 }
 
 bool layout_ok(PrefillWeight const& w) {
+  if (w.layout == kDecodeLayoutNvFp4V1)
+    return w.quantizer == kDecodeQuantizerNvFp4V1 && w.k <= 5120 && w.n % 8 == 0;
   if (w.layout == kDecodeLayoutQ4KCandidateV2)
     return w.quantizer == kDecodeQuantizerQ4KCandidateV2;
   if (w.layout == kDecodeLayoutQ8G32CandidateV1)
@@ -150,6 +153,25 @@ bool layout_ok(PrefillWeight const& w) {
   if (w.layout == kDecodeLayoutBf16DenseTileV0)
     return w.quantizer == kDecodeQuantizerNone;
   return false;
+}
+
+DecodeMmvDesc nvfp4_decode(PrefillWeight const& w, std::uint16_t const* input,
+                            void* output, DecodeEpilogue epilogue) {
+  DecodeMmvDesc d;
+  d.layout=w.layout; d.quantizer=w.quantizer; d.n=w.n; d.k=w.k;
+  d.padded_n=w.padded_n; d.padded_k=w.padded_k; d.epilogue=epilogue;
+  d.codes=decode_matrix_view(const_cast<void*>(w.codes),DecodeDtype::NvFp4,w.layout,
+      w.n,w.k,w.padded_n,w.padded_k,w.codes_bytes,16);
+  auto units=static_cast<std::uint32_t>(w.scales_bytes/2);
+  d.scales=decode_matrix_view(const_cast<void*>(w.scales),DecodeDtype::Fp16,w.layout,
+      1,units,1,units,w.scales_bytes,16);
+  d.input=decode_vector_view(const_cast<std::uint16_t*>(input),DecodeDtype::Bf16,
+      kDecodeLayoutBf16VectorV0,w.k,std::uint64_t(w.k)*2,2,false);
+  bool bf16=epilogue==DecodeEpilogue::StoreBf16 || epilogue==DecodeEpilogue::SwigluStoreBf16;
+  d.output=decode_vector_view(output,bf16?DecodeDtype::Bf16:DecodeDtype::Fp32,
+      bf16?kDecodeLayoutBf16VectorV0:kDecodeLayoutFp32VectorV0,w.n,
+      std::uint64_t(w.n)*(bf16?2:4),bf16?2:4,true);
+  return d;
 }
 
 struct Region {
@@ -332,14 +354,14 @@ std::expected<void, Error> PrefillEngine::contract(
   }
   auto guard = stream_->activate();
   if (!guard) return std::unexpected(guard.error());
-  auto codes = device_region(w.codes, w.codes_bytes, 2u, device_);
+  auto codes = device_region(w.codes, w.codes_bytes, w.layout == kDecodeLayoutNvFp4V1 ? 16u : 2u, device_);
   auto workspace = device_region(workspace_.data(), workspace_.bytes(), 16u, device_);
   if (!codes || !workspace) {
     return std::unexpected(make_error(ErrorCode::InvalidArgument, "prefill.weight",
                                       "invalid weight or workspace range"));
   }
   if (w.scales_bytes) {
-    auto scales = device_region(w.scales, w.scales_bytes, 2u, device_);
+    auto scales = device_region(w.scales, w.scales_bytes, w.layout == kDecodeLayoutNvFp4V1 ? 16u : 2u, device_);
     if (!scales) return std::unexpected(scales.error());
     std::array<Region, 3> regions{*codes, *scales, *workspace};
     return distinct(regions);
@@ -352,6 +374,10 @@ std::expected<void, Error> PrefillEngine::gemm_tile(
     PrefillWeight const& w, std::uint16_t const* input,
     std::uint32_t valid_tokens, std::uint32_t row_start, float* accum) {
   std::uint32_t const tile_rows = std::min(weight_rows_, w.n - row_start);
+  if (w.layout == kDecodeLayoutNvFp4V1)
+    return nvfp4_gemm_tile(w.codes,w.scales,packed_input(),packed_scales(),
+        valid_tokens,tile_rows,w.k,row_start,accum,library_workspace_,
+        kCublasWorkspaceBytes,*stream_);
   auto guard = stream_->activate();
   if (!guard) return std::unexpected(guard.error());
   std::uint64_t const elements = static_cast<std::uint64_t>(tile_rows) * w.k;
@@ -426,6 +452,15 @@ std::expected<void, Error> PrefillEngine::project(PrefillProjection const& d) {
     ranges[count++] = *residual;
   }
   if (auto st = distinct(std::span<Region const>{ranges.data(), count}); !st) return st;
+  if (d.weight.layout == kDecodeLayoutNvFp4V1) {
+    if (d.valid_tokens == 1) {
+      auto desc = nvfp4_decode(d.weight,d.input,d.output,static_cast<DecodeEpilogue>(d.epilogue));
+      if (d.residual) desc.residual=decode_vector_view(const_cast<float*>(d.residual),
+          DecodeDtype::Fp32,kDecodeLayoutFp32VectorV0,d.weight.n,std::uint64_t(d.weight.n)*4,4,false);
+      return launch_decode_mmv(desc,*stream_);
+    }
+    if (auto st=launch_pack_nvfp4(d.input,packed_input(),packed_scales(),d.valid_tokens,d.weight.k,*stream_); !st) return st;
+  }
   for (std::uint32_t start = 0; start < d.weight.n; start += weight_rows_) {
     std::uint32_t const rows = std::min(weight_rows_, d.weight.n - start);
     if (auto st = gemm_tile(d.weight, d.input, d.valid_tokens, start, accum_a_); !st)
@@ -444,6 +479,13 @@ std::expected<void, Error> PrefillEngine::paired_swiglu(
     PrefillWeight const& gate, PrefillWeight const& up,
     std::uint16_t const* normalized, std::uint16_t* swiglu,
     std::uint32_t valid_tokens, std::uint64_t first_position) {
+  return paired_swiglu_impl(gate,up,normalized,swiglu,valid_tokens,first_position,false);
+}
+
+std::expected<void, Error> PrefillEngine::paired_swiglu_impl(
+    PrefillWeight const& gate, PrefillWeight const& up,
+    std::uint16_t const* normalized, std::uint16_t* swiglu,
+    std::uint32_t valid_tokens, std::uint64_t first_position, bool packed) {
   if (!stream_ || stream_->empty()) {
     return std::unexpected(make_error(ErrorCode::InvalidArgument, "prefill.swiglu",
                                       "stream is closed"));
@@ -490,6 +532,17 @@ std::expected<void, Error> PrefillEngine::paired_swiglu(
     ranges[count++] = *scales;
   }
   if (auto st = distinct(std::span<Region const>{ranges.data(), count}); !st) return st;
+  if (gate.layout == kDecodeLayoutNvFp4V1) {
+    if (valid_tokens == 1) {
+      DecodeMmvPairedDesc d;
+      d.a=nvfp4_decode(gate,normalized,swiglu,DecodeEpilogue::SwigluStoreBf16);
+      d.b=nvfp4_decode(up,normalized,swiglu,DecodeEpilogue::SwigluStoreBf16);
+      d.b.output={};
+      return launch_decode_mmv_paired(d,*stream_);
+    }
+    if (!packed)
+      if (auto st=launch_pack_nvfp4(normalized,packed_input(),packed_scales(),valid_tokens,gate.k,*stream_); !st) return st;
+  }
   for (std::uint32_t start = 0; start < gate.n; start += weight_rows_) {
     std::uint32_t const rows = std::min(weight_rows_, gate.n - start);
     if (auto st = gemm_tile(gate, normalized, valid_tokens, start, accum_a_); !st)
@@ -518,7 +571,10 @@ std::expected<void, Error> PrefillEngine::mlp(
   auto guard = stream_->activate();
   if (!guard) return std::unexpected(guard.error());
   if (!h_mid || !gamma || !next_h || !std::isfinite(eps) || eps <= 0.0f ||
-      gate.n != 17408 || gate.k != 5120 || down.n != 5120 || down.k != 17408) {
+      gate.n != 17408 || gate.k != 5120 || down.n != 5120 || down.k != 17408 ||
+      up.n != gate.n || up.k != gate.k || up.layout != gate.layout ||
+      up.quantizer != gate.quantizer ||
+      first_position > std::numeric_limits<std::uint64_t>::max() - valid_tokens) {
     return std::unexpected(make_error(ErrorCode::InvalidArgument, "prefill.mlp",
                                       "MLP shape or pointer contract mismatch"));
   }
@@ -552,10 +608,14 @@ std::expected<void, Error> PrefillEngine::mlp(
       }
     }
   }
-  if (auto st = launch_hidden_rms(h_mid, gamma, eps, valid_tokens, normalized_,
-                                  *stream_); !st) return st;
-  if (auto st = paired_swiglu(gate, up, normalized_, swiglu_, valid_tokens,
-                              first_position); !st) return st;
+  bool const packed = gate.layout == kDecodeLayoutNvFp4V1 && valid_tokens >= 2;
+  if (packed) {
+    if (auto st=launch_hidden_rms_nvfp4(h_mid,gamma,eps,valid_tokens,
+                                       packed_input(),packed_scales(),*stream_); !st) return st;
+  } else {
+    if (auto st=launch_hidden_rms(h_mid,gamma,eps,valid_tokens,normalized_,*stream_); !st) return st;
+  }
+  if (auto st=paired_swiglu_impl(gate,up,normalized_,swiglu_,valid_tokens,first_position,packed); !st) return st;
   return project(PrefillProjection{.weight = down, .input = swiglu_,
                                    .output = next_h, .residual = h_mid,
                                    .valid_tokens = valid_tokens,

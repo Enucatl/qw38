@@ -1,4 +1,5 @@
 #include "cuda/decode_mmv.hpp"
+#include "cuda/nvfp4_device.cuh"
 
 #include <cmath>
 #include <cstddef>
@@ -8,7 +9,7 @@
 namespace qw38::cuda {
 namespace {
 
-enum class WeightKind { Q4, Q4K, Q8, Bf16 };
+enum class WeightKind { NvFp4, Q4, Q4K, Q8, Bf16 };
 
 __device__ __forceinline__ float bf16_to_fp32(std::uint16_t h) {
   return __uint_as_float(static_cast<std::uint32_t>(h) << 16);
@@ -86,7 +87,17 @@ __device__ __forceinline__ float silu_fp32(float z) {
 
 template <WeightKind Kind>
 __device__ void decode8(std::byte const* codes, std::byte const* scales,
-                        std::uint64_t tile_row, int lane, float out[8]) {
+                        std::uint64_t tile_row, int lane, float out[8], std::uint32_t padded_k) {
+  if constexpr (Kind == WeightKind::NvFp4) {
+    auto row = (tile_row / (8u * (padded_k / 256u))) * 8u + tile_row % 8u;
+    auto col = ((tile_row / 8u) % (padded_k / 256u)) * 256u + unsigned(lane) * 8u;
+    auto word = *reinterpret_cast<std::uint32_t const*>(codes + (row * padded_k + col) / 2);
+    auto sf = static_cast<unsigned>(scales[256 + nvfp4_sf_index(row,col/16,padded_k)]);
+    float scale = nvfp4_scale_value(sf) * *reinterpret_cast<float const*>(scales);
+#pragma unroll
+    for (int i = 0; i < 8; ++i) out[i] = scale * nvfp4_code_value((word >> (4*i)) & 15);
+    return;
+  }
   if constexpr (Kind == WeightKind::Q4) {
     auto const* row = codes + tile_row * 128u + static_cast<std::uint32_t>(lane) * 4u;
     auto const word = *reinterpret_cast<std::uint32_t const*>(row);
@@ -197,10 +208,10 @@ __global__ void decode_mmv_kernel(std::byte const* codes_a, std::byte const* sca
     std::uint64_t const tile_row =
         (static_cast<std::uint64_t>(tn) * tiles_k + tk) * 8u + warp;
     float da[8];
-    decode8<Kind>(codes_a, scales_a, tile_row, lane, da);
+    decode8<Kind>(codes_a, scales_a, tile_row, lane, da, padded_k);
     float db[8];
     if constexpr (Paired) {
-      decode8<Kind>(codes_b, scales_b, tile_row, lane, db);
+      decode8<Kind>(codes_b, scales_b, tile_row, lane, db, padded_k);
     }
     std::uint32_t const k0 =
         tk * static_cast<std::uint32_t>(kDecodeTileK) + static_cast<std::uint32_t>(lane) * 8u;
@@ -244,6 +255,7 @@ std::expected<void, Error> require_stream(Stream const& stream, std::string_view
 }
 
 bool layout_quantizer_ok(std::uint16_t layout, std::uint16_t quantizer) noexcept {
+  if (layout == kDecodeLayoutNvFp4V1) return quantizer == kDecodeQuantizerNvFp4V1;
   if (layout == kDecodeLayoutQ4KCandidateV2) {
     return quantizer == kDecodeQuantizerQ4KCandidateV2;
   }
@@ -266,6 +278,7 @@ bool layout_quantizer_ok(std::uint16_t layout, std::uint16_t quantizer) noexcept
 }
 
 DecodeDtype weight_dtype(std::uint16_t layout) noexcept {
+  if (layout == kDecodeLayoutNvFp4V1) return DecodeDtype::NvFp4;
   if (layout == kDecodeLayoutQ4KCandidateV2 ||
       layout == kDecodeLayoutQ4G64V0 ||
       layout == kDecodeLayoutQ4G64CandidateV1) {
@@ -338,6 +351,7 @@ std::expected<void, Error> validate_non_overlap(DecodeMmvDesc const& d,
 }
 
 std::uint32_t group_size(std::uint16_t layout) noexcept {
+  if (layout == kDecodeLayoutNvFp4V1) return 1;
   if (layout == kDecodeLayoutQ4KCandidateV2) {
     return 256;
   }
@@ -365,6 +379,9 @@ std::expected<void, Error> validate_geometry(DecodeMmvDesc const& d,
   if (d.n == 0 || d.k == 0) {
     return std::unexpected(
         make_error(ErrorCode::InvalidArgument, op, "N and K must be nonzero"));
+  }
+  if (d.layout == kDecodeLayoutNvFp4V1 && d.n > 248320) {
+    return std::unexpected(make_error(ErrorCode::InvalidArgument, op, "NVFP4 N exceeds model geometry"));
   }
   if (d.n > kDecodeMaxN) {
     return std::unexpected(make_error(
@@ -407,10 +424,11 @@ std::expected<void, Error> validate_geometry(DecodeMmvDesc const& d,
                                         "BF16 dense tile must not supply scales"));
     }
   } else {
-    auto const units_per_row = static_cast<std::uint32_t>(want_scales / d.padded_n / 2u);
-    st = validate_view(d.scales, DecodeDtype::Fp16, d.layout, d.padded_n,
-                       units_per_row, d.padded_n,
-                       units_per_row, want_scales, 2, false,
+    auto const scale_rows = d.layout == kDecodeLayoutNvFp4V1 ? 1u : d.padded_n;
+    auto const units_per_row = static_cast<std::uint32_t>(want_scales / scale_rows / 2u);
+    st = validate_view(d.scales, DecodeDtype::Fp16, d.layout, scale_rows,
+                       units_per_row, scale_rows,
+                       units_per_row, want_scales, d.layout == kDecodeLayoutNvFp4V1 ? 16u : 2u, false,
                        op, "scales");
     if (!st) {
       return st;
@@ -550,6 +568,8 @@ std::expected<void, Error> launch_layout(DecodeMmvDesc const& a,
                                          DecodeMmvDesc const* b,
                                          Stream const& stream,
                                          std::string_view op) {
+  if (a.layout == kDecodeLayoutNvFp4V1)
+    return launch_kind<WeightKind::NvFp4, Paired>(a, b, stream, op);
   if (a.layout == kDecodeLayoutQ4KCandidateV2) {
     if constexpr (!Paired) {
       if (a.k == kDecodeMaxK) {
@@ -620,7 +640,7 @@ __global__ void decode_mmv_ranges_kernel(
     std::uint64_t const tile_row =
         (static_cast<std::uint64_t>(tn) * tiles_k + tk) * 8u + warp;
     float d[8];
-    decode8<Kind>(codes, scales, tile_row, lane, d);
+    decode8<Kind>(codes, scales, tile_row, lane, d, padded_k);
     std::uint32_t const k0 =
         tk * static_cast<std::uint32_t>(kDecodeTileK) + static_cast<std::uint32_t>(lane) * 8u;
 #pragma unroll
@@ -750,6 +770,10 @@ std::expected<void, Error> launch_decode_mmv_ranges(DecodeMmvRangeDesc const& de
         "ranged launch requires two or three projections"));
   }
   auto const& first = desc.ranges.front();
+  if (first.layout == kDecodeLayoutNvFp4V1) {
+    return std::unexpected(make_error(ErrorCode::InvalidArgument, "decode_mmv_ranges",
+                                      "NVFP4 supports single or paired gate/up launches only"));
+  }
   if (first.epilogue != DecodeEpilogue::StoreBf16) {
     return std::unexpected(make_error(ErrorCode::InvalidArgument, "decode_mmv_ranges",
                                       "ranged projections store BF16"));

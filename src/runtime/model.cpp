@@ -17,6 +17,7 @@ qw38::format::ArithmeticDtype dtype_for_storage(
   switch (storage) {
     case qw38::format::StorageClass::Fp32:
       return qw38::format::ArithmeticDtype::Fp32;
+    case qw38::format::StorageClass::NvFp4:
     case qw38::format::StorageClass::Bf16:
     case qw38::format::StorageClass::Int4Grouped:
     case qw38::format::StorageClass::Int8Grouped:

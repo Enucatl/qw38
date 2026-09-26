@@ -9,6 +9,7 @@ add_library(qw38_format STATIC
   format/reader.cpp
   format/pack.cpp
   format/unpack.cpp
+  format/nvfp4.cpp
 )
 target_include_directories(qw38_format PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 target_compile_features(qw38_format PUBLIC cxx_std_23)
@@ -26,12 +27,14 @@ add_library(qw38_compiler STATIC
   compiler/quantization/quantizer.cpp
   compiler/quantization/reference.cpp
   compiler/quantization/q4k.cpp
+  compiler/quantization/nvfp4.cpp
 )
 # Reference fitting and reconstruction use the pinned scalar operation order.
 set_source_files_properties(compiler/quantization/q4k.cpp
   compiler/quantization/reference.cpp PROPERTIES COMPILE_OPTIONS "-ffp-contract=off;-fno-fast-math")
 target_include_directories(qw38_compiler PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 target_link_libraries(qw38_compiler PUBLIC qw38_format)
+target_include_directories(qw38_compiler SYSTEM PRIVATE "${QW38_CUTLASS_DIR}/include" ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
 target_compile_features(qw38_compiler PUBLIC cxx_std_23)
 target_compile_options(qw38_compiler PRIVATE
   $<$<COMPILE_LANGUAGE:CXX>:-Wall -Wextra -Wpedantic>

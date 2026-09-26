@@ -29,6 +29,8 @@ inline constexpr std::uint16_t kDecodeLayoutBf16DenseTileV0 = 0x0203;
 inline constexpr std::uint16_t kDecodeLayoutQ4G64CandidateV1 = 0x020B;
 inline constexpr std::uint16_t kDecodeLayoutQ8G32CandidateV1 = 0x020C;
 inline constexpr std::uint16_t kDecodeLayoutQ4KCandidateV2 = 0x020D;
+inline constexpr std::uint16_t kDecodeLayoutNvFp4V1 = 0x020E;
+inline constexpr std::uint16_t kDecodeQuantizerNvFp4V1 = 0x0106;
 inline constexpr std::uint16_t kDecodeQuantizerNone = 0x0100;
 inline constexpr std::uint16_t kDecodeQuantizerQ4G64V0 = 0x0101;
 inline constexpr std::uint16_t kDecodeQuantizerQ8G32V0 = 0x0102;
@@ -57,6 +59,7 @@ enum class DecodeDtype : std::uint8_t {
   Bf16 = 3,
   Fp16 = 4,
   Fp32 = 5,
+  NvFp4 = 6,
 };
 
 inline constexpr std::uint16_t kDecodeLayoutBf16VectorV0 = 0x0205;
@@ -134,6 +137,7 @@ struct DecodeMmvPairedDesc {
 
 // One launch over two or three independent output-N ranges that share
 // K/input/layout. This combines scheduling only; reductions stay per row.
+// NVFP4 is unsupported here; gate/up uses the paired entry point.
 struct DecodeMmvRangeDesc {
   std::span<DecodeMmvDesc const> ranges{};
 };
@@ -160,7 +164,8 @@ struct DecodeMmvRangeDesc {
     std::uint16_t layout, std::uint32_t padded_n, std::uint32_t padded_k) noexcept {
   std::uint64_t const nk =
       static_cast<std::uint64_t>(padded_n) * static_cast<std::uint64_t>(padded_k);
-  if (layout == kDecodeLayoutQ4G64V0 ||
+  if (layout == kDecodeLayoutNvFp4V1 ||
+      layout == kDecodeLayoutQ4G64V0 ||
       layout == kDecodeLayoutQ4G64CandidateV1 ||
       layout == kDecodeLayoutQ4KCandidateV2) {
     return nk / 2u;
@@ -178,6 +183,8 @@ struct DecodeMmvRangeDesc {
 [[nodiscard]] constexpr std::uint64_t decode_scale_bytes(
     std::uint16_t layout, std::uint32_t padded_n, std::uint32_t padded_k) noexcept {
   std::uint64_t const rows = padded_n;
+  if (layout == kDecodeLayoutNvFp4V1)
+    return 256 + ((rows + 127) / 128) * 128 * (padded_k / 16u);
   if (layout == kDecodeLayoutQ4KCandidateV2) {
     return rows * (static_cast<std::uint64_t>(padded_k) / 256u) * 16u;
   }

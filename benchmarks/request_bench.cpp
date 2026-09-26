@@ -227,15 +227,18 @@ struct Engine {
     std::ostringstream digest;
     for (auto byte : model.schema().integrity.back().digest.bytes)
       digest << std::hex << std::setw(2) << std::setfill('0') << unsigned(byte);
-    check(digest.str() == "41c1f5e673bb24eb2fb283aa6044dbccdebecc7cd85f847815b3c02a6763fc43",
-          "artifact differs from TASK-026 accepted identity");
+    bool const nvfp4 = model.schema().precision.id == qw38::format::PrecisionPolicyId::NvFp4MlpV1;
+    check(digest.str() == "41c1f5e673bb24eb2fb283aa6044dbccdebecc7cd85f847815b3c02a6763fc43" ||
+          (nvfp4 && digest.str() == "3904394f34a9d551d400956c6a97bd1c405c990f4461b5b5625df85b625ff786"),
+          "artifact differs from the accepted control or frozen TASK-029 candidate");
     out << "\"manifest_digest\":\"" << digest.str() << "\",\"capacity_requested\":" << capacity
         << ",\"capacity_allocated\":" << session.kv_capacity()
         << ",\"model_device_bytes\":" << model.device_bytes()
         << ",\"persistent_bytes\":" << session.persistent_bytes()
         << ",\"scratch_bytes\":" << session.arena_plan().total_bytes
         << ",\"chunk\":256,\"kv_type\":\"BF16\",\"state_type\":\"FP32\""
-        << ",\"activation_type\":\"BF16\",\"graph_mode\":\"none\"";
+        << ",\"activation_type\":\"" << (nvfp4 ? "BF16;NVFP4 gate/up prefill" : "BF16")
+        << "\",\"graph_mode\":\"none\"";
   }
   unsigned prefill(std::span<std::uint32_t const> ids) {
     auto result = take(plan.prefill_tokens(ids));

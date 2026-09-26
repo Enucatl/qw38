@@ -1,4 +1,5 @@
 #include "format/reader.hpp"
+#include "format/nvfp4.hpp"
 
 #include "format/constants.hpp"
 #include "format/layout.hpp"
@@ -391,7 +392,8 @@ std::expected<void, FormatError> validate_quantized_payloads(
           FormatErrorCode::SharedBinding, 0, "shared.owner",
           "canonical owner is missing"));
     }
-    if (owner->quantizer != LogicalQuantizerId::Q4G64V0 &&
+    if (owner->quantizer != LogicalQuantizerId::NvFp4V1 &&
+        owner->quantizer != LogicalQuantizerId::Q4G64V0 &&
         owner->quantizer != LogicalQuantizerId::Q8G32V0 &&
         owner->quantizer != LogicalQuantizerId::Q4G64CandidateV1 &&
         owner->quantizer != LogicalQuantizerId::Q8G32CandidateV1 &&
@@ -406,7 +408,9 @@ std::expected<void, FormatError> validate_quantized_payloads(
     if (!scales) {
       return std::unexpected(scales.error());
     }
-    auto st = validate_cuda_v0(
+    auto st = owner->quantizer == LogicalQuantizerId::NvFp4V1
+        ? validate_nvfp4(owner->shape.logical[0], owner->shape.logical[1], *codes, *scales)
+        : validate_cuda_v0(
         owner->quantizer, owner->layout, owner->shape.logical[0],
         owner->shape.logical[1], *codes, *scales, owner->payload.offset,
         owner->scales.offset);

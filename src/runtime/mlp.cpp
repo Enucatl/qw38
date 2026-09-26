@@ -30,6 +30,8 @@ using qw38::cuda::kDecodeLayoutBf16DenseTileV0;
 using qw38::cuda::kDecodeLayoutQ4G64V0;
 using qw38::cuda::kDecodeLayoutQ4G64CandidateV1;
 using qw38::cuda::kDecodeLayoutQ4KCandidateV2;
+using qw38::cuda::kDecodeLayoutNvFp4V1;
+using qw38::cuda::kDecodeQuantizerNvFp4V1;
 using qw38::cuda::kDecodeQuantizerNone;
 using qw38::cuda::kDecodeQuantizerQ4G64V0;
 using qw38::cuda::kDecodeQuantizerQ4G64CandidateV1;
@@ -78,13 +80,15 @@ std::expected<void, Error> require_alignment(
 }
 
 bool layout_ok(PhysicalLayoutId layout) noexcept {
-  return layout == PhysicalLayoutId::CudaQ4KCandidateV2 ||
+  return layout == PhysicalLayoutId::CudaNvFp4V1 ||
+         layout == PhysicalLayoutId::CudaQ4KCandidateV2 ||
          layout == PhysicalLayoutId::CudaQ4G64V0 ||
          layout == PhysicalLayoutId::CudaQ4G64CandidateV1 ||
          layout == PhysicalLayoutId::CudaBf16DenseTileV0;
 }
 
 std::uint16_t quantizer_for(PhysicalLayoutId layout) noexcept {
+  if (layout == PhysicalLayoutId::CudaNvFp4V1) return kDecodeQuantizerNvFp4V1;
   if (layout == PhysicalLayoutId::CudaQ4KCandidateV2) {
     return kDecodeQuantizerQ4KCandidateV2;
   }
@@ -156,7 +160,10 @@ std::expected<MlpWeightBinding, Error> bind_weight(ConstTensorView codes,
   bool const q4 = codes.layout == PhysicalLayoutId::CudaQ4KCandidateV2 ||
                   codes.layout == PhysicalLayoutId::CudaQ4G64V0 ||
                   codes.layout == PhysicalLayoutId::CudaQ4G64CandidateV1;
-  if (q4) {
+  if (codes.layout == PhysicalLayoutId::CudaNvFp4V1) {
+    if (codes.storage != StorageClass::NvFp4 || want_k != kHidden || want_n != kFfnWidth)
+      return std::unexpected(arg_error(field, "NVFP4 is restricted to MLP gate/up"));
+  } else if (q4) {
     if (codes.storage != StorageClass::Int4Grouped) {
       return std::unexpected(arg_error(field, "Q4 payload storage must be int4_grouped"));
     }
@@ -193,7 +200,7 @@ std::expected<MlpWeightBinding, Error> bind_weight(ConstTensorView codes,
         scales.extent[0] != b.scales_bytes / qw38::format::kFp16Size) {
       return std::unexpected(arg_error(field, "scale typed view contract mismatch"));
     }
-    if (auto st = require_alignment(scales, qw38::format::kFp16Size, field);
+    if (auto st = require_alignment(scales, codes.layout == PhysicalLayoutId::CudaNvFp4V1 ? 16u : qw38::format::kFp16Size, field);
         !st) {
       return std::unexpected(st.error());
     }
@@ -324,7 +331,7 @@ DecodeMmvDesc mmv_from_weight(MlpWeightBinding const& w) {
   d.k = w.k;
   d.padded_n = w.padded_n;
   d.padded_k = w.padded_k;
-  DecodeDtype const dtype =
+  DecodeDtype const dtype = w.layout == kDecodeLayoutNvFp4V1 ? DecodeDtype::NvFp4 :
       (w.layout == kDecodeLayoutQ4KCandidateV2 ||
        w.layout == kDecodeLayoutQ4G64V0 ||
        w.layout == kDecodeLayoutQ4G64CandidateV1) ? DecodeDtype::Q4
@@ -334,12 +341,13 @@ DecodeMmvDesc mmv_from_weight(MlpWeightBinding const& w) {
                                w.padded_n, w.padded_k, w.codes_bytes, 16);
   if (w.scales_bytes != 0) {
     // Q4_K metadata shares the FP16-backed span: eight units per superblock.
-    auto const units_per_row = static_cast<std::uint32_t>(w.scales_bytes / w.padded_n / 2u);
+    auto const scale_rows = w.layout == kDecodeLayoutNvFp4V1 ? 1u : w.padded_n;
+    auto const units_per_row = static_cast<std::uint32_t>(w.scales_bytes / scale_rows / 2u);
     d.scales = decode_matrix_view(
         const_cast<void*>(w.scales.pointer), DecodeDtype::Fp16, w.layout,
-        w.padded_n,
-        units_per_row, w.padded_n, units_per_row,
-        w.scales_bytes, 2);
+        scale_rows,
+        units_per_row, scale_rows, units_per_row,
+        w.scales_bytes, w.layout == kDecodeLayoutNvFp4V1 ? 16u : 2u);
   }
   return d;
 }
@@ -424,7 +432,9 @@ std::expected<MlpPlan, Error> bind_mlp_plan(MlpBindViews const& views,
   if (!down) {
     return std::unexpected(down.error());
   }
-  if (!same_family(*gate, *up) || !same_family(*gate, *down)) {
+  bool const native_mlp = gate->layout == kDecodeLayoutNvFp4V1 &&
+                          down->layout == kDecodeLayoutQ4KCandidateV2;
+  if (!same_family(*gate, *up) || (!native_mlp && !same_family(*gate, *down))) {
     return std::unexpected(
         arg_error("layout", "gate/up/down must share one Q4 or BF16-control family"));
   }

@@ -1,4 +1,5 @@
 #include "cuda/activation.hpp"
+#include "cuda/nvfp4_device.cuh"
 
 #include "cuda/copy.hpp"
 
@@ -124,12 +125,22 @@ __global__ void embed_gather_chunk_kernel(std::uint16_t const* table,
   }
 }
 
+template <bool Pack = false>
 __global__ void hidden_rms_kernel(float const* residual,
                                   std::uint16_t const* gamma, float eps,
-                                  std::uint16_t* out_bf16) {
+                                  std::uint16_t* out_bf16,
+                                  unsigned n_tokens = 0, std::uint8_t* codes = nullptr,
+                                  std::uint8_t* scales = nullptr) {
+  if constexpr (Pack) {
+    if (blockIdx.x >= n_tokens) {
+      nvfp4_pack_row(nullptr,codes,scales,blockIdx.x,kHidden,kHidden,false);
+      return;
+    }
+  }
+  __shared__ std::uint16_t rounded[kHidden];
   float const* x = residual + static_cast<std::size_t>(blockIdx.x) * kHidden;
   std::uint16_t* y =
-      out_bf16 + static_cast<std::size_t>(blockIdx.x) * kHidden;
+      Pack ? rounded : out_bf16 + static_cast<std::size_t>(blockIdx.x) * kHidden;
   float scale = 0.0f;
   for (std::uint32_t i = threadIdx.x; i < kHidden; i += blockDim.x) {
     scale = fmaxf(scale, fabsf(x[i]));
@@ -151,6 +162,10 @@ __global__ void hidden_rms_kernel(float const* residual,
     float const normalized = (x[i] / safe_scale) * inv_scaled_rms;
     float const v = (1.0f + g) * normalized;
     y[i] = fp32_to_bf16_rne(v);
+  }
+  if constexpr (Pack) {
+    __syncthreads();
+    nvfp4_pack_row(rounded,codes,scales,blockIdx.x,kHidden,kHidden,true);
   }
 }
 
@@ -445,9 +460,22 @@ std::expected<void, Error> launch_hidden_rms(float const* residual,
   }
   auto guard = stream.activate();
   if (!guard) return std::unexpected(guard.error());
-  hidden_rms_kernel<<<n_tokens, kHiddenRmsThreads, 0, stream.native()>>>(
+  hidden_rms_kernel<false><<<n_tokens, kHiddenRmsThreads, 0, stream.native()>>>(
       residual, gamma, eps, out_bf16);
   return check(cudaGetLastError(), "hidden_rms_kernel");
+}
+
+std::expected<void, Error> launch_hidden_rms_nvfp4(float const* residual,
+    std::uint16_t const* gamma, float eps, std::uint32_t n_tokens,
+    std::uint8_t* codes, std::uint8_t* scales, Stream const& stream) {
+  if (!residual || !gamma || !codes || !scales || !n_tokens || n_tokens > 1024 ||
+      !finite_pos(eps) || stream.empty())
+    return std::unexpected(make_error(ErrorCode::InvalidArgument,"nvfp4.rms","invalid operands"));
+  auto guard = stream.activate();
+  if (!guard) return std::unexpected(guard.error());
+  hidden_rms_kernel<true><<<((n_tokens+127)/128)*128,kHiddenRmsThreads,0,stream.native()>>>(
+      residual,gamma,eps,nullptr,n_tokens,codes,scales);
+  return check(cudaGetLastError(),"nvfp4.rms_pack");
 }
 
 std::expected<void, Error> launch_qk_rms_rope(

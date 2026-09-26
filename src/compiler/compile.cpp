@@ -1,4 +1,6 @@
 #include "compiler/compile.hpp"
+#include "compiler/quantization/nvfp4.hpp"
+#include "format/nvfp4.hpp"
 
 #include "compiler/quantization/quantizer.hpp"
 #include "compiler/quantization/reference.hpp"
@@ -123,6 +125,9 @@ std::expected<std::uint64_t, CompilerError> expected_tensor_bytes(
 }
 
 LogicalPhysicalMapping mapping_for(PhysicalLayoutId layout) {
+  if (layout == PhysicalLayoutId::CudaNvFp4V1)
+    return {.kind = MappingKind::NvFp4TN, .tile_rows = 1, .tile_k = 16,
+            .group_size = 16, .packed_bytes_per_tile_row = 8};
   if (layout == PhysicalLayoutId::CudaQ4KCandidateV2) {
     return LogicalPhysicalMapping{
         .kind = MappingKind::DenseTileNK,
@@ -623,6 +628,9 @@ std::expected<ArtifactSchema, CompilerError> build_schema(
         CompilerErrorCode::ArchitectureMismatch, "compiler.ident",
         "candidate compiler revision must identify the selected policy and calibration"));
   }
+  if (policy == WeightFormatPolicy::NvFp4MlpV1 && revision.ident != kNvFp4CompilerIdent)
+    return std::unexpected(make_error(CompilerErrorCode::ArchitectureMismatch,
+        "compiler.ident", "NVFP4 requires its frozen compiler recipe"));
   ArtifactSchema schema{};
   if (policy == WeightFormatPolicy::CandidateV2 &&
       revision.ident != kQ4KCandidateCompilerIdent) {
@@ -639,6 +647,10 @@ std::expected<ArtifactSchema, CompilerError> build_schema(
                          : v0_precision_policy();
   if (policy == WeightFormatPolicy::CandidateV2) {
     schema.precision = qw38::format::candidate_v2_precision_policy();
+  }
+  if (policy == WeightFormatPolicy::NvFp4MlpV1) {
+    schema.precision = qw38::format::candidate_v2_precision_policy();
+    schema.precision.id = qw38::format::PrecisionPolicyId::NvFp4MlpV1;
   }
   schema.scope = SemanticScope::LanguagePlusMtpDescriptors;
   schema.state = language_state_schema();
@@ -788,6 +800,14 @@ std::expected<void, CompilerError> emit_classified_tensor(
     std::span<std::byte const> src, WeightFormatPolicy policy) {
   auto const& exp = item.expected;
   auto const fmt = select_weight_format(exp.family, exp.layout, policy);
+  if (fmt.quantizer == LogicalQuantizerId::NvFp4V1) {
+    auto packed = quantize_nvfp4(src, exp.shape.dims[0], exp.shape.dims[1]);
+    if (!packed) return std::unexpected(packed.error());
+    if (auto st = write_span(writer, exp.name, packed->codes); !st) return st;
+    auto st = writer.write_span(exp.name, SpanKind::Scales, packed->scales);
+    if (!st) return std::unexpected(from_format(st.error()));
+    return {};
+  }
   if (fmt.quantizer == LogicalQuantizerId::Q4G64V0 ||
       fmt.quantizer == LogicalQuantizerId::Q8G32V0 ||
       fmt.quantizer == LogicalQuantizerId::Q4G64CandidateV1 ||
@@ -909,6 +929,14 @@ std::expected<void, CompilerError> verify_quantized_tensor(
     PhysicalLayoutId layout, std::uint64_t n, std::uint64_t k,
     std::span<std::byte const> source, std::span<std::byte const> payload,
     std::span<std::byte const> scales) {
+  if (quantizer == LogicalQuantizerId::NvFp4V1 && layout == PhysicalLayoutId::CudaNvFp4V1) {
+    auto packed = quantize_nvfp4(source, n, k);
+    if (!packed) return std::unexpected(packed.error());
+    if (!std::ranges::equal(packed->codes, payload) || !std::ranges::equal(packed->scales, scales))
+      return std::unexpected(make_error(CompilerErrorCode::InvalidCode,
+          name, "NVFP4 reconstruction differs"));
+    return {};
+  }
   if (!qw38::format::quantizer_layout_pair_ok(quantizer, layout)) {
     return std::unexpected(make_error(
         CompilerErrorCode::Internal, name,
@@ -1111,7 +1139,8 @@ std::expected<void, CompilerError> verify_compiled_artifact(
                                           "artifact tensor metadata is absent"));
       }
       auto const& exp = item->expected;
-      if (record->quantizer == LogicalQuantizerId::Q4G64V0 ||
+      if (record->quantizer == LogicalQuantizerId::NvFp4V1 ||
+          record->quantizer == LogicalQuantizerId::Q4G64V0 ||
           record->quantizer == LogicalQuantizerId::Q8G32V0 ||
           record->quantizer == LogicalQuantizerId::Q4G64CandidateV1 ||
           record->quantizer == LogicalQuantizerId::Q8G32CandidateV1 ||

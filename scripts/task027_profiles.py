@@ -44,7 +44,7 @@ def category(name: str, grid_x: int, engine: str, head: bool) -> str:
         or (engine == "llama" and name == "mul_mat_vec_q" and grid_x == 248320)
     ):
         return "head"
-    if "unpack_tile" in name or "quantize" in name:
+    if "unpack_tile" in name or "quantize" in name or name == "pack_kernel":
         return "weight_unpack_or_activation_packing"
     if "attention" in name or "flash_attn" in name or "fattn" in name:
         return "attention"
@@ -56,7 +56,8 @@ def category(name: str, grid_x: int, engine: str, head: bool) -> str:
     ):
         return "gdn"
     if (
-        "mmv" in name
+        name == "device_kernel"  # CUTLASS native NVFP4; confirmed by full kernel name.
+        or "mmv" in name
         or "mma" in name
         or "gemm" in name.lower()
         or "mul_mat" in name

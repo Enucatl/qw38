@@ -489,3 +489,10 @@ set_tests_properties(
   PROPERTIES
   LABELS "cuda;gpu;attention"
 )
+
+add_executable(qw38_nvfp4_test nvfp4_test.cpp)
+target_link_libraries(qw38_nvfp4_test PRIVATE qw38_cuda qw38_compiler)
+target_include_directories(qw38_nvfp4_test SYSTEM PRIVATE "${QW38_CUTLASS_DIR}/include"
+  "${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES}/cccl")
+add_test(NAME nvfp4 COMMAND qw38_nvfp4_test)
+set_tests_properties(nvfp4 PROPERTIES LABELS "cuda;gpu;compiler;prefill")

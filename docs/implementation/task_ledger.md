@@ -366,7 +366,7 @@ an achieved performance target.
 | TASK-026 | Full-model prefill, handoff and quality gate | M8 | TASK-025 | End-to-end candidate, core suite plus fixed 32768 retrieval, chunk/dispatch boundary validation | DONE |
 | TASK-027 | Matched whole-request performance baseline | M9 | TASK-026 | PERF-01 comparison, cold/warm costs, peak memory and bottleneck-ranked gap report | DONE |
 | TASK-028 | Reuse-oriented long-context attention | M10 | TASK-027 | Multi-query prefill reuse and cooperative segmented decode with bounded memory | DONE |
-| TASK-029 | Integrated native NVFP4 MLP gate/up | M10 | TASK-028 | Compiler/layout, GPU packing/reuse, GEMM/GEMV and local fusion; checked fallback allowed | TODO |
+| TASK-029 | Integrated native NVFP4 MLP gate/up | M10 | TASK-028 | Implemented; development/session/numerical checks and reserve projection pass; request/decode cost regression checked, retain Q4_K/Q8 candidate | DONE |
 | TASK-030 | Combined validation and delivery decision | M11 | TASK-029 | Core-54, fixed long case, replay, capacity, matched performance and promotion decision | TODO |
 | TASK-031 | Retired state-refinement task | — | — | Attention moved to TASK-028; state experiments deferred | SUPERSEDED |
 | TASK-032 | Retired final-promotion task | — | — | Final obligations merged into TASK-030 | SUPERSEDED |
@@ -634,14 +634,14 @@ numerical/session check set, request-32768 and decode-32768 establish the
 production path and observed improvement. See [the task](tasks/TASK-028.md)
 for defaults, completion and targeted fallback.
 
-### TASK-029 — Integrated native NVFP4 MLP gate/up
+### TASK-029 — Integrated native NVFP4 MLP gate/up — DONE
 
-Depends on TASK-028. Compile consumer-compatible gate/up weights once, pack
-activations on GPU, reuse across gate/up, integrate native prefill and same-view
-GEMV decode plus useful RMS/packing/SwiGLU fusion. Keep down/sensitive families
-and state precision. One focused correctness/development screen and
-request-4096/decode-4096 support the candidate or a checked Q4_K/Q8 fallback.
-See [the task](tasks/TASK-029.md); final quality is not claimed here.
+Implemented the integrated compiler/GPU path and checked its rejection for
+promotion: development quality, session/numerical checks and projected reserve
+pass, while conversion-inclusive request/decode cost regresses. Retain the
+Q4_K/Q8 CandidateV2 artifact with TASK-028 attention for final validation.
+See the [completion report](tasks/TASK-029.md#completion-report). Final
+EVAL-01 and measured 32K capacity remain with TASK-030.
 
 ### TASK-030 — Combined validation and delivery decision
 

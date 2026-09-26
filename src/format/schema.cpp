@@ -1,4 +1,5 @@
 #include "format/schema.hpp"
+#include "format/nvfp4.hpp"
 
 #include <initializer_list>
 #include <iterator>
@@ -954,6 +955,17 @@ std::expected<void, FormatError> require_shape_rank(
 std::expected<void, FormatError> validate_mapping_for_tensor(
     TensorRecord const& tensor, std::uint64_t offset) {
   auto const& m = tensor.mapping;
+  if (tensor.layout == PhysicalLayoutId::CudaNvFp4V1) {
+    if (tensor.shape.rank != 2 || tensor.shape.logical[0] > 248320 ||
+        tensor.shape.logical[1] > 17408 ||
+        tensor.shape.padded[0] != dense_pad_n(tensor.shape.logical[0]) ||
+        tensor.shape.padded[1] != dense_pad_k(tensor.shape.logical[1]) ||
+        m.kind != MappingKind::NvFp4TN || m.tile_rows != 1 ||
+        m.tile_k != 16 || m.group_size != 16 || m.packed_bytes_per_tile_row != 8)
+      return std::unexpected(make_error(FormatErrorCode::InvalidMapping, offset,
+          "nvfp4.mapping", "NVFP4 TN geometry/mapping mismatch"));
+    return {};
+  }
   if (layout_is_tiled_dense(tensor.layout)) {
     if (m.kind != MappingKind::DenseTileNK) {
       return std::unexpected(make_error(FormatErrorCode::InvalidMapping, offset,
@@ -1060,6 +1072,12 @@ std::expected<void, FormatError> validate_mapping_for_tensor(
 std::expected<void, FormatError> validate_quantizer_layout(
     TensorRecord const& tensor, std::uint64_t offset) {
   switch (tensor.quantizer) {
+    case LogicalQuantizerId::NvFp4V1:
+      if (tensor.storage != StorageClass::NvFp4 ||
+          tensor.layout != PhysicalLayoutId::CudaNvFp4V1)
+        return std::unexpected(make_error(FormatErrorCode::InvalidQuantizerLayoutPair,
+            offset, "nvfp4", "NVFP4 storage/layout mismatch"));
+      return {};
     case LogicalQuantizerId::Q4KCandidateV2:
       if (tensor.storage != StorageClass::Int4Grouped) {
         return std::unexpected(make_error(
@@ -1225,7 +1243,8 @@ std::expected<void, FormatError> validate_precision(
   }
   if (policy.id != PrecisionPolicyId::V0 &&
       policy.id != PrecisionPolicyId::CandidateV1 &&
-      policy.id != PrecisionPolicyId::CandidateV2) {
+      policy.id != PrecisionPolicyId::CandidateV2 &&
+      policy.id != PrecisionPolicyId::NvFp4MlpV1) {
     return std::unexpected(make_error(FormatErrorCode::InvalidPrecisionPolicy,
                                       offset, "precision.id",
                                       "only precision policy V0 is defined"));
@@ -1625,6 +1644,13 @@ std::expected<std::uint64_t, FormatError> expected_payload_bytes(
     return std::unexpected(make_error(FormatErrorCode::UnknownEnum, offset,
                                       "tensor.layout", "unknown physical layout"));
   }
+  if (tensor.layout == PhysicalLayoutId::CudaNvFp4V1) {
+    if (auto st = validate_mapping_for_tensor(tensor, offset); !st)
+      return std::unexpected(st.error());
+    auto count = checked_mul(tensor.shape.padded[0], tensor.shape.padded[1], offset, "nvfp4");
+    if (!count) return std::unexpected(count.error());
+    return *count / 2;
+  }
   if (layout_is_tiled_dense(tensor.layout)) {
     if (tensor.shape.rank != 2) {
       return std::unexpected(make_error(FormatErrorCode::InvalidShape, offset,
@@ -1685,6 +1711,11 @@ std::expected<std::uint64_t, FormatError> expected_scale_bytes(
     return std::unexpected(make_error(FormatErrorCode::InvalidShape, offset,
                                       "tensor.shape",
                                       "quantized tensors are rank-2"));
+  }
+  if (tensor.quantizer == LogicalQuantizerId::NvFp4V1) {
+    if (auto st = validate_mapping_for_tensor(tensor, offset); !st)
+      return std::unexpected(st.error());
+    return kNvFp4ScaleHeader + nvfp4_scale_count(tensor.shape.padded[0], tensor.shape.padded[1]);
   }
   std::uint64_t group = 0;
   if (tensor.quantizer == LogicalQuantizerId::Q4KCandidateV2) {
@@ -2479,12 +2510,19 @@ static std::expected<void, FormatError> validate_schema_at_offsets(
     auto const tensor_offset =
         record_offset(&SchemaRecordOffsets::tensors, i);
     if (schema.tensors[i].quantizer == LogicalQuantizerId::Q4KCandidateV2 &&
-        schema.precision.id != PrecisionPolicyId::CandidateV2) {
+        schema.precision.id != PrecisionPolicyId::CandidateV2 &&
+        schema.precision.id != PrecisionPolicyId::NvFp4MlpV1) {
       return std::unexpected(make_error(
           FormatErrorCode::InvalidPrecisionPolicy, tensor_offset,
           schema.tensors[i].logical_name + ".tensor.quantizer",
           "Q4_K requires candidate V2 precision policy"));
     }
+    if (schema.tensors[i].quantizer == LogicalQuantizerId::NvFp4V1 &&
+        (schema.precision.id != PrecisionPolicyId::NvFp4MlpV1 ||
+         (!schema.tensors[i].logical_name.ends_with(".mlp.gate_proj.weight") &&
+          !schema.tensors[i].logical_name.ends_with(".mlp.up_proj.weight"))))
+      return std::unexpected(make_error(FormatErrorCode::InvalidPrecisionPolicy,
+          tensor_offset, "nvfp4.policy", "NVFP4 requires gate/up and its precision policy"));
     if (schema.precision.id == PrecisionPolicyId::V0 &&
         (schema.tensors[i].quantizer == LogicalQuantizerId::Q4G64CandidateV1 ||
          schema.tensors[i].quantizer == LogicalQuantizerId::Q8G32CandidateV1)) {

@@ -35,6 +35,8 @@ std::uint8_t q8_byte(std::int8_t code, FormatError* err) {
 
 bool quantizer_layout_pair_ok(LogicalQuantizerId quantizer,
                               PhysicalLayoutId layout) noexcept {
+  if (quantizer == LogicalQuantizerId::NvFp4V1)
+    return layout == PhysicalLayoutId::CudaNvFp4V1;
   if (quantizer == LogicalQuantizerId::Q4G64V0) {
     return layout == PhysicalLayoutId::CudaQ4G64V0;
   }
@@ -78,7 +80,8 @@ std::uint64_t dense_pad_k(std::uint64_t k) noexcept {
 std::expected<PackedMatrix, FormatError> pack_cuda_v0(
     LogicalQuantizerId quantizer, PhysicalLayoutId layout,
     LogicalWeightCodes const& logical) {
-  if (!quantizer_layout_pair_ok(quantizer, layout) ||
+  if (quantizer == LogicalQuantizerId::NvFp4V1 ||
+      !quantizer_layout_pair_ok(quantizer, layout) ||
       logical.quantizer != quantizer) {
     return std::unexpected(pack_err(FormatErrorCode::InvalidQuantizerLayoutPair,
                                     "pack",

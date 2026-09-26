@@ -63,6 +63,13 @@ message(STATUS "qw38 CUDA host compiler: ${CMAKE_CUDA_HOST_COMPILER}")
 message(STATUS "qw38 CUDA architectures: ${CMAKE_CUDA_ARCHITECTURES}")
 message(STATUS "qw38 build type: ${CMAKE_BUILD_TYPE}")
 
+set(QW38_CUTLASS_DIR "${CMAKE_SOURCE_DIR}/.cache/dependencies/cutlass" CACHE PATH
+    "CUTLASS checkout at 098de2a652cf8f00fd70b2df54051c7eccbb855a")
+file(READ "${QW38_CUTLASS_DIR}/.git/HEAD" QW38_CUTLASS_REV)
+string(STRIP "${QW38_CUTLASS_REV}" QW38_CUTLASS_REV)
+if(NOT QW38_CUTLASS_REV STREQUAL "098de2a652cf8f00fd70b2df54051c7eccbb855a")
+  message(FATAL_ERROR "TASK-029 requires the pinned CUTLASS checkout; see docs/implementation/task029-nvfp4-format.md")
+endif()
 add_subdirectory(cuda)
 add_subdirectory(src)
 add_subdirectory(benchmarks)

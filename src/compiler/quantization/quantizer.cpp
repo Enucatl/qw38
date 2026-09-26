@@ -37,6 +37,7 @@ std::uint32_t quantizer_group_size(LogicalQuantizerId id) noexcept {
     case LogicalQuantizerId::Q8G32V0:
     case LogicalQuantizerId::Q8G32CandidateV1:
       return qw38::format::kQ8GroupSize;
+    case LogicalQuantizerId::NvFp4V1:  // Uses quantize_nvfp4, not the integer group API.
     case LogicalQuantizerId::None:
       return 0;
   }
@@ -53,6 +54,7 @@ int quantizer_qmax(LogicalQuantizerId id) noexcept {
     case LogicalQuantizerId::Q8G32V0:
     case LogicalQuantizerId::Q8G32CandidateV1:
       return 127;
+    case LogicalQuantizerId::NvFp4V1:  // Uses quantize_nvfp4, not the integer group API.
     case LogicalQuantizerId::None:
       return 0;
   }

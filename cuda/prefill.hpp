@@ -13,9 +13,8 @@
 
 namespace qw38::cuda {
 
-// The candidate keeps BF16 projection activations. There is no activation
-// scale buffer or packing step; a normalized BF16 row can feed every compatible
-// projection without another conversion.
+// NVFP4 gate/up reuse packed activations in the bounded weight-tile buffer.
+// Other projections retain BF16 normalized activations.
 inline constexpr std::uint32_t kPrefillMaxTokens = 1024;
 inline constexpr std::uint32_t kPrefillDefaultTokens = 1024;
 inline constexpr std::uint32_t kPrefillDefaultWeightRows = 512;
@@ -115,6 +114,16 @@ class PrefillEngine {
   [[nodiscard]] Stream const* stream() const noexcept { return stream_; }
 
  private:
+  [[nodiscard]] std::expected<void, Error> paired_swiglu_impl(
+      PrefillWeight const& gate, PrefillWeight const& up,
+      std::uint16_t const* normalized, std::uint16_t* swiglu,
+      std::uint32_t valid_tokens, std::uint64_t first_position, bool packed);
+  [[nodiscard]] std::uint8_t* packed_input() const noexcept {
+    return reinterpret_cast<std::uint8_t*>(weight_tile_);
+  }
+  [[nodiscard]] std::uint8_t* packed_scales() const noexcept {
+    return packed_input() + std::uint64_t(token_capacity_) * 5120u / 2;
+  }
   [[nodiscard]] std::expected<void, Error> contract(
       PrefillWeight const& weight, std::uint32_t valid_tokens) const;
   [[nodiscard]] std::expected<void, Error> gemm_tile(
