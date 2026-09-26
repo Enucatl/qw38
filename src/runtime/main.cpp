@@ -104,8 +104,7 @@ int main(int argc, char** argv) {
   if (capacity == 0) capacity = static_cast<std::uint32_t>(
       tokens.size() + static_cast<std::uint64_t>(generate));
 
-  std::cout << "primary-language-only; prompt setup uses slow repeated decode; "
-               "MTP disabled\n";
+  std::cout << "primary-language-only; bounded prefill; MTP disabled\n";
   using Clock = std::chrono::steady_clock;
   auto const elapsed_ms = [](Clock::time_point start) {
     return std::chrono::duration<double, std::milli>(Clock::now() - start).count();
@@ -141,17 +140,15 @@ int main(int argc, char** argv) {
   auto const session_bind_ms = elapsed_ms(session_bind_start);
   setup_range.close();
   std::uint32_t next = 0;
-  std::uint64_t position = 0;
+  std::uint64_t position = tokens.size();
   auto const prompt_start = Clock::now();
   qw38::runtime::profiling::ScopedRange prompt_range("prompt_ingestion");
-  for (auto token : tokens) {
-    auto decoded = plan->decode_token(token, position++);
-    if (!decoded) {
-      std::cerr << qw38::runtime::error_message(decoded.error()) << '\n';
-      return 1;
-    }
-    next = decoded->argmax;
+  auto prompt_result = plan->prefill_tokens(tokens);
+  if (!prompt_result) {
+    std::cerr << qw38::runtime::error_message(prompt_result.error()) << '\n';
+    return 1;
   }
+  next = prompt_result->argmax;
   auto const prompt_ms = elapsed_ms(prompt_start);
   prompt_range.close();
   std::cout << "prompt_tokens=" << tokens.size() << " next_argmax=" << next

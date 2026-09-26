@@ -279,7 +279,7 @@ int main(int argc, char** argv) {
     auto plan = LanguageModelPlan::bind(*model, *session, runtime->stream());
     if (!plan) return fail(plan.error());
 
-    auto prompt_result = plan->setup_prompt_slow(prompt);
+    auto prompt_result = plan->prefill_tokens(prompt);
     if (!prompt_result) return fail(prompt_result.error());
     std::vector<std::uint32_t> generated;
     std::string stop_reason = "cap";
@@ -308,7 +308,7 @@ int main(int argc, char** argv) {
           options.output / (record.id + ".candidate-logits.f32le"),
           std::ios::binary | std::ios::trunc);
       if (!teacher_logits) return 1;
-      auto score = plan->setup_prompt_slow(prompt);
+      auto score = plan->prefill_tokens(prompt);
       if (!score) return fail(score.error());
       for (std::size_t i = 0; i < targets.size(); ++i) {
         if (!write_logits(teacher_logits, score->logits)) {

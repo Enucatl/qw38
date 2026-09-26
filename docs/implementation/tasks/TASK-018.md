@@ -225,8 +225,9 @@ evidence. No source tensor payload digest is introduced.
 - **Final evaluation:** `qw38-language-v1`, 216 core cases: P100 100, C92 92,
   L12 12, and R512/R4096 12. Keep all 100 P100 qualitative adjudications,
   existing answer/NLL gates, uncertainty method, masks and scoring unchanged.
-  Freeze all six R32768 cases now; TASK-026 evaluates them with production
-  prefill. Candidate core decode acceptance is TASK-022; complete prefill and
+  Freeze all six R32768 cases now; the later TASK-026 policy selects only
+  `R-32768-s0-d0.1` for production-prefill evaluation. Candidate core decode
+  acceptance is TASK-022; complete prefill and
   long-context acceptance is TASK-026.
 - **Calibration:** use Hub repository `Salesforce/wikitext`, configuration
   `wikitext-103-raw-v1`, split `train`, at

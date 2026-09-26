@@ -28,8 +28,9 @@ rules to the selected cases; report denominators and selected slice membership.
 Review all 15 selected P100 outputs. A core result supports a claim about this
 fixed diagnostic sample, not about untested P100/C92 cases. Missing selected
 cases, incomplete references, unresolved reviews, or failed gates still block
-routine acceptance. The six frozen R-32768 cases remain a separate mandatory
-extension for TASK-026 and later applicable gates.
+routine acceptance. `R-32768-s0-d0.1` is the sole required and permitted
+32768 quality case for TASK-026 and later applicable gates; the other five
+frozen 32768 fixtures remain inventory only.
 
 ## Full suite execution
 

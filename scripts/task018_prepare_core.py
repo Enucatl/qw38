@@ -16,9 +16,9 @@ from typing import Any
 import transformers
 
 try:
-    from .task018_core_selection import CORE_SPEC, select_cases
+    from .task018_core_selection import CORE_SPEC, select_cases, select_long_cases
 except ImportError:
-    from task018_core_selection import CORE_SPEC, select_cases
+    from task018_core_selection import CORE_SPEC, select_cases, select_long_cases
 
 
 def sha256_file(path: Path) -> str:
@@ -26,7 +26,8 @@ def sha256_file(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def prepare(fixtures: Path, output: Path, full: bool = False) -> dict[str, Any]:
+def prepare(fixtures: Path, output: Path, full: bool = False,
+            long_only: bool = False) -> dict[str, Any]:
     """Write the routine core or the manually requested full core."""
     root = fixtures.resolve()
     manifest = json.loads((root / "manifest.json").read_text(encoding="utf-8"))
@@ -47,7 +48,7 @@ def prepare(fixtures: Path, output: Path, full: bool = False) -> dict[str, Any]:
             .splitlines()
         )
     }
-    core, _ = select_cases(root, full=full)
+    core = select_long_cases(root) if long_only else select_cases(root, full=full)[0]
     counts = Counter(case["family"] for case in core)
     if len({case["id"] for case in core}) != len(core):
         raise ValueError("duplicate core case ID")
@@ -119,10 +120,10 @@ def prepare(fixtures: Path, output: Path, full: bool = False) -> dict[str, Any]:
             "sha256"
         ],
         "core_cases": len(core),
-        "coverage": "full" if full else "core-54",
-        "sample_spec_sha256": None if full else sha256_file(CORE_SPEC),
+        "coverage": "long-32768" if long_only else "full" if full else "core-54",
+        "sample_spec_sha256": None if full or long_only else sha256_file(CORE_SPEC),
         "families": dict(sorted(counts.items())),
-        "retrieval_horizons": {"512": 6, "4096": 6},
+        "retrieval_horizons": {"32768": 1} if long_only else {"512": 6, "4096": 6},
         "l12_fixed_answer_targets": fixed_answer_targets,
         "case_tsv": str(output),
         "case_tsv_sha256": sha256_file(output),
@@ -139,9 +140,11 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--fixtures", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
-    parser.add_argument("--full", action="store_true", help="prepare all 216 cases")
+    scope = parser.add_mutually_exclusive_group()
+    scope.add_argument("--full", action="store_true", help="prepare all 216 cases")
+    scope.add_argument("--long-only", action="store_true", help="prepare fixed R-32768 case")
     args = parser.parse_args()
-    print(json.dumps(prepare(args.fixtures, args.output, args.full), sort_keys=True))
+    print(json.dumps(prepare(args.fixtures, args.output, args.full, args.long_only), sort_keys=True))
     return 0
 
 

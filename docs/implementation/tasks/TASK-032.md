@@ -97,7 +97,7 @@ Retained independent arithmetic, artifact reconstruction and model-semantic cont
 
 ### Integration checks
 
-Complete 54-case EVAL-01 core, six 32768 retrieval cases, selected-P100 adjudication, required same-schedule/cross-schedule/dispatch checks and session failure/replay coverage for the frozen combined artifact/runtime.
+Complete 54-case EVAL-01 core, the fixed `R-32768-s0-d0.1` retrieval case, selected-P100 adjudication, required same-schedule/cross-schedule/dispatch checks and session failure/replay coverage for the frozen combined artifact/runtime.
 
 ## Benchmark required
 

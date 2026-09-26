@@ -59,3 +59,22 @@ def select_cases(
     ) != Counter({"P100": 15, "C92": 15, "L12": 12, "R": 12}):
         raise ValueError("frozen 54-case sample differs from its selection rule")
     return selected, spec
+
+
+def select_long_cases(root: Path) -> list[dict[str, Any]]:
+    """Validate the frozen 32768 inventory and select its fixed quality case."""
+    manifest = json.loads((root / "manifest.json").read_text(encoding="utf-8"))
+    prompts_path = root / "prompts.jsonl"
+    if hashlib.sha256(prompts_path.read_bytes()).hexdigest() != manifest["files"]["prompts.jsonl"]["sha256"]:
+        raise ValueError("frozen source prompt hash differs")
+    rows = [json.loads(line) for line in prompts_path.read_text().splitlines()]
+    selected = [
+        row for row in rows
+        if row["family"] == "R" and row["details"]["horizon"] == 32768
+    ]
+    if len(selected) != 6 or len({row["id"] for row in selected}) != 6:
+        raise ValueError("frozen R-32768 inventory differs")
+    fixed = [row for row in selected if row["id"] == "R-32768-s0-d0.1"]
+    if len(fixed) != 1:
+        raise ValueError("fixed R-32768 case is missing")
+    return fixed

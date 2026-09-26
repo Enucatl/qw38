@@ -23,9 +23,9 @@ from pathlib import Path
 from typing import Any
 
 try:
-    from .task018_core_selection import CORE_SPEC, select_cases
+    from .task018_core_selection import CORE_SPEC, select_cases, select_long_cases
 except ImportError:
-    from task018_core_selection import CORE_SPEC, select_cases
+    from task018_core_selection import CORE_SPEC, select_cases, select_long_cases
 
 IMAGE = "ghcr.io/ggml-org/llama.cpp:full-cuda13"
 MODEL = Path("models/Qwen3.8-27B-Q4_K_M.gguf")
@@ -187,7 +187,9 @@ def main() -> int:
     parser.add_argument("--model", type=Path, default=MODEL)
     parser.add_argument("--port", type=int, default=18111)
     parser.add_argument("--startup-timeout", type=int, default=600)
-    parser.add_argument("--manual-full", action="store_true")
+    scope = parser.add_mutually_exclusive_group()
+    scope.add_argument("--manual-full", action="store_true")
+    scope.add_argument("--long-only", action="store_true")
     args = parser.parse_args()
     if args.manual_full and not sys.stdin.isatty():
         parser.error("full 216-case evaluation requires an interactive manual launch")
@@ -216,7 +218,10 @@ def main() -> int:
     except BlockingIOError as exc:
         raise SystemExit("another TASK-018 llama evaluation holds the lock") from exc
 
-    cases, sample = select_cases(root, full=args.manual_full)
+    if args.long_only:
+        cases, sample = select_long_cases(root), None
+    else:
+        cases, sample = select_cases(root, full=args.manual_full)
     full_cases, _ = select_cases(root, full=True)
     prompts = {
         case["id"]: read_u32le(root / case["prompt_token_file"]) for case in cases
@@ -268,7 +273,7 @@ def main() -> int:
         "gpu_layers": "all",
         "prompt_cache": "default enabled, matching the teacher reference capture",
         "cases_expected": len(cases),
-        "evaluation_scope": "full-216" if args.manual_full else "core-54",
+        "evaluation_scope": "long-32768" if args.long_only else "full-216" if args.manual_full else "core-54",
         "sample_spec_sha256": None if sample is None else hash_file(CORE_SPEC),
         "generation": {
             "temperature": 0.0,
@@ -353,9 +358,10 @@ def main() -> int:
                 f"llama {index}/{len(cases)} {case['id']} tokens={record['generation_tokens']} stop={record['generation_stop']}",
                 flush=True,
             )
-        by_id = {case["id"]: case for case in full_cases}
+        by_id = {case["id"]: case for case in full_cases + cases}
         replay_rows = []
-        for case_id in sorted(REPLAY_IDS):
+        replay_ids = {cases[0]["id"]} if args.long_only else REPLAY_IDS
+        for case_id in sorted(replay_ids):
             prompt_ids = prompts.get(case_id) or read_u32le(
                 root / by_id[case_id]["prompt_token_file"]
             )

@@ -5,11 +5,13 @@
 #include "format/constants.hpp"
 #include "runtime/profiling.hpp"
 
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <limits>
 #include <new>
 #include <stdexcept>
+#include <variant>
 
 namespace qw38::runtime {
 namespace {
@@ -154,15 +156,29 @@ std::expected<LanguageModelPlan, Error> LanguageModelPlan::bind(
       if (!bound) return std::unexpected(bound.error());
       plan.layers_.push_back(std::move(*bound));
     }
+    plan.prefill_layers_.reserve(kLanguageLayers);
+    for (std::uint32_t layer = 0; layer < kLanguageLayers; ++layer) {
+      if (is_gdn_language_layer(layer)) {
+        auto bound = bind_prefill_gdn_layer(model, session, layer, stream);
+        if (!bound) return std::unexpected(bound.error());
+        plan.prefill_layers_.emplace_back(std::move(*bound));
+      } else {
+        auto bound = bind_prefill_attention_layer(model, session, layer, stream);
+        if (!bound) return std::unexpected(bound.error());
+        plan.prefill_layers_.emplace_back(std::move(*bound));
+      }
+    }
     plan.logits_.resize(kVocab);
-    plan.session_ = &session;
+    plan.model_ = &model;
     plan.stream_ = &stream;
     plan.state_ = state;
     plan.embedding_ = static_cast<std::uint16_t const*>(embed_data->pointer);
     plan.final_gamma_ = static_cast<std::uint16_t const*>(norm_data->pointer);
     plan.normalized_ = static_cast<std::uint16_t*>(normalized->region[0].tensor.pointer);
     plan.residual_ = static_cast<float*>(session.residual_h().pointer);
+    plan.residual_mid_ = static_cast<float*>(session.residual_h_mid().pointer);
     plan.device_logits_ = static_cast<float*>(logits->region[0].tensor.pointer);
+    plan.kv_capacity_ = session.kv_capacity();
 
     auto const layout = static_cast<std::uint16_t>((*head)->layout);
     bool const q8 = (layout == qw38::cuda::kDecodeLayoutQ8G32V0 ||
@@ -232,7 +248,7 @@ std::expected<DecodeResult, Error> LanguageModelPlan::decode_token(
     return std::unexpected(make_error(ErrorCode::InvalidArgument, "token_id",
                                       "token ID exceeds language vocabulary"));
   }
-  if (position >= session_->kv_capacity() ||
+  if (position >= kv_capacity_ ||
       position > static_cast<std::uint64_t>(std::numeric_limits<std::int32_t>::max())) {
     return std::unexpected(make_error(ErrorCode::InvalidCapacity, "position",
                                       "position exceeds session or RoPE capacity"));
@@ -299,6 +315,168 @@ std::expected<DecodeResult, Error> LanguageModelPlan::setup_prompt_slow(
     if (!result) return result;
   }
   return result;
+}
+
+std::expected<void, Error> LanguageModelPlan::initialize_prefill() {
+  if (prefill_) return {};
+  try {
+    PrefillState state;
+    constexpr auto capacity = static_cast<std::uint32_t>(kArenaTokenCapacity);
+    auto engine = qw38::cuda::PrefillEngine::create(*stream_, capacity);
+    if (!engine) return std::unexpected(from_cuda(engine.error()));
+    state.engine = std::move(*engine);
+    auto gdn = PrefillGdnWorkspace::create(capacity, stream_->device());
+    if (!gdn) return std::unexpected(gdn.error());
+    state.gdn_workspace = std::move(*gdn);
+    auto attention = PrefillAttentionWorkspace::create(capacity, stream_->device());
+    if (!attention) return std::unexpected(attention.error());
+    state.attention_workspace = std::move(*attention);
+    auto ids = qw38::cuda::DeviceBuffer::allocate(
+        static_cast<std::uint64_t>(capacity) * sizeof(std::uint32_t),
+        stream_->device());
+    if (!ids) return std::unexpected(from_cuda(ids.error()));
+    state.token_ids = std::move(*ids);
+    auto next = qw38::cuda::DeviceBuffer::allocate(
+        static_cast<std::uint64_t>(capacity) * kHidden * sizeof(float),
+        stream_->device());
+    if (!next) return std::unexpected(from_cuda(next.error()));
+    state.next_h = std::move(*next);
+    auto head = bind_prefill_head(*model_, *stream_);
+    if (!head) return std::unexpected(head.error());
+    state.head = *head;
+    prefill_.emplace(std::move(state));
+    return {};
+  } catch (std::bad_alloc const&) {
+    return std::unexpected(make_error(ErrorCode::AllocationFailed,
+                                      "language_model.prefill", "host allocation failed"));
+  }
+}
+
+std::expected<DecodeResult, Error> LanguageModelPlan::prefill_tokens(
+    std::span<std::uint32_t const> token_ids,
+    std::span<std::uint64_t const> requested_rows,
+    LogitRowSink const& sink) {
+  if (!state_ || state_->is_poisoned() || !stream_ || stream_->empty()) {
+    return std::unexpected(make_error(ErrorCode::InvalidArgument, "session",
+                                      "session is poisoned or closed"));
+  }
+  auto const first = state_->token_position();
+  if (token_ids.empty() || first >= kv_capacity_ ||
+      token_ids.size() > kv_capacity_ - first ||
+      first > static_cast<std::uint64_t>(std::numeric_limits<std::int32_t>::max()) ||
+      token_ids.size() - 1u >
+          static_cast<std::uint64_t>(std::numeric_limits<std::int32_t>::max()) - first ||
+      !state_->layers_at(first)) {
+    return std::unexpected(make_error(ErrorCode::InvalidCapacity, "prefill",
+                                      "invalid token range or session position"));
+  }
+  for (auto id : token_ids) {
+    if (id >= kVocab)
+      return std::unexpected(make_error(ErrorCode::InvalidArgument, "token_id",
+                                        "token ID exceeds language vocabulary"));
+  }
+  if (!requested_rows.empty() && !sink)
+    return std::unexpected(make_error(ErrorCode::InvalidArgument, "prefill.rows",
+                                      "requested rows require a sink"));
+  for (std::size_t i = 0; i < requested_rows.size(); ++i) {
+    if (requested_rows[i] < first ||
+        requested_rows[i] - first >= token_ids.size() ||
+        (i && requested_rows[i] <= requested_rows[i - 1]))
+      return std::unexpected(make_error(ErrorCode::InvalidArgument, "prefill.rows",
+                                        "requested rows must be unique and increasing"));
+  }
+  if (auto st = initialize_prefill(); !st) return std::unexpected(st.error());
+  auto fail = [&](Error error) -> std::expected<DecodeResult, Error> {
+    state_->poison();
+    (void)stream_->sync();
+    return std::unexpected(std::move(error));
+  };
+  auto& p = *prefill_;
+  std::size_t row_index = 0;
+  std::uint32_t best = 0;
+  for (std::size_t offset = 0; offset < token_ids.size();) {
+    auto const count = static_cast<std::uint32_t>(std::min<std::size_t>(
+        kArenaTokenCapacity, token_ids.size() - offset));
+    auto const position = first + offset;
+    if (auto st = qw38::cuda::copy_h2d(p.token_ids.data(), token_ids.data() + offset,
+                                       count * sizeof(std::uint32_t), *stream_); !st)
+      return fail(from_cuda(st.error()));
+    auto* residual = residual_;
+    auto* h_mid = residual_mid_;
+    auto* next = static_cast<float*>(p.next_h.data());
+    if (auto st = qw38::cuda::launch_embed_gather_chunk(
+            embedding_, kVocab, static_cast<std::uint32_t const*>(p.token_ids.data()),
+            count, residual, *stream_); !st)
+      return fail(from_cuda(st.error()));
+    for (auto& layer : prefill_layers_) {
+      std::expected<void, Error> status;
+      if (auto* gdn = std::get_if<PrefillGdnLayerPlan>(&layer))
+        status = execute_prefill_gdn_layer(*gdn, p.gdn_workspace, p.engine,
+                                           residual, h_mid, next, count, position);
+      else
+        status = execute_prefill_attention_layer(
+            std::get<PrefillAttentionLayerPlan>(layer), p.attention_workspace,
+            p.engine, residual, h_mid, next, count, position);
+      if (!status) return fail(status.error());
+      auto* old = residual;
+      residual = next;
+      next = h_mid;
+      h_mid = old;
+    }
+    if (!state_->layers_at(position + count))
+      return fail(make_error(ErrorCode::Internal, "prefill.position",
+                             "a language layer did not advance its state"));
+    auto readout = [&](std::uint32_t row) -> std::expected<std::uint32_t, Error> {
+      if (auto st = qw38::cuda::launch_hidden_rms(
+              residual + static_cast<std::uint64_t>(row) * kHidden,
+              final_gamma_, kMlpRmsEps, 1, normalized_, *stream_); !st)
+        return std::unexpected(from_cuda(st.error()));
+      if (auto st = p.engine.head_generation(p.head, normalized_, 1,
+                                             position + row, device_logits_); !st)
+        return std::unexpected(from_cuda(st.error()));
+      if (auto st = qw38::cuda::copy_d2h(logits_.data(), device_logits_,
+                                         kLogitsBytesPerToken, *stream_); !st)
+        return std::unexpected(from_cuda(st.error()));
+      if (auto st = stream_->sync(); !st) return std::unexpected(from_cuda(st.error()));
+      std::uint32_t argmax = 0;
+      for (std::uint32_t i = 0; i < kVocab; ++i) {
+        if (!std::isfinite(logits_[i]))
+          return std::unexpected(make_error(ErrorCode::Internal, "logits",
+                                            "language head produced a non-finite logit"));
+        if (logits_[i] > logits_[argmax]) argmax = i;
+      }
+      return argmax;
+    };
+    while (row_index < requested_rows.size() &&
+           requested_rows[row_index] < position + count) {
+      auto const row = static_cast<std::uint32_t>(requested_rows[row_index] - position);
+      auto result = readout(row);
+      if (!result) return fail(result.error());
+      std::expected<void, Error> delivered;
+      try {
+        delivered = sink(requested_rows[row_index], logits_);
+      } catch (std::bad_alloc const&) {
+        return fail(make_error(ErrorCode::AllocationFailed, "prefill.rows",
+                               "requested-row sink allocation failed"));
+      } catch (std::exception const&) {
+        return fail(make_error(ErrorCode::Internal, "prefill.rows",
+                               "requested-row sink threw"));
+      } catch (...) {
+        return fail(make_error(ErrorCode::Internal, "prefill.rows",
+                               "requested-row sink threw"));
+      }
+      if (!delivered) return fail(delivered.error());
+      ++row_index;
+    }
+    if (offset + count == token_ids.size()) {
+      auto result = readout(count - 1u);
+      if (!result) return fail(result.error());
+      best = *result;
+    }
+    for (std::uint32_t i = 0; i < count; ++i) state_->commit_token();
+    offset += count;
+  }
+  return DecodeResult{.logits = logits_, .argmax = best};
 }
 
 }  // namespace qw38::runtime

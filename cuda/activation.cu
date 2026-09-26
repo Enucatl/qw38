@@ -113,6 +113,17 @@ __global__ void embed_gather_kernel(std::uint16_t const* table,
   }
 }
 
+__global__ void embed_gather_chunk_kernel(std::uint16_t const* table,
+                                          std::uint32_t const* token_ids,
+                                          float* residual) {
+  auto const token = blockIdx.x;
+  auto const row = static_cast<std::size_t>(token_ids[token]) * kHidden;
+  auto* output = residual + static_cast<std::size_t>(token) * kHidden;
+  for (std::uint32_t i = threadIdx.x; i < kHidden; i += blockDim.x) {
+    output[i] = bf16_to_fp32(table[row + i]);
+  }
+}
+
 __global__ void hidden_rms_kernel(float const* residual,
                                   std::uint16_t const* gamma, float eps,
                                   std::uint16_t* out_bf16) {
@@ -392,6 +403,23 @@ std::expected<void, Error> launch_embed_gather(std::uint16_t const* table,
   embed_gather_kernel<<<1, kHiddenRmsThreads, 0, stream.native()>>>(
       table, token_id, residual);
   return check(cudaGetLastError(), "embed_gather_kernel");
+}
+
+std::expected<void, Error> launch_embed_gather_chunk(
+    std::uint16_t const* table, std::uint32_t vocab,
+    std::uint32_t const* token_ids, std::uint32_t valid_tokens,
+    float* residual, Stream const& stream) {
+  if (auto st = require_stream(stream, "embed_gather_chunk"); !st) return st;
+  if (!table || !token_ids || !residual || vocab == 0 || valid_tokens == 0 ||
+      valid_tokens > 1024) {
+    return std::unexpected(make_error(ErrorCode::InvalidArgument,
+                                      "embed_gather_chunk", "invalid input or count"));
+  }
+  auto guard = stream.activate();
+  if (!guard) return std::unexpected(guard.error());
+  embed_gather_chunk_kernel<<<valid_tokens, kHiddenRmsThreads, 0,
+                              stream.native()>>>(table, token_ids, residual);
+  return check(cudaGetLastError(), "embed_gather_chunk_kernel");
 }
 
 std::expected<void, Error> launch_hidden_rms(float const* residual,

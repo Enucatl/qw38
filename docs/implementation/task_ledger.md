@@ -46,7 +46,8 @@ screening may precede routine core quality acceptance; production promotion may 
 The [54-case core amendment](../architecture/evaluation-policy-core-54.md)
 governs routine TASK-022–032 evaluation: 15 frozen P100, 15 frozen C92, all
 12 L12 and all 12 R-512/R-4096 cases. TASK-026 and later applicable gates
-retain the six R-32768 cases. The 216-case suite is optional, strictly
+retain the six R-32768 fixtures, while running only the fixed
+`R-32768-s0-d0.1` case. The 216-case suite is optional, strictly
 human-initiated interactive work; agents and automation must never launch or
 require it. The full run already in flight on 2026-09-25 continues untouched
 under its captured policy identity. Historical 216-case evidence remains
@@ -243,7 +244,7 @@ an achieved performance target.
 | TASK-023 | Production prefill projections and workspace | M8 | TASK-022 | Native GEMMs, activation quantization/reuse, bounded chunks and precision-correct epilogues | DONE |
 | TASK-024 | GDN prefill algorithm and layer integration | M8 | TASK-023 | Measured serial/chunkwise recurrence choice, FIR/history and validated complete GDN layer | DONE |
 | TASK-025 | Causal attention prefill and layer integration | M8 | TASK-024 | Tiled attention, GQA/cache/position correctness and validated complete attention layer | DONE |
-| TASK-026 | Full-model prefill, handoff and quality gate | M8 | TASK-025 | End-to-end candidate, core suite plus 32768 retrieval, chunk/dispatch boundary validation | TODO |
+| TASK-026 | Full-model prefill, handoff and quality gate | M8 | TASK-025 | End-to-end candidate, core suite plus fixed 32768 retrieval, chunk/dispatch boundary validation | DONE |
 | TASK-027 | Matched whole-request performance baseline | M9 | TASK-026 | PERF-01 comparison, cold/warm costs, peak memory and bottleneck-ranked gap report | TODO |
 | TASK-028 | Conversion-minimized native FP4 path | M10 | TASK-027 | Real-family NVFP4/MXFP4 path with GPU activation conversion, native prefill/decode comparison, quality, capacity and complete-request evidence | TODO |
 | TASK-029 | Precision and representation refinement | M10 | TASK-028 | Targeted head/family/activation/view tradeoffs with complete quality and request evidence | TODO |
@@ -299,7 +300,8 @@ plans, technology dependency rationale, and EVAL-01/PERF-01 task references with
 OVERALL-01. Distinguish historical V0 controls from proposed candidates.
 Inventory which frozen fixtures/references have authenticated provenance and
 which require regeneration; retain the original 216-case fixture inventory and
-six 32768 retrieval cases, scoring, budgets, and review requirements. Routine
+six 32768 retrieval fixtures and their historical scoring records; current
+execution uses the single fixed case under EVAL-01. Routine
 coverage is governed by the 54-case amendment above.
 
 Freeze calibration/development/evaluation separation, the real-shape benchmark
@@ -476,15 +478,18 @@ for the entire prompt. Test prefill into nonempty sessions and continuation
 across native GEMM/GEMV dispatch transitions with the same resident weights.
 
 Run the complete 54-case EVAL-01 core through production prefill plus decode, and the
-six frozen 32768 retrieval cases in both required comparison arms. Preserve
+fixed `R-32768-s0-d0.1` case in both required comparison arms. Preserve
 the original boundaries/partitions (including 1/63/64/65/255/256/257 and
 alternating 63/65), adding boundaries around chosen chunks and dispatch
 crossovers. Require bitwise replay only for identical schedules; compare
 different schedules using component tolerances and the unchanged behavioral
-gates. Test chunk-dependent activation scales explicitly. **Exit:** accepted
+gates. Test chunk-dependent activation scales when selected; record their
+absence for the accepted BF16-activation path. **Exit:** accepted
 full candidate quality, correct positions/history/state, bounded measured
 memory, and documented coverage. Missing mandatory long-context evidence
 blocks acceptance; full prefill equivalence is not inferred from one token.
+Historical six-case 32768 runs remain evidence, but the fixed case alone is
+required on the final binary under EVAL-01.
 
 ### TASK-027 — Matched whole-request performance baseline
 

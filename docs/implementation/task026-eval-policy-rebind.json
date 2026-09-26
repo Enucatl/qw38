@@ -1,0 +1,12 @@
+{
+  "schema": "qw38-eval-policy-rebind-v1",
+  "fixture_manifest_sha256": "2ddbd25f11dfcc7905353462052fb5f90ec987e1f332ce23288e788593fe3fee",
+  "previous_policy_sha256": "afa5b8c80bc03a583fce9fa85ccffa26f6ec0ab821002b2c5fe16fc944885bb6",
+  "effective_policy_sha256": "7da1a1171984dc4761c86d87260a549f6462d9baf9ad14f5143ac0511a1cc679",
+  "prompts_sha256": "799847cb84b9f17d81ee4eb1f6478a1a8aba227e8bfd0ad7acd0226423a90b56",
+  "teacher_refs_sha256": "33b60ea55b9c3b7cad97ee167ec6c1f4db853a176b9fbf072771f2f9433edf95",
+  "teacher_probabilities_sha256": "385b5fbd0da61ea576fa6b308400e7abf78d56c96ba3c6ffdf64fad1f5f53f55",
+  "scoring_sha256": "2c4810f3648e1ef0af5a8ec19075664c4dff201061f952e04306d151dcf23aa5",
+  "metrics_sha256": "e580e3d17a13ab661e0b969d38ddafac08cf2197611566dbf3fa10c09118146f",
+  "decision": "FP4-01 changed future task numbering. The repository owner selected R-32768-s0-d0.1 as the only 32768 quality case for TASK-026 and later gates. The other five prompts remain frozen inventory and historical evidence. Frozen core inputs, references, scoring rules, and thresholds are unchanged."
+}

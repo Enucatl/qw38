@@ -58,7 +58,7 @@ scoring, uncertainty rules, coverage, or PERF-01 measurement definitions.
 TASK-018 reconciles documentation and inventories existing evidence; it does
 not require another exhaustive old-V0 run. TASK-022 owns selected-candidate
 decode and the 216-case core. TASK-026 owns production-prefill core coverage
-and the six frozen 32768 retrieval cases. TASK-027 owns the matched PERF-01
+and one fixed 32768 retrieval case. TASK-027 owns the matched PERF-01
 comparison. Existing V0 and Q4_K_M records remain controls with their captured
 scope and identity; incomplete arms cannot establish acceptance.
 
@@ -184,6 +184,9 @@ They are excluded from aggregate NLL to avoid diluting the continuation corpus.
 
 Construct six deterministic prompts at each target prompt horizon
 **512, 4096, 32768** tokens: `s` in `{0,1}`, depth `d` in `{0.1,0.5,0.9}`.
+Retain the six frozen 32768 fixtures, but execute only
+`R-32768-s0-d0.1` as the fixed long-context quality case in TASK-026 and
+later gates. Do not run the other five 32768 cases.
 For each case, render a single user message with this construction:
 
 1. Start with `Read the archive and remember the locker access code.\n`.
@@ -206,7 +209,7 @@ token; do not add EOS to this retrieval target. This directly measures the known
 answer, separately from teacher-continuation agreement.
 
 The 216-case core requires retrieval horizons 512 and 4096 (12 cases). Freeze
-the 32768 cases with the same inputs; candidate decode/core execution belongs
+the 32768 inventory with the same inputs; candidate decode/core execution belongs
 to TASK-022 and production-prefill plus 32768 acceptance belongs to TASK-026.
 This is a selected staged requirement, not an
 implementer-selected feasible subset. An optional capacity probe uses the same
@@ -475,6 +478,12 @@ limited to an optional elementary sanity check. Runs can be sequential, and
 cached evidence may be reused only with all identities matching. Slow execution
 does not permit silently reducing cases or caps.
 
+For TASK-026 and later gates, the single fixed 32768 case above is the complete
+long-context quality check. Run that case once in each comparison arm, with
+the same frozen inputs, cap, scorer, and identity checks. Historical six-case
+runs remain valid historical evidence but are not required or repeated. A
+repair-only binary revision needs only this one case on the final binary.
+
 TASK-026 runs the accepted candidate core through production prefill followed
 by decode and runs R at 32768. Compare the same artifact under repeated decode and
 prefill at the checkpoints above with partitions of 1, 63, 64, 65, 255, 256,
@@ -485,7 +494,7 @@ equality is required only for replay of one fixed schedule. Reuse the relevant
 component numerical tolerances for component-level boundary checks.
 
 The 32768 reference can be precomputed slowly; absence of either llama.cpp or
-candidate evidence is not a passing paired comparison. TASK-027 and subsequent
+candidate evidence for the fixed case is not a passing paired comparison. TASK-027 and subsequent
 performance work must reference the accepted core plus 32768 extension. If
 resources prevent a mandatory case, report missing coverage and BLOCKED to the
 acceptance owner. The maximum-capacity probe alone is optional.

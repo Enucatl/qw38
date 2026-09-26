@@ -22,6 +22,12 @@ inline constexpr int kHeadNormThreads = 128;   // T-03: one block/head
     std::uint16_t const* table, std::uint32_t vocab, std::uint32_t token_id,
     float* residual, Stream const& stream);
 
+// Gather valid token rows from device IDs into token-major FP32 residuals.
+[[nodiscard]] std::expected<void, Error> launch_embed_gather_chunk(
+    std::uint16_t const* table, std::uint32_t vocab,
+    std::uint32_t const* token_ids, std::uint32_t valid_tokens,
+    float* residual, Stream const& stream);
+
 // Hidden zero-centered RMS (1+gamma) → BF16. residual/out are [n_tokens, 5120].
 [[nodiscard]] std::expected<void, Error> launch_hidden_rms(
     float const* residual, std::uint16_t const* gamma, float eps,
