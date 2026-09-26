@@ -41,7 +41,8 @@ std::vector<T> download(qw38::cuda::DeviceBuffer const& src, std::size_t n,
 }
 
 bool scan_case(qw38::cuda::Stream const& stream, std::uint32_t first,
-               std::uint32_t count, std::uint32_t query_tile) {
+               std::uint32_t count, std::uint32_t query_tile,
+               bool signed_values = false) {
   std::vector<std::uint16_t> q((M + 1u) * H * D), g(q.size());
   std::vector<std::uint16_t> kv(16u * 2u * KVH * C * D,
                                fp32_to_bf16_rne(777.0f));
@@ -70,8 +71,10 @@ bool scan_case(qw38::cuda::Stream const& stream, std::uint32_t first,
             0.02f * (static_cast<int>((d * 3u + head + t * 5u) % 29u) - 14));
       for (std::uint32_t d = 0; d < D; ++d)
         kv[kv_index(1, head, t, d)] = fp32_to_bf16_rne(
-            (t < 64u ? 0.05f : 0.8f) * static_cast<float>(head + 1u) +
-            0.001f * d);
+            signed_values
+                ? 0.1f * (static_cast<int>((t * 13u + d * 7u + head * 3u) % 101u) - 50)
+                : (t < 64u ? 0.05f : 0.8f) * static_cast<float>(head + 1u) +
+                      0.001f * d);
     }
   auto dq = qw38::cuda::DeviceBuffer::allocate(q.size() * 2u);
   auto dg = qw38::cuda::DeviceBuffer::allocate(g.size() * 2u);
@@ -169,6 +172,7 @@ bool scan_case(qw38::cuda::Stream const& stream, std::uint32_t first,
     }
   std::cout << "scan first=" << first << " count=" << count
             << " query_tile=" << query_tile
+            << " signed_values=" << signed_values
             << " max_bf16_diff=" << max_diff << '\n';
   return true;
 }
@@ -192,6 +196,9 @@ int main() {
   for (std::uint32_t count : {31u, 32u, 33u, 63u, 64u, 65u})
     if (!scan_case(*stream, 0, count, qw38::cuda::kAttnPrefillQueryTile)) return 1;
   if (!scan_case(*stream, 63, 2, qw38::cuda::kAttnPrefillQueryTile) ||
-      !scan_case(*stream, 271, 65, qw38::cuda::kAttnPrefillQueryTile)) return 1;
+      !scan_case(*stream, 271, 65, qw38::cuda::kAttnPrefillQueryTile) ||
+      // Signed, asymmetric V exposes orientation and cancellation errors in
+      // the BF16 P operand against the independent unrounded softmax above.
+      !scan_case(*stream, 271, 65, qw38::cuda::kAttnPrefillQueryTile, true)) return 1;
   return 0;
 }

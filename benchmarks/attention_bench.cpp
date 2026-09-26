@@ -1,142 +1,93 @@
 #include "cuda/attention.hpp"
 #include "cuda/buffer.hpp"
-#include "cuda/error.hpp"
+#include "cuda/copy.hpp"
 #include "cuda/event.hpp"
 #include "cuda/stream.hpp"
+#include "src/format/floatcvt.hpp"
 
 #include <cuda_runtime.h>
 
-#include <algorithm>
-#include <cmath>
 #include <cstdint>
 #include <iostream>
+#include <span>
 #include <vector>
 
-using qw38::cuda::DeviceBuffer;
-using qw38::cuda::Event;
-using qw38::cuda::Stream;
-using qw38::cuda::elapsed_ms;
-
-namespace {
-
-bool launch_once(DeviceBuffer& q, DeviceBuffer& kv, DeviceBuffer& partials,
-                 DeviceBuffer& g, DeviceBuffer& y, std::uint64_t capacity,
-                 std::uint64_t populated, std::uint32_t segments,
-                 Stream const& stream) {
-  return qw38::cuda::zero(partials, stream) &&
-         qw38::cuda::launch_attention_scan(
-             static_cast<std::uint16_t const*>(q.data()),
-             static_cast<std::uint16_t const*>(kv.data()), 0, capacity,
-             populated, static_cast<float*>(partials.data()), segments,
-             stream) &&
-         qw38::cuda::launch_attention_merge(
-             static_cast<float const*>(partials.data()),
-             static_cast<std::uint16_t const*>(g.data()), segments,
-             static_cast<std::uint16_t*>(y.data()), stream);
-}
-
-float percentile(std::vector<float> samples, float p) {
-  std::sort(samples.begin(), samples.end());
-  float const rank = p * static_cast<float>(samples.size() - 1u);
-  auto const lo = static_cast<std::size_t>(rank);
-  auto const hi = std::min(lo + 1u, samples.size() - 1u);
-  float const frac = rank - static_cast<float>(lo);
-  return samples[lo] + frac * (samples[hi] - samples[lo]);
-}
-
-float standard_error(std::vector<float> const& samples) {
-  float mean = 0.0f;
-  for (float const sample : samples) mean += sample;
-  mean /= static_cast<float>(samples.size());
-  float variance = 0.0f;
-  for (float const sample : samples) {
-    float const delta = sample - mean;
-    variance += delta * delta;
-  }
-  variance /= static_cast<float>(samples.size() - 1u);
-  return std::sqrt(variance / static_cast<float>(samples.size()));
-}
-
-}  // namespace
-
+// FAST-01: one complete operation per phase, no warmups or repetitions.
 int main() {
-  cudaDeviceProp prop{};
-  if (auto st = qw38::cuda::check(cudaGetDeviceProperties(&prop, 0),
-                                  "cudaGetDeviceProperties");
-      !st) {
-    std::cerr << qw38::cuda::error_message(st.error()) << '\n';
-    return 1;
-  }
+  using namespace qw38::cuda;
+  constexpr std::uint32_t prefix = 4096, rows = 32, capacity = prefix + rows;
+  constexpr std::uint32_t H = kAttnQueryHeads, D = kAttnHeadDim;
+  constexpr std::uint32_t W = kAttnKvHeads * D;
   auto stream = Stream::create();
   if (!stream) return 1;
-
-  constexpr std::uint64_t capacity = 32768;
-  constexpr std::uint64_t kv_bytes =
-      16ull * 2ull * qw38::cuda::kAttnKvHeads * capacity *
-      qw38::cuda::kAttnHeadDim * sizeof(std::uint16_t);
-  constexpr std::uint64_t partial_bytes =
-      static_cast<std::uint64_t>(qw38::cuda::kAttnQueryHeads) *
-      ((capacity + 255u) / 256u) * qw38::cuda::kAttnPartialStride *
-      sizeof(float);
-  auto q = DeviceBuffer::allocate(
-      static_cast<std::uint64_t>(qw38::cuda::kAttnQueryHeads) *
-      qw38::cuda::kAttnHeadDim * sizeof(std::uint16_t));
-  auto g = DeviceBuffer::allocate(
-      static_cast<std::uint64_t>(qw38::cuda::kAttnQueryHeads) *
-      qw38::cuda::kAttnHeadDim * sizeof(std::uint16_t));
-  auto kv = DeviceBuffer::allocate(kv_bytes);
-  auto partials = DeviceBuffer::allocate(partial_bytes);
-  auto y = DeviceBuffer::allocate(
-      static_cast<std::uint64_t>(qw38::cuda::kAttnQueryHeads) *
-      qw38::cuda::kAttnHeadDim * sizeof(std::uint16_t));
-  if (!q || !g || !kv || !partials || !y) {
-    std::cerr << "attention benchmark allocation failed\n";
-    return 1;
+  auto upload = [&](std::vector<std::uint16_t> const& values) {
+    auto result = DeviceBuffer::allocate(values.size() * 2u);
+    if (result && (!copy_h2d(result->data(), std::as_bytes(std::span(values)), *stream) ||
+                   !stream->sync()))
+      return decltype(result)(std::unexpected(make_error(
+          ErrorCode::InvalidArgument, "benchmark", "upload failed")));
+    return result;
+  };
+  auto data = [](std::size_t count, unsigned seed) {
+    std::vector<std::uint16_t> result(count);
+    for (std::size_t i = 0; i < count; ++i)
+      result[i] = qw38::format::fp32_to_bf16_rne(
+          0.01f * (static_cast<int>((i * seed + i / D) % 101) - 50));
+    return result;
+  };
+  auto qg = upload(data(rows * H * 2u * D, 7));
+  auto k = upload(data(rows * W, 11));
+  auto v = upload(data(rows * W, 13));
+  auto gamma = upload(std::vector<std::uint16_t>(2u * D, 0));
+  auto kv = upload(data(16ull * 2 * W * capacity, 17));
+  auto q = DeviceBuffer::allocate(rows * H * D * 2u);
+  auto g = DeviceBuffer::allocate(rows * H * D * 2u);
+  auto y = DeviceBuffer::allocate(rows * H * D * 2u);
+  constexpr auto segments = (prefix + 1 + kAttnSegmentKeys - 1) / kAttnSegmentKeys;
+  auto partials = DeviceBuffer::allocate(H * segments * kAttnPartialStride * 4u);
+  auto frequencies = DeviceBuffer::allocate(kAttnRopeFreqs * 4u);
+  auto start = Event::create_timing();
+  auto end = Event::create_timing();
+  if (!qg || !k || !v || !gamma || !kv || !q || !g || !y || !partials ||
+      !frequencies || !start || !end || !zero(*frequencies, *stream) ||
+      !stream->sync()) return 1;
+  auto resources = attention_prefill_resources();
+  cudaDeviceProp prop{};
+  if (!resources || cudaGetDeviceProperties(&prop, 0) != cudaSuccess) return 1;
+  std::cout << "device=" << prop.name << " prefix=" << prefix
+            << " capacity=" << capacity << " warmups=0 repetitions=1"
+            << " registers=" << resources->registers
+            << " shared_bytes=" << resources->shared_bytes
+            << " local_bytes=" << resources->local_bytes
+            << " blocks_per_sm=" << resources->occupancy_blocks_per_sm << '\n';
+  for (bool prefill : {true, false}) {
+    if (!start->record(*stream) || !launch_attention_prepare_chunk(
+        static_cast<std::uint16_t const*>(qg->data()),
+        static_cast<std::uint16_t const*>(k->data()),
+        static_cast<std::uint16_t const*>(v->data()),
+        static_cast<std::uint16_t const*>(gamma->data()) + D,
+        static_cast<std::uint16_t const*>(gamma->data()),
+        static_cast<float const*>(frequencies->data()), 1e-6f,
+        prefix, prefill ? rows : 1u, static_cast<std::uint16_t*>(q->data()),
+        static_cast<std::uint16_t*>(g->data()), static_cast<std::uint16_t*>(kv->data()),
+        0, capacity, *stream)) return 1;
+    if (prefill) {
+      if (!launch_attention_prefill_scan(
+          static_cast<std::uint16_t const*>(q->data()),
+          static_cast<std::uint16_t const*>(g->data()),
+          static_cast<std::uint16_t const*>(kv->data()), 0, capacity, prefix,
+          rows, static_cast<std::uint16_t*>(y->data()), *stream)) return 1;
+    } else if (!launch_attention_scan(
+        static_cast<std::uint16_t const*>(q->data()),
+        static_cast<std::uint16_t const*>(kv->data()), 0, capacity, prefix + 1,
+        static_cast<float*>(partials->data()), segments, *stream) ||
+        !launch_attention_merge(static_cast<float const*>(partials->data()),
+        static_cast<std::uint16_t const*>(g->data()), segments,
+        static_cast<std::uint16_t*>(y->data()), *stream)) return 1;
+    if (!end->record(*stream) || !end->sync()) return 1;
+    auto ms = elapsed_ms(*start, *end);
+    if (!ms) return 1;
+    std::cout << "phase=" << (prefill ? "prefill" : "decode")
+              << " rows=" << (prefill ? rows : 1u) << " complete_gpu_ms=" << *ms << '\n';
   }
-  if (!qw38::cuda::zero(*q, *stream) || !qw38::cuda::zero(*g, *stream) ||
-      !qw38::cuda::zero(*kv, *stream)) {
-    return 1;
-  }
-
-  std::cout << "qw38_bench_attention\n";
-  std::cout << "mode=diagnostic-only\n";
-  std::cout << "device=" << prop.name << " sm_" << prop.major << prop.minor
-            << " capacity=" << capacity << " kv_bytes=" << kv_bytes << '\n';
-  std::cout << "geometry threads=" << qw38::cuda::kAttnScanThreads
-            << " segment_keys=" << qw38::cuda::kAttnSegmentKeys
-            << " subtile_keys=" << qw38::cuda::kAttnSubtileKeys
-            << " merge_threads=" << qw38::cuda::kAttnMergeThreads << '\n';
-
-  for (std::uint64_t populated : {512ull, 4096ull, 32768ull}) {
-    auto const segments = static_cast<std::uint32_t>((populated + 255u) / 256u);
-    constexpr int warmup = 5;
-    constexpr int repetitions = 20;
-    for (int i = 0; i < warmup; ++i) {
-      if (!launch_once(*q, *kv, *partials, *g, *y, capacity, populated,
-                       segments, *stream)) {
-        return 1;
-      }
-    }
-    std::vector<float> samples;
-    samples.reserve(repetitions);
-    for (int i = 0; i < repetitions; ++i) {
-      auto t0 = Event::create_timing();
-      auto t1 = Event::create_timing();
-      if (!t0 || !t1 || !t0->record(*stream) ||
-          !launch_once(*q, *kv, *partials, *g, *y, capacity, populated,
-                       segments, *stream) ||
-          !t1->record(*stream) || !t1->sync()) {
-        return 1;
-      }
-      auto ms = elapsed_ms(*t0, *t1);
-      if (!ms) return 1;
-      samples.push_back(*ms);
-    }
-    std::cout << "populated=" << populated << " segments=" << segments
-              << " warmups=" << warmup << " repetitions=" << repetitions
-              << " median_ms=" << percentile(samples, 0.50f)
-              << " p99_ms=" << percentile(samples, 0.99f)
-              << " uncertainty_ms=" << standard_error(samples) << '\n';
-  }
-  return 0;
 }

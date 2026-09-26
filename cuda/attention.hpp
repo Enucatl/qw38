@@ -66,7 +66,8 @@ struct AttentionPrefillResources {
 };
 
 // One block per query head and 32 query rows. BF16 tensor-core QK, FP32
-// softmax/PV, shared K/V staging; statistics/numerators remain block-local.
+// softmax, two BF16 P components, BF16 V and FP32 PV accumulation. K/V/PV
+// staging is reused; statistics/numerators remain block-local.
 // Explicit query tiles 1 and 4 select the scalar diagnostic controls.
 [[nodiscard]] std::expected<void, Error> launch_attention_prefill_scan(
     std::uint16_t const* q, std::uint16_t const* g,

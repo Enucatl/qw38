@@ -182,7 +182,6 @@ __global__ void attention_scan_kernel(
   __shared__ float l_shared;
   __shared__ float num_shared[kAttnHeadDim];
   __shared__ float old_scale;
-  __shared__ float tile_scale;
 
   std::uint32_t const h = blockIdx.x;
   std::uint32_t const segment = blockIdx.y;
@@ -253,23 +252,21 @@ __global__ void attention_scan_kernel(
       old_scale = (m_shared == -INFINITY)
                       ? 0.0f
                       : expf(m_shared - m_new);
-      tile_scale = (tile_max == -INFINITY)
-                       ? 0.0f
-                       : expf(tile_max - m_new);
-      l_shared *= old_scale;
-      float tile_sum = 0.0f;
-      for (std::uint32_t i = 0; i < key_count; ++i) {
-        if (scores[i] != -INFINITY) {
-          tile_sum += expf(scores[i] - tile_max);
-        }
-      }
-      l_shared += tile_scale * tile_sum;
-      for (std::uint32_t d = 0; d < kAttnHeadDim; ++d) {
-        num_shared[d] *= old_scale;
-      }
       m_shared = m_new;
     }
     __syncthreads();
+    // Reuse one FP32 probability for the denominator and every value lane.
+    if (tid < key_count)
+      scores[tid] = scores[tid] == -INFINITY
+          ? 0.0f : expf(scores[tid] - m_shared);
+    for (std::uint32_t d = tid; d < kAttnHeadDim; d += kAttnScanThreads)
+      num_shared[d] *= old_scale;
+    __syncthreads();
+    if (tid == 0) {
+      float tile_sum = 0.0f;
+      for (std::uint32_t i = 0; i < key_count; ++i) tile_sum += scores[i];
+      l_shared = l_shared * old_scale + tile_sum;
+    }
 
     for (std::uint32_t i = tid; i < key_count * kAttnHeadDim;
          i += kAttnScanThreads) {
@@ -288,14 +285,8 @@ __global__ void attention_scan_kernel(
     // the upper half untouched would silently zero half of attention output.
     for (std::uint32_t d = tid; d < kAttnHeadDim; d += kAttnScanThreads) {
       float add = 0.0f;
-      if (m_shared != -INFINITY) {
-        for (std::uint32_t i = 0; i < key_count; ++i) {
-          if (scores[i] != -INFINITY) {
-            add += expf(scores[i] - m_shared) *
-                   bf16_to_fp32(tile[i * kAttnHeadDim + d]);
-          }
-        }
-      }
+      for (std::uint32_t i = 0; i < key_count; ++i)
+        add += scores[i] * bf16_to_fp32(tile[i * kAttnHeadDim + d]);
       num_shared[d] += add;
     }
     __syncthreads();
@@ -564,6 +555,7 @@ __global__ void attention_prefill_scan_kernel(
 constexpr int kPrefillThreads = 256;
 constexpr std::size_t kPrefillSharedBytes =
     (kAttnPrefillQueryTile + kAttnPrefillKeyTile) * kAttnHeadDim * 2u +
+    kAttnPrefillQueryTile * kAttnPrefillKeyTile * 4u +
     (kAttnPrefillQueryTile * kAttnPrefillKeyTile +
      3u * kAttnPrefillQueryTile) * sizeof(float);
 
@@ -579,7 +571,9 @@ __global__ void attention_prefill_mma_kernel(
   auto* qs = reinterpret_cast<__nv_bfloat16*>(storage);
   auto* tile = qs + Q * D;  // K and V share storage after QK completes.
   auto* scores = reinterpret_cast<float*>(tile + K * D);
-  float* m = scores + Q * K;
+  auto* probabilities = reinterpret_cast<__nv_bfloat16*>(scores + Q * K);
+  auto* probability_residual = probabilities + Q * K;
+  float* m = reinterpret_cast<float*>(probability_residual + Q * K);
   float* l = m + Q;
   float* rescale = l + Q;
   int const tid = threadIdx.x, warp = tid / 32, lane = tid % 32;
@@ -620,7 +614,9 @@ __global__ void attention_prefill_mma_kernel(
                             dot, K, wmma::mem_row_major);
     __syncthreads();
     // A warp owns each row's two groups of 32 scores. All reductions,
-    // probabilities and running statistics stay FP32, including masked tails.
+    // exponentials and running statistics stay FP32, including masked tails.
+    // A single BF16 P failed the real-layer tolerance. Split P into BF16 high
+    // and residual components for two MMA contributions (TASK-033 fallback).
     for (int r = warp; r < Q; r += kPrefillThreads / 32) {
       bool const valid = row0 + r < valid_tokens;
       float s0 = valid && base + lane <= first_position + row0 + r
@@ -635,8 +631,12 @@ __global__ void attention_prefill_mma_kernel(
       float const p0 = s0 == -INFINITY ? 0.0f : expf(s0 - best);
       float const p1 = s1 == -INFINITY ? 0.0f : expf(s1 - best);
       float const sum = warp_sum(p0 + p1);
-      scores[r * K + lane] = p0;
-      scores[r * K + lane + 32] = p1;
+      probabilities[r * K + lane] = __float2bfloat16_rn(p0);
+      probabilities[r * K + lane + 32] = __float2bfloat16_rn(p1);
+      probability_residual[r * K + lane] = __float2bfloat16_rn(
+          p0 - __bfloat162float(probabilities[r * K + lane]));
+      probability_residual[r * K + lane + 32] = __float2bfloat16_rn(
+          p1 - __bfloat162float(probabilities[r * K + lane + 32]));
       if (lane == 0) {
         m[r] = best;
         l[r] = l[r] * scale + sum;
@@ -652,13 +652,33 @@ __global__ void attention_prefill_mma_kernel(
     __syncthreads();
 #pragma unroll
     for (int r = 0; r < Q; ++r) numerator[r] *= rescale[r];
-#pragma unroll 1
-    for (int key = 0; key < K; ++key) {
-      float const value = __bfloat162float(tile[key * D + tid]);
+    wmma::fragment<wmma::matrix_b, 16, 16, 16, __nv_bfloat16, wmma::row_major> values;
+    wmma::fragment<wmma::accumulator, 16, 16, 16, float> pv[4];
 #pragma unroll
-      for (int r = 0; r < Q; ++r)
-        numerator[r] += scores[r * K + key] * value;
+    for (int col = 0; col < 4; ++col) wmma::fill_fragment(pv[col], 0.0f);
+    for (int key = 0; key < K; key += 16) {
+      wmma::load_matrix_sync(a, probabilities + (warp / 4) * 16 * K + key, K);
+      wmma::fragment<wmma::matrix_a, 16, 16, 16, __nv_bfloat16, wmma::row_major> low;
+      wmma::load_matrix_sync(low, probability_residual + (warp / 4) * 16 * K + key, K);
+#pragma unroll
+      for (int col = 0; col < 4; ++col) {
+        wmma::load_matrix_sync(values, tile + key * D + (warp % 4) * 64 + col * 16, D);
+        wmma::mma_sync(pv[col], a, values, pv[col]);
+        wmma::mma_sync(pv[col], low, values, pv[col]);
+      }
     }
+    // All V readers finish before its 32 KiB staging becomes FP32 PV output.
+    // This avoids assumptions about WMMA fragment element-to-row mappings.
+    __syncthreads();
+    auto* product = reinterpret_cast<float*>(tile);
+    static_assert(Q * D * sizeof(float) <= K * D * sizeof(__nv_bfloat16));
+#pragma unroll
+    for (int col = 0; col < 4; ++col)
+      wmma::store_matrix_sync(product + (warp / 4) * 16 * D +
+          (warp % 4) * 64 + col * 16, pv[col], D, wmma::mem_row_major);
+    __syncthreads();
+#pragma unroll
+    for (int r = 0; r < Q; ++r) numerator[r] += product[r * D + tid];
     __syncthreads();
   }
 #pragma unroll
