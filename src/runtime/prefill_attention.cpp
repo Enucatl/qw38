@@ -37,6 +37,12 @@ std::expected<PrefillAttentionLayerPlan, Error> bind_prefill_attention_layer(
   if (!prep) return std::unexpected(prep.error());
   auto projections = bind_prefill_layer_projections(model, layer, stream);
   if (!projections) return std::unexpected(projections.error());
+  // This policy shares FP8 producer storage across the complete mixer.
+  // Reject a partial FP8 mixer before any KV or scratch mutation.
+  if ((projections->first.layout == qw38::cuda::kDecodeLayoutFp8V1) !=
+      (projections->mixer_out.layout == qw38::cuda::kDecodeLayoutFp8V1))
+    return std::unexpected(make_error(ErrorCode::InvalidArgument,
+        "prefill.attention.layout", "FP8 input and output projections must agree"));
   return PrefillAttentionLayerPlan{*prep, *projections};
 }
 
@@ -144,6 +150,8 @@ std::expected<void, Error> execute_prefill_attention_layer(
     if (!status) return fail(from_cuda(status.error()));
     return {};
   };
+  bool const fp8=p.first.layout==qw38::cuda::kDecodeLayoutFp8V1 && valid_tokens>1;
+  auto packed=fp8 ? engine.fp8_operand(valid_tokens,kHidden) : qw38::cuda::Fp8Input{};
   auto project = [&](qw38::cuda::PrefillWeight const& weight,
                      std::uint16_t const* input, void* output,
                      qw38::cuda::PrefillEpilogue epilogue,
@@ -151,10 +159,15 @@ std::expected<void, Error> execute_prefill_attention_layer(
     return cuda_step(engine.project(qw38::cuda::PrefillProjection{
         .weight = weight, .input = input, .output = output, .residual = add,
         .valid_tokens = valid_tokens, .first_position = first_position,
-        .epilogue = epilogue}));
+        .epilogue = epilogue, .packed = weight.layout==qw38::cuda::kDecodeLayoutFp8V1 ? packed : qw38::cuda::Fp8Input{}}));
   };
   using qw38::cuda::PrefillEpilogue;
-  if (auto st = cuda_step(qw38::cuda::launch_hidden_rms(
+  if(fp8) {
+    if(packed.codes.empty()) return fail(make_error(ErrorCode::InvalidArgument,"fp8.workspace","missing prefill pack"));
+    if(auto st=cuda_step(qw38::cuda::launch_hidden_rms_fp8(residual,
+        static_cast<std::uint16_t const*>(prep.gamma.pointer),prep.eps,valid_tokens,
+        nullptr,const_cast<std::uint8_t*>(packed.codes.data()),const_cast<float*>(packed.scales.data()),*stream));!st)return st;
+  } else if (auto st = cuda_step(qw38::cuda::launch_hidden_rms(
           residual, static_cast<std::uint16_t const*>(prep.gamma.pointer),
           prep.eps, valid_tokens, s.normalized, *stream)); !st) return st;
   if (auto st = project(p.first, s.normalized, s.qg, PrefillEpilogue::StoreBf16);
@@ -171,10 +184,12 @@ std::expected<void, Error> execute_prefill_attention_layer(
           first_position, valid_tokens, s.q, s.g,
           static_cast<std::uint16_t*>(prep.kv.pointer), prep.attn_layer,
           prep.kv_capacity, *stream)); !st) return st;
+  packed=fp8 ? engine.fp8_operand(valid_tokens,kAttnOutWidth) : qw38::cuda::Fp8Input{};
   if (auto st = cuda_step(qw38::cuda::launch_attention_prefill_scan(
           s.q, s.g, static_cast<std::uint16_t const*>(prep.kv.pointer),
           prep.attn_layer, prep.kv_capacity, first_position,
-          valid_tokens, s.y, *stream)); !st) return st;
+          valid_tokens, s.y, *stream, qw38::cuda::kAttnPrefillQueryTile,
+          const_cast<std::uint8_t*>(packed.codes.data()),const_cast<float*>(packed.scales.data()))); !st) return st;
   if (auto st = project(p.mixer_out, s.y, h_mid,
                         PrefillEpilogue::ResidualAddFp32, residual); !st) return st;
   if (auto st = execute_prefill_mlp(p, engine, h_mid, next_h,

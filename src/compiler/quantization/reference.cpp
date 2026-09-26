@@ -57,6 +57,12 @@ bool family_uses_q8g32(TensorFamily family) noexcept {
 WeightFormat select_weight_format(TensorFamily family,
                                   PhysicalLayoutId identity_layout,
                                   WeightFormatPolicy policy) noexcept {
+  if (policy == WeightFormatPolicy::Fp8MixerV1) {
+    auto prior = select_weight_format(family, identity_layout, WeightFormatPolicy::CandidateV2);
+    if (family != TensorFamily::LmHead && prior.quantizer == LogicalQuantizerId::Q8G32CandidateV1)
+      return {StorageClass::Fp8, LogicalQuantizerId::Fp8V1, PhysicalLayoutId::CudaFp8V1};
+    return prior;
+  }
   if (policy == WeightFormatPolicy::NvFp4MlpV1) {
     if (family == TensorFamily::MlpGateProj || family == TensorFamily::MlpUpProj)
       return {StorageClass::NvFp4, LogicalQuantizerId::NvFp4V1, PhysicalLayoutId::CudaNvFp4V1};

@@ -58,6 +58,7 @@ enum class StorageClass : std::uint16_t {
   Bf16 = 0x0003,
   Fp32 = 0x0004,
   NvFp4 = 0x0005,
+  Fp8 = 0x0006,
 };
 
 enum class LogicalQuantizerId : std::uint16_t {
@@ -68,6 +69,7 @@ enum class LogicalQuantizerId : std::uint16_t {
   Q8G32CandidateV1 = 0x0104,
   Q4KCandidateV2 = 0x0105,
   NvFp4V1 = 0x0106,
+  Fp8V1 = 0x0107,
 };
 
 enum class PhysicalLayoutId : std::uint16_t {
@@ -85,6 +87,7 @@ enum class PhysicalLayoutId : std::uint16_t {
   CudaQ8G32CandidateV1 = 0x020C,
   CudaQ4KCandidateV2 = 0x020D,
   CudaNvFp4V1 = 0x020E,
+  CudaFp8V1 = 0x020F,
 };
 
 enum class SemanticNodeKind : std::uint16_t {
@@ -101,6 +104,7 @@ enum class PrecisionPolicyId : std::uint16_t {
   CandidateV1 = 0x0402,
   CandidateV2 = 0x0403,
   NvFp4MlpV1 = 0x0404,
+  Fp8MixerV1 = 0x0405,
 };
 
 enum class SemanticScope : std::uint16_t {
@@ -129,6 +133,7 @@ enum class MappingKind : std::uint16_t {
   // Logical [channel, 1, tap] is stored as physical [tap, channel].
   TapMajorConvC1T = 0x0703,
   NvFp4TN = 0x0704,
+  Fp8TN = 0x0705,
 };
 
 enum class IntegrityKind : std::uint16_t {

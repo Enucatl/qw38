@@ -322,7 +322,9 @@ std::expected<void, Error> LanguageModelPlan::initialize_prefill() {
   try {
     PrefillState state;
     constexpr auto capacity = static_cast<std::uint32_t>(kArenaTokenCapacity);
-    auto engine = qw38::cuda::PrefillEngine::create(*stream_, capacity);
+    auto engine = qw38::cuda::PrefillEngine::create(*stream_, capacity,
+        qw38::cuda::kPrefillDefaultWeightRows, qw38::cuda::PrefillDispatch::BoundedUnpackBf16Cublas,
+        model_->schema().precision.id == qw38::format::PrecisionPolicyId::Fp8MixerV1);
     if (!engine) return std::unexpected(from_cuda(engine.error()));
     state.engine = std::move(*engine);
     auto gdn = PrefillGdnWorkspace::create(capacity, stream_->device());

@@ -496,3 +496,15 @@ target_include_directories(qw38_nvfp4_test SYSTEM PRIVATE "${QW38_CUTLASS_DIR}/i
   "${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES}/cccl")
 add_test(NAME nvfp4 COMMAND qw38_nvfp4_test)
 set_tests_properties(nvfp4 PROPERTIES LABELS "cuda;gpu;compiler;prefill")
+
+add_executable(qw38_fp8_test fp8_test.cpp)
+target_link_libraries(qw38_fp8_test PRIVATE qw38_cuda qw38_compiler)
+target_include_directories(qw38_fp8_test SYSTEM PRIVATE "${QW38_CUTLASS_DIR}/include"
+  "${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES}/cccl")
+add_test(NAME fp8 COMMAND qw38_fp8_test)
+set_tests_properties(fp8 PROPERTIES LABELS "cuda;gpu;compiler;prefill")
+
+add_executable(qw38_fp8_attention_binding_test fp8_attention_binding_test.cpp)
+target_link_libraries(qw38_fp8_attention_binding_test PRIVATE qw38_runtime)
+add_test(NAME fp8_attention_binding COMMAND qw38_fp8_attention_binding_test)
+set_tests_properties(fp8_attention_binding PROPERTIES LABELS "cuda;gpu;attention;prefill;extended")

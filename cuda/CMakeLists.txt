@@ -20,7 +20,7 @@ set_target_properties(qw38_cuda PROPERTIES
 target_include_directories(qw38_cuda PUBLIC "${CMAKE_SOURCE_DIR}")
 target_include_directories(qw38_cuda SYSTEM PRIVATE "${QW38_CUTLASS_DIR}/include"
   "${QW38_CUTLASS_DIR}/tools/util/include")
-add_library(qw38_nvfp4 OBJECT nvfp4.cu)
+add_library(qw38_nvfp4 OBJECT nvfp4.cu fp8.cu)
 set_target_properties(qw38_nvfp4 PROPERTIES CUDA_ARCHITECTURES OFF)
 target_include_directories(qw38_nvfp4 PRIVATE "${CMAKE_SOURCE_DIR}")
 target_include_directories(qw38_nvfp4 SYSTEM PRIVATE "${QW38_CUTLASS_DIR}/include"

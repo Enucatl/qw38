@@ -194,8 +194,8 @@ int main(int argc, char** argv) {
   }
   auto identity = std::ofstream(options.output / "candidate_identity.json", std::ios::trunc);
   if (!identity) return 1;
-  std::array<std::uint64_t, 5> storage_counts{};
-  std::array<std::uint64_t, 7> quantizer_counts{};
+  std::array<std::uint64_t, 6> storage_counts{};
+  std::array<std::uint64_t, 8> quantizer_counts{};
   for (auto const& tensor : schema.tensors) {
     auto const storage = static_cast<std::uint16_t>(tensor.storage);
     auto const quantizer = static_cast<std::uint16_t>(tensor.quantizer);
@@ -217,6 +217,7 @@ int main(int argc, char** argv) {
            << ",\"int8_grouped\":" << storage_counts[1]
            << ",\"bf16\":" << storage_counts[2]
            << ",\"fp32\":" << storage_counts[3];
+  if (storage_counts[5]) identity << ",\"fp8\":" << storage_counts[5];
   if (storage_counts[4]) identity << ",\"nvfp4\":" << storage_counts[4];
   identity << "},\"logical_quantizer_counts\":{\"none\":" << quantizer_counts[0]
            << ",\"q4_g64_v0\":" << quantizer_counts[1]
@@ -224,6 +225,7 @@ int main(int argc, char** argv) {
            << ",\"q4_g64_candidate_v1\":" << quantizer_counts[3]
            << ",\"q8_g32_candidate_v1\":" << quantizer_counts[4]
            << ",\"q4_k_candidate_v2\":" << quantizer_counts[5];
+  if (quantizer_counts[7]) identity << ",\"fp8_v1\":" << quantizer_counts[7];
   if (quantizer_counts[6]) identity << ",\"nvfp4_v1\":" << quantizer_counts[6];
   identity << "},\"decode_dispatch\":{\"activation_policy\":\"bf16\","
               "\"quantized_kernel\":\"grouped_gemv\","
@@ -232,6 +234,7 @@ int main(int argc, char** argv) {
       ",\"mlp_gate_up_dispatch\":{\"m1\":\"nvfp4_weight_bf16_activation_gemv\","
       "\"m_ge_2\":\"native_nvfp4_w4a4\",\"activation_factor\":1,"
       "\"packed_input_reused\":true,\"weight_view\":\"cuda_nvfp4_v1\"}";
+  if (quantizer_counts[7]) identity << ",\"mixer_dispatch\":{\"m1\":\"fp8_weight_bf16_activation_gemv\",\"m_ge_2\":\"groupwise_fp8\",\"packed_input_reused\":true,\"weight_view\":\"cuda_fp8_v1\"}";
   identity << "}\n";
   identity.close();
   if (!identity) return 1;

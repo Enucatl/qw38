@@ -10,6 +10,7 @@ add_library(qw38_format STATIC
   format/pack.cpp
   format/unpack.cpp
   format/nvfp4.cpp
+  format/fp8.cpp
 )
 target_include_directories(qw38_format PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 target_compile_features(qw38_format PUBLIC cxx_std_23)
@@ -28,6 +29,7 @@ add_library(qw38_compiler STATIC
   compiler/quantization/reference.cpp
   compiler/quantization/q4k.cpp
   compiler/quantization/nvfp4.cpp
+  compiler/quantization/fp8.cpp
 )
 # Reference fitting and reconstruction use the pinned scalar operation order.
 set_source_files_properties(compiler/quantization/q4k.cpp

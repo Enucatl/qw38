@@ -1,4 +1,5 @@
 #include "cuda/attention.hpp"
+#include "cuda/fp8_device.cuh"
 #include "cuda/prefill.hpp"
 
 #include <mma.h>
@@ -563,7 +564,7 @@ __global__ void attention_prefill_mma_kernel(
     std::uint16_t const* q, std::uint16_t const* g,
     std::uint16_t const* kv, std::uint32_t attn_layer,
     std::uint64_t capacity, std::uint64_t first_position,
-    std::uint32_t valid_tokens, std::uint16_t* y) {
+    std::uint32_t valid_tokens, std::uint16_t* y, std::uint8_t* fp8_codes, float* fp8_scales) {
   namespace wmma = nvcuda::wmma;
   constexpr int Q = kAttnPrefillQueryTile, K = kAttnPrefillKeyTile;
   constexpr int D = kAttnHeadDim;
@@ -578,6 +579,12 @@ __global__ void attention_prefill_mma_kernel(
   float* rescale = l + Q;
   int const tid = threadIdx.x, warp = tid / 32, lane = tid % 32;
   std::uint32_t const h = blockIdx.x, row0 = blockIdx.y * Q;
+  unsigned const pm=(valid_tokens+127)/128*128;
+  if(fp8_codes && row0>=valid_tokens) {
+    for(unsigned r=0;r<Q;++r)
+      fp8_pack_row(nullptr,row0+r,pm,D,fp8_codes,fp8_scales,h*2,6144);
+    return;
+  }
   std::size_t const head_stride = static_cast<std::size_t>(capacity) * D;
   std::size_t const comp_stride = kAttnKvHeads * head_stride;
   auto const* k_base = kv + attn_layer * 2u * comp_stride +
@@ -686,8 +693,15 @@ __global__ void attention_prefill_mma_kernel(
     if (row0 + r < valid_tokens) {
       std::size_t const off = (static_cast<std::size_t>(row0 + r) *
           kAttnQueryHeads + h) * D + tid;
-      y[off] = fp32_to_bf16_rne(numerator[r] / l[r] *
+      auto rounded = fp32_to_bf16_rne(numerator[r] / l[r] *
                                 sigmoid_fp32(bf16_to_fp32(g[off])));
+      if(fp8_codes) reinterpret_cast<std::uint16_t*>(tile)[tid]=rounded;
+      else y[off]=rounded;
+    } else if(fp8_codes) reinterpret_cast<std::uint16_t*>(tile)[tid]=0;
+    if(fp8_codes) {
+      __syncthreads();
+      fp8_pack_row(reinterpret_cast<std::uint16_t*>(tile),row0+r,pm,D,fp8_codes,fp8_scales,h*2,6144);
+      __syncthreads();
     }
   }
 }
@@ -809,7 +823,7 @@ std::expected<void, Error> launch_attention_prefill_scan(
     std::uint16_t const* kv, std::uint32_t attn_layer,
     std::uint64_t capacity, std::uint64_t first_position,
     std::uint32_t valid_tokens, std::uint16_t* y,
-    Stream const& stream, std::uint32_t query_tile) {
+    Stream const& stream, std::uint32_t query_tile, std::uint8_t* fp8_codes, float* fp8_scales) {
   if (auto st = require_stream(stream, "attention_prefill_scan"); !st) return st;
   if (!q || !g || !kv || !y || attn_layer >= kAttnLayers ||
       !valid_tokens || valid_tokens > 1024u ||
@@ -849,13 +863,25 @@ std::expected<void, Error> launch_attention_prefill_scan(
                                           "attention_prefill_scan", "live operands overlap"));
   auto guard = stream.activate();
   if (!guard) return std::unexpected(guard.error());
-  dim3 const grid(kAttnQueryHeads,
-                  (valid_tokens + query_tile - 1u) / query_tile);
+  unsigned rows=valid_tokens;
+  if(fp8_codes || fp8_scales) {
+    if(!fp8_codes || !fp8_scales || query_tile!=kAttnPrefillQueryTile)
+      return std::unexpected(make_error(ErrorCode::InvalidArgument,"fp8.attention","invalid packed output"));
+    rows=(valid_tokens+127)/128*128;
+    if(auto st=validate_prefill_device_span(fp8_codes,std::uint64_t(rows)*6144,16,stream.device());!st)return st;
+    if(auto st=validate_prefill_device_span(fp8_scales,std::uint64_t(rows)*48*4,16,stream.device());!st)return st;
+    auto c=checked_interval(fp8_codes,std::uint64_t(rows)*6144,"fp8.codes");
+    auto s=checked_interval(fp8_scales,std::uint64_t(rows)*48*4,"fp8.scales");
+    if(!c || !s || overlaps(*c,*s))return std::unexpected(make_error(ErrorCode::InvalidArgument,"fp8.attention","pack overlap"));
+    for(auto r:ranges)if(overlaps(r,*c) || overlaps(r,*s))
+      return std::unexpected(make_error(ErrorCode::InvalidArgument,"fp8.attention","pack aliases live operand"));
+  }
+  dim3 const grid(kAttnQueryHeads,(rows + query_tile - 1u) / query_tile);
   if (query_tile == kAttnPrefillQueryTile) {
     if (auto st = configure_prefill_mma(); !st) return st;
     attention_prefill_mma_kernel
         <<<grid, kPrefillThreads, kPrefillSharedBytes, stream.native()>>>(
-            q, g, kv, attn_layer, capacity, first_position, valid_tokens, y);
+            q, g, kv, attn_layer, capacity, first_position, valid_tokens, y, fp8_codes, fp8_scales);
   } else if (query_tile == kAttnPrefillQueryTileScalar)
     attention_prefill_scan_kernel<kAttnPrefillQueryTileScalar>
         <<<grid, kAttnScanThreads, 0, stream.native()>>>(

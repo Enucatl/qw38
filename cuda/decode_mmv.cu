@@ -1,4 +1,5 @@
 #include "cuda/decode_mmv.hpp"
+#include "cuda/fp8.hpp"
 #include "cuda/nvfp4_device.cuh"
 
 #include <cmath>
@@ -255,6 +256,7 @@ std::expected<void, Error> require_stream(Stream const& stream, std::string_view
 }
 
 bool layout_quantizer_ok(std::uint16_t layout, std::uint16_t quantizer) noexcept {
+  if (layout == kDecodeLayoutFp8V1) return quantizer == kDecodeQuantizerFp8V1;
   if (layout == kDecodeLayoutNvFp4V1) return quantizer == kDecodeQuantizerNvFp4V1;
   if (layout == kDecodeLayoutQ4KCandidateV2) {
     return quantizer == kDecodeQuantizerQ4KCandidateV2;
@@ -278,6 +280,7 @@ bool layout_quantizer_ok(std::uint16_t layout, std::uint16_t quantizer) noexcept
 }
 
 DecodeDtype weight_dtype(std::uint16_t layout) noexcept {
+  if (layout == kDecodeLayoutFp8V1) return DecodeDtype::Fp8;
   if (layout == kDecodeLayoutNvFp4V1) return DecodeDtype::NvFp4;
   if (layout == kDecodeLayoutQ4KCandidateV2 ||
       layout == kDecodeLayoutQ4G64V0 ||
@@ -351,6 +354,7 @@ std::expected<void, Error> validate_non_overlap(DecodeMmvDesc const& d,
 }
 
 std::uint32_t group_size(std::uint16_t layout) noexcept {
+  if (layout == kDecodeLayoutFp8V1) return 128;
   if (layout == kDecodeLayoutNvFp4V1) return 1;
   if (layout == kDecodeLayoutQ4KCandidateV2) {
     return 256;
@@ -380,6 +384,8 @@ std::expected<void, Error> validate_geometry(DecodeMmvDesc const& d,
     return std::unexpected(
         make_error(ErrorCode::InvalidArgument, op, "N and K must be nonzero"));
   }
+  if (d.layout == kDecodeLayoutFp8V1 && (d.n > 17408 || d.n % 128 || d.k % 256))
+    return std::unexpected(make_error(ErrorCode::InvalidArgument, op, "FP8 requires aligned mixer geometry"));
   if (d.layout == kDecodeLayoutNvFp4V1 && d.n > 248320) {
     return std::unexpected(make_error(ErrorCode::InvalidArgument, op, "NVFP4 N exceeds model geometry"));
   }
@@ -424,11 +430,12 @@ std::expected<void, Error> validate_geometry(DecodeMmvDesc const& d,
                                         "BF16 dense tile must not supply scales"));
     }
   } else {
-    auto const scale_rows = d.layout == kDecodeLayoutNvFp4V1 ? 1u : d.padded_n;
-    auto const units_per_row = static_cast<std::uint32_t>(want_scales / scale_rows / 2u);
-    st = validate_view(d.scales, DecodeDtype::Fp16, d.layout, scale_rows,
+    bool const fp8 = d.layout == kDecodeLayoutFp8V1;
+    auto const scale_rows = fp8 || d.layout == kDecodeLayoutNvFp4V1 ? 1u : d.padded_n;
+    auto const units_per_row = static_cast<std::uint32_t>(want_scales / scale_rows / (fp8 ? 4u : 2u));
+    st = validate_view(d.scales, fp8 ? DecodeDtype::Fp32 : DecodeDtype::Fp16, d.layout, scale_rows,
                        units_per_row, scale_rows,
-                       units_per_row, want_scales, d.layout == kDecodeLayoutNvFp4V1 ? 16u : 2u, false,
+                       units_per_row, want_scales, fp8 || d.layout == kDecodeLayoutNvFp4V1 ? 16u : 2u, false,
                        op, "scales");
     if (!st) {
       return st;
@@ -568,6 +575,10 @@ std::expected<void, Error> launch_layout(DecodeMmvDesc const& a,
                                          DecodeMmvDesc const* b,
                                          Stream const& stream,
                                          std::string_view op) {
+  if (a.layout == kDecodeLayoutFp8V1) {
+    if constexpr (Paired) return std::unexpected(make_error(ErrorCode::InvalidArgument, op, "FP8 paired SwiGLU is not supported"));
+    return fp8_decode(a, stream);
+  }
   if (a.layout == kDecodeLayoutNvFp4V1)
     return launch_kind<WeightKind::NvFp4, Paired>(a, b, stream, op);
   if (a.layout == kDecodeLayoutQ4KCandidateV2) {
@@ -813,6 +824,10 @@ std::expected<void, Error> launch_decode_mmv_ranges(DecodeMmvRangeDesc const& de
   if (first.layout == kDecodeLayoutQ4G64V0 ||
       first.layout == kDecodeLayoutQ4G64CandidateV1) {
     return launch_range_kind<WeightKind::Q4>(desc.ranges, stream);
+  }
+  if (first.layout == kDecodeLayoutFp8V1) {
+    for (auto const& d : desc.ranges) if (auto result = fp8_decode(d, stream); !result) return result;
+    return {};
   }
   if (first.layout == kDecodeLayoutQ8G32V0 ||
       first.layout == kDecodeLayoutQ8G32CandidateV1) {

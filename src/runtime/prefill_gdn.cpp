@@ -172,6 +172,8 @@ std::expected<void, Error> execute_prefill_gdn_layer(
     if (!status) return fail(from_cuda(status.error()));
     return {};
   };
+  bool const fp8=p.first.layout==qw38::cuda::kDecodeLayoutFp8V1 && valid_tokens>1;
+  auto packed=fp8 ? engine.fp8_operand(valid_tokens,kHidden) : qw38::cuda::Fp8Input{};
   auto project = [&](qw38::cuda::PrefillWeight const& weight,
                      std::uint16_t const* input, void* output,
                      qw38::cuda::PrefillEpilogue epilogue,
@@ -179,10 +181,15 @@ std::expected<void, Error> execute_prefill_gdn_layer(
     return cuda_step(engine.project(qw38::cuda::PrefillProjection{
         .weight = weight, .input = input, .output = output, .residual = add,
         .valid_tokens = valid_tokens, .first_position = first_position,
-        .epilogue = epilogue}));
+        .epilogue = epilogue, .packed = weight.layout==qw38::cuda::kDecodeLayoutFp8V1 ? packed : qw38::cuda::Fp8Input{}}));
   };
 
-  if (auto st = cuda_step(qw38::cuda::launch_hidden_rms(
+  if(fp8) {
+    if(packed.codes.empty()) return fail(make_error(ErrorCode::InvalidArgument,"fp8.workspace","missing prefill pack"));
+    if(auto st=cuda_step(qw38::cuda::launch_hidden_rms_fp8(residual,
+        static_cast<std::uint16_t const*>(f.gamma.pointer),f.eps,valid_tokens,
+        s.normalized,const_cast<std::uint8_t*>(packed.codes.data()),const_cast<float*>(packed.scales.data()),*stream));!st)return st;
+  } else if (auto st = cuda_step(qw38::cuda::launch_hidden_rms(
           residual, static_cast<std::uint16_t const*>(f.gamma.pointer),
           f.eps, valid_tokens, s.normalized, *stream)); !st) return st;
   using qw38::cuda::PrefillEpilogue;
@@ -210,9 +217,11 @@ std::expected<void, Error> execute_prefill_gdn_layer(
           s.q_hat, s.k_hat, s.alpha, s.beta, s.convolved,
           static_cast<float*>(gdn.s.pointer), gdn.s_layer, s.o,
           valid_tokens, recurrence_interval, *stream)); !st) return st;
+  packed=fp8 ? engine.fp8_operand(valid_tokens,kGdnZWidth) : qw38::cuda::Fp8Input{};
   if (auto st = cuda_step(qw38::cuda::launch_gdn_gated_rms(
           s.o, s.z, static_cast<std::uint16_t const*>(gdn.gated_gamma.pointer),
-          f.eps, valid_tokens * kGdnValueHeads, s.u, *stream)); !st) return st;
+          f.eps, valid_tokens * kGdnValueHeads, s.u, *stream,
+          const_cast<std::uint8_t*>(packed.codes.data()),const_cast<float*>(packed.scales.data()))); !st) return st;
   if (auto st = project(p.mixer_out, s.u, h_mid,
                         PrefillEpilogue::ResidualAddFp32, residual); !st) return st;
   if (auto st = execute_prefill_mlp(p, engine, h_mid, next_h,

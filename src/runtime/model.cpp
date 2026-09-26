@@ -17,6 +17,7 @@ qw38::format::ArithmeticDtype dtype_for_storage(
   switch (storage) {
     case qw38::format::StorageClass::Fp32:
       return qw38::format::ArithmeticDtype::Fp32;
+    case qw38::format::StorageClass::Fp8:
     case qw38::format::StorageClass::NvFp4:
     case qw38::format::StorageClass::Bf16:
     case qw38::format::StorageClass::Int4Grouped:
@@ -44,12 +45,12 @@ ConstTensorView make_scale_view(qw38::format::TensorRecord const& rec,
   ConstTensorView v{};
   v.pointer = ptr;
   // Q4_K metadata uses this same 16-bit backing span; only d/dmin are FP16.
-  v.dtype = qw38::format::ArithmeticDtype::Fp16;
+  v.dtype = rec.storage == qw38::format::StorageClass::Fp8 ? qw38::format::ArithmeticDtype::Fp32 : qw38::format::ArithmeticDtype::Fp16;
   v.layout = rec.layout;
   v.storage = rec.storage;
   v.space = MemorySpace::Device;
   v.rank = 1;
-  v.extent[0] = rec.scales.length / qw38::format::kFp16Size;
+  v.extent[0] = rec.scales.length / qw38::format::element_size(v.dtype);
   return v;
 }
 

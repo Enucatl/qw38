@@ -55,6 +55,9 @@ int main(int argc, char** argv) {
       } else if (mode == "candidate") {
         options.format_policy = qw38::compiler::WeightFormatPolicy::CandidateV1;
         options.revision.ident = qw38::compiler::kCandidateCompilerIdent;
+      } else if (mode == "fp8-mixer") {
+        options.format_policy = qw38::compiler::WeightFormatPolicy::Fp8MixerV1;
+        options.revision.ident = qw38::compiler::kFp8CompilerIdent;
       } else if (mode == "nvfp4-mlp") {
         options.format_policy = qw38::compiler::WeightFormatPolicy::NvFp4MlpV1;
         options.revision.ident = qw38::compiler::kNvFp4CompilerIdent;
@@ -94,7 +97,7 @@ int main(int argc, char** argv) {
               << " peak_rss_bytes="
               << qw38::compiler::current_peak_rss_bytes()
               << " policy="
-              << (options.format_policy == qw38::compiler::WeightFormatPolicy::NvFp4MlpV1
+              << (options.format_policy == qw38::compiler::WeightFormatPolicy::Fp8MixerV1 ? "fp8-mixer" : options.format_policy == qw38::compiler::WeightFormatPolicy::NvFp4MlpV1
                     ? "nvfp4-mlp" : options.format_policy == qw38::compiler::WeightFormatPolicy::CandidateV2
                       ? "candidate-q4k" : options.format_policy ==
                           qw38::compiler::WeightFormatPolicy::CandidateV1
@@ -133,7 +136,7 @@ int main(int argc, char** argv) {
             << result->identity.compiler.minor << '.'
             << result->identity.compiler.patch
             << " policy="
-            << (result->format_policy == qw38::compiler::WeightFormatPolicy::NvFp4MlpV1
+            << (result->format_policy == qw38::compiler::WeightFormatPolicy::Fp8MixerV1 ? "fp8-mixer" : result->format_policy == qw38::compiler::WeightFormatPolicy::NvFp4MlpV1
                     ? "nvfp4-mlp" : result->format_policy == qw38::compiler::WeightFormatPolicy::CandidateV2
                     ? "candidate-q4k" : result->format_policy ==
                         qw38::compiler::WeightFormatPolicy::IdentityBf16

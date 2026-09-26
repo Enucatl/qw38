@@ -197,13 +197,14 @@ std::expected<void, Error> validate_gdn_state_view(TensorView const& s) {
 }
 
 bool q4_or_bf16_tile(PhysicalLayoutId layout) noexcept {
-  return layout == PhysicalLayoutId::CudaQ4G64V0 ||
+  return layout == PhysicalLayoutId::CudaFp8V1 || layout == PhysicalLayoutId::CudaQ4G64V0 ||
          layout == PhysicalLayoutId::CudaQ4G64CandidateV1 ||
          layout == PhysicalLayoutId::CudaQ8G32CandidateV1 ||
          layout == PhysicalLayoutId::CudaBf16DenseTileV0;
 }
 
 std::uint16_t quantizer_for(PhysicalLayoutId layout) noexcept {
+  if (layout == PhysicalLayoutId::CudaFp8V1) return qw38::cuda::kDecodeQuantizerFp8V1;
   if (layout == PhysicalLayoutId::CudaQ4G64V0) {
     return kDecodeQuantizerQ4G64V0;
   }
@@ -239,7 +240,11 @@ std::expected<GdnWeightBinding, Error> bind_q4_or_bf16(ConstTensorView codes,
   bool const q4 = codes.layout == PhysicalLayoutId::CudaQ4G64V0 ||
                   codes.layout == PhysicalLayoutId::CudaQ4G64CandidateV1;
   bool const q8 = codes.layout == PhysicalLayoutId::CudaQ8G32CandidateV1;
-  if (q4) {
+  bool const fp8 = codes.layout == PhysicalLayoutId::CudaFp8V1;
+  if (fp8) {
+    if(codes.storage != StorageClass::Fp8 || want_n%128 || want_k%256)
+      return std::unexpected(arg_error(field,"FP8 mixer geometry/storage mismatch"));
+  } else if (q4) {
     if (codes.storage != StorageClass::Int4Grouped) {
       return std::unexpected(arg_error(field, "Q4 payload storage must be int4_grouped"));
     }
@@ -273,10 +278,10 @@ std::expected<GdnWeightBinding, Error> bind_q4_or_bf16(ConstTensorView codes,
       return std::unexpected(arg_error(field, "Q4 weight requires scales"));
     }
     if (scales.space != MemorySpace::Device ||
-        scales.dtype != ArithmeticDtype::Fp16 ||
+        scales.dtype != (fp8 ? ArithmeticDtype::Fp32 : ArithmeticDtype::Fp16) ||
         scales.layout != codes.layout || scales.storage != codes.storage ||
         scales.rank != 1 ||
-        scales.extent[0] != b.scales_bytes / qw38::format::kFp16Size) {
+        scales.extent[0] != b.scales_bytes / (fp8 ? 4u : 2u)) {
       return std::unexpected(
           arg_error(field, "scale typed view contract mismatch"));
     }
@@ -333,6 +338,7 @@ DecodeMmvDesc mmv_from_weight(GdnWeightBinding const& w) {
   d.padded_n = w.padded_n;
   d.padded_k = w.padded_k;
   DecodeDtype const dtype =
+      w.layout == qw38::cuda::kDecodeLayoutFp8V1 ? DecodeDtype::Fp8 :
       (w.layout == kDecodeLayoutQ4G64V0 ||
        w.layout == kDecodeLayoutQ4G64CandidateV1) ? DecodeDtype::Q4
       : w.layout == qw38::cuda::kDecodeLayoutQ8G32CandidateV1 ? DecodeDtype::Q8
@@ -340,7 +346,11 @@ DecodeMmvDesc mmv_from_weight(GdnWeightBinding const& w) {
   d.codes = decode_matrix_view(const_cast<void*>(w.codes.pointer), dtype,
                                w.layout, w.n, w.k,
                                w.padded_n, w.padded_k, w.codes_bytes, 16);
-  if (w.scales_bytes != 0) {
+  if (w.layout == qw38::cuda::kDecodeLayoutFp8V1) {
+    auto count = static_cast<unsigned>(w.scales_bytes/4);
+    d.scales = decode_matrix_view(const_cast<void*>(w.scales.pointer), DecodeDtype::Fp32,
+        w.layout,1,count,1,count,w.scales_bytes,16);
+  } else if (w.scales_bytes != 0) {
     d.scales = decode_matrix_view(
         const_cast<void*>(w.scales.pointer), DecodeDtype::Fp16, w.layout,
         w.padded_n,

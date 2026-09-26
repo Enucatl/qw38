@@ -1,5 +1,6 @@
 #include "cuda/activation.hpp"
 #include "cuda/nvfp4_device.cuh"
+#include "cuda/fp8_device.cuh"
 
 #include "cuda/copy.hpp"
 
@@ -125,15 +126,18 @@ __global__ void embed_gather_chunk_kernel(std::uint16_t const* table,
   }
 }
 
-template <bool Pack = false>
+template <int Pack = 0>
 __global__ void hidden_rms_kernel(float const* residual,
                                   std::uint16_t const* gamma, float eps,
                                   std::uint16_t* out_bf16,
                                   unsigned n_tokens = 0, std::uint8_t* codes = nullptr,
-                                  std::uint8_t* scales = nullptr) {
+                                  std::uint8_t* scales = nullptr, float* fp8_scales = nullptr) {
   if constexpr (Pack) {
     if (blockIdx.x >= n_tokens) {
-      nvfp4_pack_row(nullptr,codes,scales,blockIdx.x,kHidden,kHidden,false);
+      if constexpr (Pack == 1)
+        nvfp4_pack_row(nullptr,codes,scales,blockIdx.x,kHidden,kHidden,false);
+      else
+        fp8_pack_row(nullptr,blockIdx.x,gridDim.x,kHidden,codes,fp8_scales);
       return;
     }
   }
@@ -162,10 +166,15 @@ __global__ void hidden_rms_kernel(float const* residual,
     float const normalized = (x[i] / safe_scale) * inv_scaled_rms;
     float const v = (1.0f + g) * normalized;
     y[i] = fp32_to_bf16_rne(v);
+    if constexpr (Pack == 2)
+      if(out_bf16) out_bf16[std::size_t(blockIdx.x)*kHidden+i]=y[i];
   }
   if constexpr (Pack) {
     __syncthreads();
-    nvfp4_pack_row(rounded,codes,scales,blockIdx.x,kHidden,kHidden,true);
+    if constexpr (Pack == 1)
+      nvfp4_pack_row(rounded,codes,scales,blockIdx.x,kHidden,kHidden,true);
+    else
+      fp8_pack_row(rounded,blockIdx.x,gridDim.x,kHidden,codes,fp8_scales);
   }
 }
 
@@ -249,15 +258,24 @@ __global__ void qk_rms_kernel(float const* heads, std::uint16_t const* gamma,
   }
 }
 
+template<bool Pack = false>
 __global__ void gdn_gated_rms_kernel(float const* o,
                                      std::uint16_t const* z_bf16,
                                      std::uint16_t const* gamma, float eps,
-                                     std::uint16_t* out_bf16) {
+                                     std::uint16_t* out_bf16, unsigned heads = 0,
+                                     std::uint8_t* codes = nullptr, float* scales = nullptr) {
+  __shared__ std::uint16_t rounded[kGdnHeadDim];
+  if constexpr(Pack) {
+    if(blockIdx.x>=heads) {
+      fp8_pack_row(nullptr,blockIdx.x/48,gridDim.x/48,128,codes,scales,blockIdx.x%48,6144);
+      return;
+    }
+  }
   float const* oh = o + static_cast<std::size_t>(blockIdx.x) * kGdnHeadDim;
   std::uint16_t const* zh =
       z_bf16 + static_cast<std::size_t>(blockIdx.x) * kGdnHeadDim;
   std::uint16_t* y =
-      out_bf16 + static_cast<std::size_t>(blockIdx.x) * kGdnHeadDim;
+      Pack ? rounded : out_bf16 + static_cast<std::size_t>(blockIdx.x) * kGdnHeadDim;
   float scale = 0.0f;
   for (std::uint32_t i = threadIdx.x; i < kGdnHeadDim; i += blockDim.x) {
     scale = fmaxf(scale, fabsf(oh[i]));
@@ -280,6 +298,10 @@ __global__ void gdn_gated_rms_kernel(float const* o,
     float const normalized = (oh[i] / safe_scale) * inv_scaled_rms;
     float const v = g * normalized * silu_fp32(z);
     y[i] = fp32_to_bf16_rne(v);
+  }
+  if constexpr(Pack) {
+    __syncthreads();
+    fp8_pack_row(rounded,blockIdx.x/48,gridDim.x/48,128,codes,scales,blockIdx.x%48,6144);
   }
 }
 
@@ -478,6 +500,18 @@ std::expected<void, Error> launch_hidden_rms_nvfp4(float const* residual,
   return check(cudaGetLastError(),"nvfp4.rms_pack");
 }
 
+std::expected<void, Error> launch_hidden_rms_fp8(float const* residual,
+    std::uint16_t const* gamma, float eps, std::uint32_t n_tokens,
+    std::uint16_t* companion, std::uint8_t* codes, float* scales, Stream const& stream) {
+  if (!residual || !gamma || !codes || !scales || !n_tokens || n_tokens>1024 ||
+      !finite_pos(eps) || stream.empty())
+    return std::unexpected(make_error(ErrorCode::InvalidArgument,"fp8.rms","invalid operands"));
+  auto guard=stream.activate(); if(!guard) return std::unexpected(guard.error());
+  hidden_rms_kernel<2><<<((n_tokens+127)/128)*128,kHiddenRmsThreads,0,stream.native()>>>(
+      residual,gamma,eps,companion,n_tokens,codes,nullptr,scales);
+  return check(cudaGetLastError(),"fp8.rms_pack");
+}
+
 std::expected<void, Error> launch_qk_rms_rope(
     std::uint16_t const* projected_heads_bf16, std::uint16_t const* gamma,
     float eps, float const* inv_freq, std::int32_t position,
@@ -545,7 +579,7 @@ std::expected<void, Error> launch_qk_rms(float const* heads,
 std::expected<void, Error> launch_gdn_gated_rms(
     float const* o, std::uint16_t const* z_bf16, std::uint16_t const* gamma,
     float eps, std::uint32_t n_heads, std::uint16_t* out_bf16,
-    Stream const& stream) {
+    Stream const& stream, std::uint8_t* fp8_codes, float* fp8_scales) {
   auto st = require_stream(stream, "gdn_gated_rms");
   if (!st) {
     return st;
@@ -567,7 +601,12 @@ std::expected<void, Error> launch_gdn_gated_rms(
   }
   auto guard = stream.activate();
   if (!guard) return std::unexpected(guard.error());
-  gdn_gated_rms_kernel<<<n_heads, kHeadNormThreads, 0, stream.native()>>>(
+  if(fp8_codes || fp8_scales) {
+    if(!fp8_codes || !fp8_scales || n_heads%48 || n_heads>1024*48)
+      return std::unexpected(make_error(ErrorCode::InvalidArgument,"fp8.gdn_norm","invalid pack geometry"));
+    gdn_gated_rms_kernel<true><<<((n_heads/48+127)/128*128)*48,kHeadNormThreads,0,stream.native()>>>(
+        o,z_bf16,gamma,eps,out_bf16,n_heads,fp8_codes,fp8_scales);
+  } else gdn_gated_rms_kernel<false><<<n_heads, kHeadNormThreads, 0, stream.native()>>>(
       o, z_bf16, gamma, eps, out_bf16);
   return check(cudaGetLastError(), "gdn_gated_rms_kernel");
 }

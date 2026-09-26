@@ -7,6 +7,11 @@
 #include <expected>
 
 namespace qw38::cuda {
+// Internal producer boundary; its plan validates spans and lifetime.
+[[nodiscard]] std::expected<void, Error> launch_hidden_rms_fp8(
+    float const* residual, std::uint16_t const* gamma, float eps,
+    std::uint32_t n_tokens, std::uint16_t* companion,
+    std::uint8_t* codes, float* scales, Stream const& stream);
 [[nodiscard]] std::expected<void, Error> launch_hidden_rms_nvfp4(
     float const* residual, std::uint16_t const* gamma, float eps,
     std::uint32_t n_tokens, std::uint8_t* codes, std::uint8_t* scales,
@@ -55,7 +60,7 @@ inline constexpr int kHeadNormThreads = 128;   // T-03: one block/head
 [[nodiscard]] std::expected<void, Error> launch_gdn_gated_rms(
     float const* o, std::uint16_t const* z_bf16, std::uint16_t const* gamma,
     float eps, std::uint32_t n_heads, std::uint16_t* out_bf16,
-    Stream const& stream);
+    Stream const& stream, std::uint8_t* fp8_codes = nullptr, float* fp8_scales = nullptr);
 
 [[nodiscard]] std::expected<void, Error> launch_sigmoid_fp32(
     float const* in, float* out, std::uint32_t n, Stream const& stream);

@@ -66,6 +66,8 @@ inline constexpr char const kProductionCompilerIdent[] = "qw38-v0";
 inline constexpr char const kCandidateCompilerIdent[] =
     "qw38-candidate-v1-policy-2ef01bff2b40095f08aedad3b84c50317ffec66e940019342bd12abcda50110e-cal-8ac4a9cab7181c7f7008f95b52420f0d76775524ac64868d0351411c2c2021a4";
 inline constexpr std::uint32_t kCompilerMajor = 0;
+inline constexpr char const kFp8CompilerIdent[] =
+    "qw38-fp8-mixer-v1-cutlass-098de2a6-e4m3-rne-absmax448-m1n128k128";
 inline constexpr char const kNvFp4CompilerIdent[] =
     "qw38-nvfp4-mlp-v1-cutlass-098de2a6-factor-pow2-rne-activation1";
 

@@ -75,7 +75,8 @@ struct AttentionPrefillResources {
     std::uint64_t capacity, std::uint64_t first_position,
     std::uint32_t valid_tokens, std::uint16_t* y,
     Stream const& stream,
-    std::uint32_t query_tile = kAttnPrefillQueryTile);
+    std::uint32_t query_tile = kAttnPrefillQueryTile,
+    std::uint8_t* fp8_codes = nullptr, float* fp8_scales = nullptr);
 
 [[nodiscard]] std::expected<AttentionPrefillResources, Error>
 attention_prefill_resources(std::uint32_t query_tile = kAttnPrefillQueryTile);

@@ -29,6 +29,8 @@ inline constexpr std::uint16_t kDecodeLayoutBf16DenseTileV0 = 0x0203;
 inline constexpr std::uint16_t kDecodeLayoutQ4G64CandidateV1 = 0x020B;
 inline constexpr std::uint16_t kDecodeLayoutQ8G32CandidateV1 = 0x020C;
 inline constexpr std::uint16_t kDecodeLayoutQ4KCandidateV2 = 0x020D;
+inline constexpr std::uint16_t kDecodeLayoutFp8V1 = 0x020F;
+inline constexpr std::uint16_t kDecodeQuantizerFp8V1 = 0x0107;
 inline constexpr std::uint16_t kDecodeLayoutNvFp4V1 = 0x020E;
 inline constexpr std::uint16_t kDecodeQuantizerNvFp4V1 = 0x0106;
 inline constexpr std::uint16_t kDecodeQuantizerNone = 0x0100;
@@ -60,6 +62,7 @@ enum class DecodeDtype : std::uint8_t {
   Fp16 = 4,
   Fp32 = 5,
   NvFp4 = 6,
+  Fp8 = 7,
 };
 
 inline constexpr std::uint16_t kDecodeLayoutBf16VectorV0 = 0x0205;
@@ -170,6 +173,7 @@ struct DecodeMmvRangeDesc {
       layout == kDecodeLayoutQ4KCandidateV2) {
     return nk / 2u;
   }
+  if (layout == kDecodeLayoutFp8V1) return nk;
   if (layout == kDecodeLayoutQ8G32V0 ||
       layout == kDecodeLayoutQ8G32CandidateV1) {
     return nk;
@@ -192,6 +196,7 @@ struct DecodeMmvRangeDesc {
       layout == kDecodeLayoutQ4G64CandidateV1) {
     return rows * (static_cast<std::uint64_t>(padded_k) / 64u) * 2u;
   }
+  if (layout == kDecodeLayoutFp8V1) return (rows/128)*(padded_k/128)*4;
   if (layout == kDecodeLayoutQ8G32V0 ||
       layout == kDecodeLayoutQ8G32CandidateV1) {
     return rows * (static_cast<std::uint64_t>(padded_k) / 32u) * 2u;

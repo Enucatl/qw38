@@ -955,6 +955,15 @@ std::expected<void, FormatError> require_shape_rank(
 std::expected<void, FormatError> validate_mapping_for_tensor(
     TensorRecord const& tensor, std::uint64_t offset) {
   auto const& m = tensor.mapping;
+  if (tensor.layout == PhysicalLayoutId::CudaFp8V1) {
+    if (tensor.shape.rank != 2 || tensor.shape.logical[0] > 17408 || tensor.shape.logical[1] > 17408 ||
+        tensor.shape.padded[0] != (tensor.shape.logical[0]+127)/128*128 ||
+        tensor.shape.padded[1] != (tensor.shape.logical[1]+127)/128*128 ||
+        m.kind != MappingKind::Fp8TN || m.tile_rows != 128 || m.tile_k != 128 ||
+        m.group_size != 128 || m.packed_bytes_per_tile_row != 128)
+      return std::unexpected(make_error(FormatErrorCode::InvalidMapping, offset, "fp8.mapping", "FP8 TN geometry mismatch"));
+    return {};
+  }
   if (tensor.layout == PhysicalLayoutId::CudaNvFp4V1) {
     if (tensor.shape.rank != 2 || tensor.shape.logical[0] > 248320 ||
         tensor.shape.logical[1] > 17408 ||
@@ -1072,6 +1081,10 @@ std::expected<void, FormatError> validate_mapping_for_tensor(
 std::expected<void, FormatError> validate_quantizer_layout(
     TensorRecord const& tensor, std::uint64_t offset) {
   switch (tensor.quantizer) {
+    case LogicalQuantizerId::Fp8V1:
+      if (tensor.storage != StorageClass::Fp8 || tensor.layout != PhysicalLayoutId::CudaFp8V1)
+        return std::unexpected(make_error(FormatErrorCode::InvalidQuantizerLayoutPair, offset, "fp8", "FP8 storage/layout mismatch"));
+      return {};
     case LogicalQuantizerId::NvFp4V1:
       if (tensor.storage != StorageClass::NvFp4 ||
           tensor.layout != PhysicalLayoutId::CudaNvFp4V1)
@@ -1244,7 +1257,7 @@ std::expected<void, FormatError> validate_precision(
   if (policy.id != PrecisionPolicyId::V0 &&
       policy.id != PrecisionPolicyId::CandidateV1 &&
       policy.id != PrecisionPolicyId::CandidateV2 &&
-      policy.id != PrecisionPolicyId::NvFp4MlpV1) {
+      policy.id != PrecisionPolicyId::NvFp4MlpV1 && policy.id != PrecisionPolicyId::Fp8MixerV1) {
     return std::unexpected(make_error(FormatErrorCode::InvalidPrecisionPolicy,
                                       offset, "precision.id",
                                       "only precision policy V0 is defined"));
@@ -1644,6 +1657,10 @@ std::expected<std::uint64_t, FormatError> expected_payload_bytes(
     return std::unexpected(make_error(FormatErrorCode::UnknownEnum, offset,
                                       "tensor.layout", "unknown physical layout"));
   }
+  if (tensor.layout == PhysicalLayoutId::CudaFp8V1) {
+    if (auto st = validate_mapping_for_tensor(tensor, offset); !st) return std::unexpected(st.error());
+    return checked_mul(tensor.shape.padded[0], tensor.shape.padded[1], offset, "fp8");
+  }
   if (tensor.layout == PhysicalLayoutId::CudaNvFp4V1) {
     if (auto st = validate_mapping_for_tensor(tensor, offset); !st)
       return std::unexpected(st.error());
@@ -1711,6 +1728,10 @@ std::expected<std::uint64_t, FormatError> expected_scale_bytes(
     return std::unexpected(make_error(FormatErrorCode::InvalidShape, offset,
                                       "tensor.shape",
                                       "quantized tensors are rank-2"));
+  }
+  if (tensor.quantizer == LogicalQuantizerId::Fp8V1) {
+    if (auto st = validate_mapping_for_tensor(tensor, offset); !st) return std::unexpected(st.error());
+    return (tensor.shape.padded[0]/128)*(tensor.shape.padded[1]/128)*4;
   }
   if (tensor.quantizer == LogicalQuantizerId::NvFp4V1) {
     if (auto st = validate_mapping_for_tensor(tensor, offset); !st)
@@ -2511,12 +2532,14 @@ static std::expected<void, FormatError> validate_schema_at_offsets(
         record_offset(&SchemaRecordOffsets::tensors, i);
     if (schema.tensors[i].quantizer == LogicalQuantizerId::Q4KCandidateV2 &&
         schema.precision.id != PrecisionPolicyId::CandidateV2 &&
-        schema.precision.id != PrecisionPolicyId::NvFp4MlpV1) {
+        schema.precision.id != PrecisionPolicyId::NvFp4MlpV1 && schema.precision.id != PrecisionPolicyId::Fp8MixerV1) {
       return std::unexpected(make_error(
           FormatErrorCode::InvalidPrecisionPolicy, tensor_offset,
           schema.tensors[i].logical_name + ".tensor.quantizer",
           "Q4_K requires candidate V2 precision policy"));
     }
+    if (schema.tensors[i].quantizer == LogicalQuantizerId::Fp8V1 && schema.precision.id != PrecisionPolicyId::Fp8MixerV1)
+      return std::unexpected(make_error(FormatErrorCode::InvalidPrecisionPolicy, tensor_offset, "fp8.policy", "FP8 requires its precision policy"));
     if (schema.tensors[i].quantizer == LogicalQuantizerId::NvFp4V1 &&
         (schema.precision.id != PrecisionPolicyId::NvFp4MlpV1 ||
          (!schema.tensors[i].logical_name.ends_with(".mlp.gate_proj.weight") &&

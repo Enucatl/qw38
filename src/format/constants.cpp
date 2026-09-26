@@ -25,6 +25,7 @@ bool is_known(StorageClass value) noexcept {
     case StorageClass::Int8Grouped:
     case StorageClass::Bf16:
     case StorageClass::Fp32:
+    case StorageClass::Fp8:
     case StorageClass::NvFp4:
       return true;
   }
@@ -39,6 +40,7 @@ bool is_known(LogicalQuantizerId value) noexcept {
     case LogicalQuantizerId::Q4G64CandidateV1:
     case LogicalQuantizerId::Q8G32CandidateV1:
     case LogicalQuantizerId::Q4KCandidateV2:
+    case LogicalQuantizerId::Fp8V1:
     case LogicalQuantizerId::NvFp4V1:
       return true;
   }
@@ -56,6 +58,7 @@ bool is_known(PhysicalLayoutId value) noexcept {
     case PhysicalLayoutId::CudaBf16RowMajorV0:
     case PhysicalLayoutId::CudaBf16VectorV0:
     case PhysicalLayoutId::CudaBf16TapMajorV0:
+    case PhysicalLayoutId::CudaFp8V1:
     case PhysicalLayoutId::CudaNvFp4V1:
     case PhysicalLayoutId::CudaFp32VectorV0:
     case PhysicalLayoutId::CudaFp32GdnSHvKV0:
@@ -83,7 +86,7 @@ bool is_known(PrecisionPolicyId value) noexcept {
   return value == PrecisionPolicyId::V0 ||
          value == PrecisionPolicyId::CandidateV1 ||
          value == PrecisionPolicyId::CandidateV2 ||
-         value == PrecisionPolicyId::NvFp4MlpV1;
+         value == PrecisionPolicyId::NvFp4MlpV1 || value == PrecisionPolicyId::Fp8MixerV1;
 }
 
 bool is_known(SemanticScope value) noexcept {
@@ -118,6 +121,7 @@ bool is_known(MappingKind value) noexcept {
   switch (value) {
     case MappingKind::Identity:
     case MappingKind::DenseTileNK:
+    case MappingKind::Fp8TN:
     case MappingKind::NvFp4TN:
     case MappingKind::TapMajorConvC1T:
       return true;
@@ -206,6 +210,7 @@ char const* name_of(StorageClass value) noexcept {
       return "bf16";
     case StorageClass::Fp32:
       return "fp32";
+    case StorageClass::Fp8: return "fp8";
     case StorageClass::NvFp4:
       return "nvfp4";
   }
@@ -226,6 +231,7 @@ char const* name_of(LogicalQuantizerId value) noexcept {
       return "q8g32_candidate_v1";
     case LogicalQuantizerId::Q4KCandidateV2:
       return "q4k_candidate_v2";
+    case LogicalQuantizerId::Fp8V1: return "fp8_v1";
     case LogicalQuantizerId::NvFp4V1:
       return "nvfp4_v1";
   }
@@ -252,6 +258,7 @@ char const* name_of(PhysicalLayoutId value) noexcept {
       return "cuda_bf16_vector_v0";
     case PhysicalLayoutId::CudaBf16TapMajorV0:
       return "cuda_bf16_tap_major_v0";
+    case PhysicalLayoutId::CudaFp8V1: return "cuda_fp8_v1";
     case PhysicalLayoutId::CudaNvFp4V1:
       return "cuda_nvfp4_v1";
     case PhysicalLayoutId::CudaFp32VectorV0:
@@ -292,6 +299,7 @@ char const* name_of(PrecisionPolicyId value) noexcept {
       return "precision_candidate_v1";
     case PrecisionPolicyId::CandidateV2:
       return "precision_candidate_v2";
+    case PrecisionPolicyId::Fp8MixerV1: return "precision_fp8_mixer_v1";
     case PrecisionPolicyId::NvFp4MlpV1:
       return "precision_nvfp4_mlp_v1";
   }
@@ -404,6 +412,7 @@ std::uint64_t element_size(ArithmeticDtype dtype) noexcept {
 
 bool layout_is_weight(PhysicalLayoutId layout) noexcept {
   switch (layout) {
+    case PhysicalLayoutId::CudaFp8V1:
     case PhysicalLayoutId::CudaNvFp4V1:
     case PhysicalLayoutId::CudaQ4G64V0:
     case PhysicalLayoutId::CudaQ8G32V0:

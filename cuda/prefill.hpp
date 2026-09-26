@@ -3,6 +3,7 @@
 #include "cuda/buffer.hpp"
 #include "cuda/decode_mmv.hpp"
 #include "cuda/error.hpp"
+#include "cuda/fp8.hpp"
 #include "cuda/stream.hpp"
 
 #include <cublas_v2.h>
@@ -65,6 +66,7 @@ struct PrefillProjection {
   std::uint32_t valid_tokens{};
   std::uint64_t first_position{};
   PrefillEpilogue epilogue{PrefillEpilogue::StoreBf16};
+  Fp8Input packed{};  // Required for FP8 M>1; borrowed until this consumer completes.
 };
 
 class PrefillEngine {
@@ -83,8 +85,10 @@ class PrefillEngine {
   [[nodiscard]] static std::expected<PrefillEngine, Error> create(
       Stream const& stream, std::uint32_t token_capacity = kPrefillDefaultTokens,
       std::uint32_t weight_rows = kPrefillDefaultWeightRows,
-      PrefillDispatch dispatch = PrefillDispatch::BoundedUnpackBf16Cublas);
+      PrefillDispatch dispatch = PrefillDispatch::BoundedUnpackBf16Cublas, bool fp8 = false);
 
+  // One reusable producer span, overwritten only after its last consumer.
+  [[nodiscard]] Fp8Input fp8_operand(unsigned m, unsigned k) const noexcept;
   [[nodiscard]] std::expected<void, Error> project(
       PrefillProjection const& projection);
   [[nodiscard]] std::expected<void, Error> paired_swiglu(
@@ -109,7 +113,7 @@ class PrefillEngine {
       std::span<std::uint32_t const> requested_rows, float* logits);
 
   [[nodiscard]] std::uint64_t workspace_bytes() const noexcept {
-    return workspace_.bytes();
+    return workspace_.bytes() + fp8_workspace_.bytes();
   }
   [[nodiscard]] std::uint32_t token_capacity() const noexcept {
     return token_capacity_;
@@ -141,6 +145,8 @@ class PrefillEngine {
   Stream const* stream_{};
   cublasHandle_t handle_{};
   DeviceBuffer workspace_{};
+  DeviceBuffer fp8_workspace_{};
+  int fp8_sm_count_{};
   std::uint16_t* weight_tile_{};
   float* accum_a_{};
   float* accum_b_{};
