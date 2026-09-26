@@ -1,5 +1,8 @@
 # TASK-021 candidate artifact contract
 
+The [TASK-030 runtime delivery guide](task030-delivery.md) identifies the
+retained CandidateV2 Q4_K/Q8 artifact, its consumers and rollback control.
+
 The TASK-020 [policy](task020-policy.json) selects one resident packed view:
 Q4G64 for primary-language MLP gate/up/down, Q8G32 for primary-language
 attention/GDN qkv/z/out projections and `lm_head`, and BF16 for the remaining

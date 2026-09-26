@@ -367,7 +367,7 @@ an achieved performance target.
 | TASK-027 | Matched whole-request performance baseline | M9 | TASK-026 | PERF-01 comparison, cold/warm costs, peak memory and bottleneck-ranked gap report | DONE |
 | TASK-028 | Reuse-oriented long-context attention | M10 | TASK-027 | Multi-query prefill reuse and cooperative segmented decode with bounded memory | DONE |
 | TASK-029 | Integrated native NVFP4 MLP gate/up | M10 | TASK-028 | Implemented; development/session/numerical checks and reserve projection pass; request/decode cost regression checked, retain Q4_K/Q8 candidate | DONE |
-| TASK-030 | Combined validation and delivery decision | M11 | TASK-029 | Core-54, fixed long case, replay, capacity, matched performance and promotion decision | TODO |
+| TASK-030 | Combined validation and delivery decision | M11 | TASK-029 | Core-54, fixed long case, replay, capacity, matched performance and promotion decision | DONE |
 | TASK-031 | Retired state-refinement task | — | — | Attention moved to TASK-028; state experiments deferred | SUPERSEDED |
 | TASK-032 | Retired final-promotion task | — | — | Final obligations merged into TASK-030 | SUPERSEDED |
 
@@ -649,7 +649,10 @@ Depends on TASK-029, including its fallback outcome. Freeze the combined
 candidate; retain core-54, selected P100 reviews, fixed long-context case,
 replay, capacity and all PERF-01 rows once, with valid comparator reuse.
 Document promotion or retention and all unmet targets. Missing acceptance
-evidence prevents completion. See [the task](tasks/TASK-030.md).
+evidence prevents completion. Completed with RETAIN_CONTROL: C92 is
+INCONCLUSIVE and all nine speed-parity targets are unmet. Resolve C92 before
+promotion; performance gaps remain FOLLOW_UP_REQUIRED. See [the task](tasks/TASK-030.md)
+and [delivery guide](task030-delivery.md).
 
 ### Retired TASK-031/032
 

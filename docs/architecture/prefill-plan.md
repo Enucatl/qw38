@@ -1,5 +1,8 @@
 # Qwen3.8-27B prefill execution plan (TASK-14)
 
+The actual bounded production schedules and TASK-030 retention decision are
+documented in the [runtime delivery guide](../implementation/task030-delivery.md).
+
 > **OVERALL-01 authority:** This Phase 1 hardware-independent serial schedule
 > is a semantic control and comparison reference, not a production schedule or
 > fixed chunk/tile commitment. TASK-019 measures candidate projection paths;

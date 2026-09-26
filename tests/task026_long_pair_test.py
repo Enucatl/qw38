@@ -20,6 +20,11 @@ def main() -> None:
     parser.add_argument("--fixtures", type=Path, required=True)
     parser.add_argument("--llama-run", type=Path, required=True)
     parser.add_argument("--candidate-run", type=Path, required=True)
+    parser.add_argument(
+        "--policy-rebind",
+        type=Path,
+        default=Path("docs/implementation/task026-eval-policy-rebind.json"),
+    )
     args = parser.parse_args()
     assert score(args)["status"] == "PASS"
     case_id = "R-32768-s0-d0.1"
@@ -28,12 +33,19 @@ def main() -> None:
         "same_length_prompt": args.fixtures / "tokens" / f"{case_id}.prompt.u32le",
         "candidate_tsv": args.candidate_run / "long.tsv",
         "generated_output": args.candidate_run / f"{case_id}.generated.u32le",
+        "policy": Path("docs/architecture/evaluation-policy-v0.md"),
     }
     original = Path.read_bytes
     for label, target in targets.items():
+
         def changed(path: Path) -> bytes:
             raw = original(path)
-            return bytes([raw[0] ^ 1]) + raw[1:] if path == target else raw
+            return (
+                bytes([raw[0] ^ 1]) + raw[1:]
+                if path.resolve() == target.resolve()
+                else raw
+            )
+
         with patch.object(Path, "read_bytes", changed):
             try:
                 score(args)
@@ -41,7 +53,7 @@ def main() -> None:
                 pass
             else:
                 raise AssertionError(f"altered {label} was accepted")
-    print("long scorer PASS; four altered-input cases INVALID")
+    print("long scorer PASS; five altered-input cases INVALID")
 
 
 if __name__ == "__main__":

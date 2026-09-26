@@ -39,6 +39,11 @@ remains the control. Intermediate development checks do not confer acceptance.
 
 # Implementation baseline
 
+The [TASK-030 delivery record](../implementation/task030-delivery.md) describes
+the actual Q4_K/Q8 candidate, measured context limits, and retained production
+control. Its combined attention candidate is not promoted because final C92
+quality is inconclusive. The V0 choices below remain historical controls.
+
 V0's reference backend is NVIDIA CUDA. Its reference GPU is the NVIDIA GeForce RTX 5090, a Blackwell device with compute capability 12.0, and the native reference target is `sm_120`. V0 may optimize specifically for that GPU and architecture. The reference deployment is a Linux container environment using Docker and the NVIDIA Container Toolkit. Implementation uses C++23 for host code and CUDA C++23 for device code.
 
 The physical V0 runtime artifact and lowering are CUDA/Blackwell-oriented. Model semantics, logical tensor identities, quantization contracts, and the semantic graph remain portable; physical `.qw38` packing and CUDA lowering may be backend-specific. Compatibility with pre-Blackwell GPUs or older toolchains is not a V0 architecture constraint.
