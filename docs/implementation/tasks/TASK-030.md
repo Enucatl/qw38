@@ -1,142 +1,96 @@
-# TASK-030 — Scheduling, dispatch and fusion refinement
+# TASK-030 — Combined validation and delivery decision
 
 ## Status
 
 TODO
 
-## Milestone
+## Milestone and dependency
 
-M10 — Measured refinement and promotion
+M11 — Validated delivery candidate.
+Depends on [TASK-029](TASK-029.md), including its documented fallback outcome.
 
-## Purpose
+## Authority and delivered behavior
 
-Reduce measured scheduling, conversion, fusion and launch costs in both phases without changing the selected weights.
+[DELIVERY-01](../task_ledger.md#delivery-amendment--delivery-01-2026-09-26)
+merges former TASK-032 final promotion here; former TASK-031 state experiments
+are deferred. Deliver a reproducible usable candidate, supported context and
+memory limits, rollback instructions and an evidence-backed promote/retain-control
+decision. Neither upstream development checks nor this planning amendment are
+production acceptance. No additional optimization experiment is required here.
 
-## Depends on
+## Candidate and representation contract
 
-- [TASK-029](TASK-029.md)
+Freeze compiler/source/calibration/artifact/runtime/toolchain identities,
+quantizer/layout/scale policy, attention schedule, dispatch and chunk sizes
+before validation. Retain one resident view per tensor, bounded reusable
+workspace, FP32 residual/accumulation/recurrent state, BF16 KV/history and the
+existing state ABI. Document any rejected native path and the chosen fallback.
+Keep primary-language tensor/tokenizer identity and all causal/session semantics.
+Use existing validation, replay and request tools from TASK-022/026/027;
+changes should be limited to necessary candidate bindings and reports.
 
-## Normative references
+## Consolidated checks, once per selected execution
 
-- [Implementation ledger](../task_ledger.md) — OVERALL-01, revised task contract,
-  overall decision rules, measurement envelope and migration of prior obligations.
-- [Architecture V0](../../architecture/architecture-v0.md) — retained model semantics
-  and controls; reopened decisions follow OVERALL-01.
-- [EVAL-01 / PERF-01](../../architecture/evaluation-policy-v0.md) — scoring
-  criteria and measurement definitions.
-- [54-case core amendment](../../architecture/evaluation-policy-core-54.md) —
-  routine coverage and manual-only full-suite execution.
-- [Technology baseline](../technology-baseline.md).
-- [Code standards](../code-standards.md).
+1. Run the frozen core-54 selection in both quality arms: 15 P100, 15 C92,
+   all 12 L12 and all 12 R-512/R-4096. Reuse authenticated matching comparator
+   outputs/references where their identities and policy remain valid; record
+   that reuse rather than rerunning the comparator. Apply unchanged EVAL-01
+   scoring, slice membership, denominators and provenance. Retain NLL limits
+   +0.03 aggregate/+0.06 per declared slice, the 0.02 capability-regression
+   budget and all existing retrieval/language criteria and uncertainty rules.
+   Quality resampling analyzes saved cases, not repeated engine timings.
+   Bind all 15 P100 reviews to these outputs; unresolved reviews, invalid,
+   failed or inconclusive gates cannot become acceptance.
+2. Run exactly `R-32768-s0-d0.1` on the final candidate, with valid paired
+   comparator evidence (reuse if unchanged). The other five fixtures remain
+   inventory only. The 216-case suite is optional human-initiated interactive
+   work, never required or launched by agents.
+3. Retain same-schedule bitwise replay, checkpoints 1/3/4/63/64/65/255/256/257,
+   partitions 1/63/64/65/255/256 and alternating 63/65, plus relevant new
+   chunk/tile/dispatch boundaries. Cover nonempty-session prefill/decode
+   handoff, reset/snapshot/restore, interleave and late-failure recovery.
+   Cross-schedule state/logit differences are diagnostics checked with existing
+   component tolerances and behavioral gates, not full-model bitwise equality.
+   Reuse already valid focused implementation checks at this exact code identity;
+   do not blindly repeat them. A changed path or unresolved concern requires
+   its affected check.
+4. Measure all PERF-01 rows: prefill and complete requests at T=256/4096/32768,
+   populated decode at T=512/4096/32768, with 128-token continuations. Reuse
+   each request's prompt phase for prefill/TTFT. One execution per selected
+   workload/engine, zero warmups, no repetitions or performance medians/p99/
+   bootstrap/confidence intervals. Label instrumentation/first-use and cold
+   load/upload separately; record context, token policy, commands and identities.
+   Reuse TASK-027 comparator rows only if workload/input, comparator/settings,
+   hardware/power/toolchain context and timing/instrumentation boundaries still
+   match. Otherwise refresh only affected comparator workloads once and explain
+   why. Do not present incomparable observations as matched speedups.
+5. Measure final 32K capacity, complete resident/transient allocation peaks,
+   workspace/scales/padding/load peaks and the 2 GiB free-memory reserve.
+   Distinguish allocations from sampled residency. Reuse that final workload
+   for capacity evidence; no separate maximum-context search. Report supported
+   context and any untested coverage.
 
-## Architecture decisions consumed
+Use existing reports and completion records; do not introduce a new evidence
+schema or run a whole-model BF16 evaluation. GGUF contextual quality checks
+are required only for an asserted quality/speed Pareto comparison; a speed-only
+report makes no such claim. Historical TASK-027 is the baseline, not final
+candidate evidence. A corrective arithmetic/policy change creates a new
+candidate identity; rerun affected gates with a reason and do not merge
+incompatible candidate outputs into a pass.
 
-| Decision | Contract for this task | Authority |
-| -------- | ---------------------- | --------- |
-| M-01, T-01–03, G-02 | Tune chunks/crossovers, scratch boundaries and scheduling | OVERALL-01 |
-| Projection part of P-02 | Preserve selected activation policy; track fusion/rounding effects | Candidate control |
-| Q-01/Q-02, S-01/S-02, P-01 | Fixed weights/state and retained numerical semantics | Experimental control |
+## Completion and delivery
 
-OVERALL-01 supersedes conflicting restrictions in the former task sequence.
-Historical EXP-A–H ordering does not constrain this task. Decisions outside
-the reopened scope remain binding.
-
-## Starting point
-
-TASK-029 records accepted precision/representation choices and remaining whole-request gaps.
-
-## Scope
-
-Address measured chunk-size, small-M crossover, activation reuse, normalization
-plus quantization, epilogue, launch and synchronization costs. Consider CUDA
-graphs only if launch overhead warrants them and stable-address/state/error
-contracts remain valid. Include redundant normalization, occupancy, scale
-generation and workspace costs when deciding fusion. Keep weights fixed.
-
-**Exit:** justified scheduling/fusion decisions and verified full-request gains
-or a measured keep decision. Rerun affected numerical/continuation gates and
-the applicable 54-case behavioral gates for arithmetic changes; replay covers graph/dispatch
-boundaries and failure recovery. Optimize both prefill and populated decode.
-
-## Out of scope
-
-Weight requantization, unrelated state changes, mandatory CUDA graph adoption, fusion without complete-path measurement and bypassing commit/error semantics.
-
-## Required interfaces and data representation
-
-Version execution-plan identity with chunk/dispatch thresholds, quantization reuse, fusion and graph mode. Typed scratch lifetimes and any stable-address graph buffers remain bounded. Runtime errors preserve complete-token commit, poisoning, reset and restore contracts.
-
-## Required semantics and constraints
-
-Measure normalization recomputation, scaling/packing, epilogues and saved materialization together. Keep selected weights fixed and record any changed activation rounding. Test dispatch/chunk thresholds and ensure padded work does not alter scale/state semantics. CUDA graphs, if warranted, must respect session storage lifetime, input updates and failure recovery.
-
-Follow the code standards' identity and manifest-only digest policy. Keep
-benchmarks separate from correctness checks and record source, binary,
-artifact/policy, inputs, toolchain and hardware identities appropriate to each
-result. Partial or invalid evidence cannot establish quality acceptance.
-
-## Tuning defaults
-
-Address measured gaps in priority order. Compare chunk sizes and small-M crossovers at fixed policies before combining changes; use identical workloads and output semantics. A measured keep decision is sufficient where tuning has no useful effect.
-
-## Expected files/modules
-
-Affected runtime plans/dispatch, normalization/quantization/epilogue kernels, scratch ownership and optional graph launch path; focused regressions and performance report.
-
-## Tests required
-
-### Unit and contract checks
-
-Crossover/tail selection, scratch aliases/lifetimes, scale reuse, stable graph bindings if introduced and error/commit propagation.
-
-### Reference and numerical checks
-
-Fused versus separate numerical paths including rounding and repeated normalization; retain precision-specific epilogue and projection checks.
-
-### Integration checks
-
-Continuation, snapshot/reset/interleave and failure recovery across selected chunk/dispatch/graph boundaries. Arithmetic changes require the complete applicable 54-case EVAL-01 behavioral gates before promotion. The optional 216-case suite is human-initiated interactive work only; agents must never launch it.
-
-## Benchmark required
-
-Complete conversion-inclusive projection/layer costs and matched prefill, populated decode and requests. Include launch/wait time, workspace, occupancy and redundant arithmetic; validate combined changes against the accepted control.
-
-## Acceptance criteria
-
-- [ ] Changes or keep decisions address measured scheduling/fusion/launch costs in both execution phases.
-- [ ] Weights and unrelated state contracts remain fixed and numerical effects are explicit.
-- [ ] Boundary, memory-lifetime and failure/replay checks pass, including graph mode if added.
-- [ ] Arithmetic changes pass the applicable 54-case behavioral/context gates.
-- [ ] Complete-request measurements justify decisions with workspace/resource costs and remaining regressions reported.
-
-## Architecture blocker rule
-
-A rejected candidate is a recorded result; use the eligible fallback within OVERALL-01 without relaxing acceptance criteria. Missing required exit evidence prevents completion. A conflict outside the reopened decisions requires the full architecture-blocker report defined in the ledger; obsolete Q4-only or experiment-order restrictions are not blockers.
+Complete after required evidence is present and a supported decision is
+recorded, architecture/format/prefill/runtime instructions describe the actual
+candidate, and reproducible commands and rollback control are available.
+Passing quality and capacity permits promotion; report every PERF-01 ratio and
+achieved/unmet target separately. Unmet speed parity is a delivery limitation,
+not a reason to claim parity or start more experiments. A failed candidate may
+complete the decision task with retain-control and failure evidence, but is
+never labeled accepted. Missing evidence or reviews leaves this task incomplete.
 
 ## Completion report
 
-### Result
-
-TODO — no execution or acceptance evidence recorded for this revised task.
-
-### Changes made
-
-Record the concrete changes or measured keep decision, including decision and artifact/layout identities.
-
-### Tests run
-
-Record exact commands, outcomes, reference tolerances, covered boundaries and
-limits. Do not infer runtime correctness from documentation checks.
-
-### Benchmark results
-
-Record raw evidence paths, timing boundaries, quality context, memory and
-uncertainty, or the reason a benchmark is not required by this task.
-
-### Architecture blocker
-
-Record none or the complete ledger-defined blocker report.
-
-### Follow-up observations
-
-Record remaining coverage and performance gaps and their downstream owners.
+TODO — no final validation or promotion recorded. Include candidate identity,
+quality/review/replay status, observed per-row performance and memory, selected
+control, remaining gaps and final documentation links.

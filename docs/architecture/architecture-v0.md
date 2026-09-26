@@ -22,11 +22,20 @@ P-02, A-01/L-01, associated M-01/T-01–03 choices, and the GDN prefill
 algorithm under G-02. The listed V0 values remain implemented control choices;
 they are not a requirement to preserve Q4/Q8 as the production candidate or to
 finish the former experiment ordering before feasibility work. A-02, Q-03,
-P-01, and S-01/S-02 remain controls except for the explicitly scoped
-TASK-031 state investigation. EVAL-01 quality gates and PERF-01 measurement
+P-01, and S-01/S-02 remain controls. DELIVERY-01 defers state experiments. EVAL-01 quality gates and PERF-01 measurement
 definitions remain binding. Revised task ownership is TASK-022 for candidate
 decode/core acceptance, TASK-026 for production-prefill and 32768 acceptance,
 and TASK-027 for matched performance.
+
+**DELIVERY-01 (2026-09-26)** supersedes remaining experiment ordering and
+validation cadence: TASK-028 implements reuse-oriented attention, TASK-029
+integrates native NVFP4 gate/up with GPU activation packing and phase-specific
+consumers, and TASK-030 owns consolidated quality/replay/capacity/performance
+and promotion. TASK-031/032 are retired, not completed. See the
+[delivery amendment](../implementation/task_ledger.md#delivery-amendment--delivery-01-2026-09-26)
+for the selected calculation chain, memory lifetimes and deferred experiments.
+All proposed gains are hypotheses until measured; the accepted Q4_K/Q8 runtime
+remains the control. Intermediate development checks do not confer acceptance.
 
 # Implementation baseline
 
@@ -55,7 +64,7 @@ This register is normative. Every V0 decision that changes on-disk bytes, numeri
 | Q-02 | Historical V0 control: `lm_head` uses Q8G32; head precision is reopened by OVERALL-01 | Vocabulary traffic and output sensitivity | DERIVED + HYPOTHESIS | Conservative head compression | Q4 is equally acceptable | TASK-019/020 candidate feasibility and screening |
 | Q-03 | Embeddings and small/sensitive families remain BF16 | Gather access class, recurrence/sensitivity analysis | DERIVED + HYPOTHESIS | Avoids low-value numerical and implementation variables | Narrowing produces material capacity/latency gain without behavior loss | Future family-specific study |
 | P-01 | FP32 residual, reductions, nonlinear/recurrent arithmetic | Numerical sensitivity analysis | DERIVED + HYPOTHESIS | Bounds accumulation and recurrence error | Narrower working paths are behaviorally sufficient | EXP-C, EXP-E |
-| P-02 | Historical V0 control: BF16 normalized/projection transport and BF16 KV/C; projection operand precision is reopened by OVERALL-01, while state semantics remain controlled | Source dtype, tensor-core path, state schema | OBSERVED + HYPOTHESIS | Reduces scratch/cache traffic and feeds prefill operands | BF16 transport changes behavior materially | TASK-019/020 operand evidence; TASK-028 native FP4 experiment; TASK-031 state investigation |
+| P-02 | Historical V0 control: BF16 normalized/projection transport and BF16 KV/C; projection operand precision is reopened by OVERALL-01, while state semantics remain controlled | Source dtype, tensor-core path, state schema | OBSERVED + HYPOTHESIS | Reduces scratch/cache traffic and feeds prefill operands | BF16 transport changes behavior materially | TASK-019/020 operand evidence; TASK-029 native gate/up integration; state changes deferred |
 | S-01 | FP32 GDN S | Recurrent equations and `mamba_ssm_dtype` intent | OBSERVED + DERIVED + HYPOTHESIS | Error crosses token boundaries; 144 MiB fixed state is affordable | BF16 state error remains bounded | EXP-C |
 | S-02 | S ABI is `[head,value,key]`, warp per value row | GDN dimensions and CUDA layout analysis | DERIVED + HYPOTHESIS | Coalesced key reduction, one read/update/write ownership | Alternate ownership wins end to end | EXP-D |
 | G-01 | Six Qwen-native semantic node families | Model semantics, dataflow, semantic graph | DERIVED | Preserves model-relevant state and boundaries | A node boundary prevents necessary optimization | EXP-F, profiling |
@@ -391,9 +400,23 @@ Evaluate the selected candidate under EVAL-01 using stable FP32 log-softmax over
 
 The selected validation policy retains **HYPOTHESIS** limits of +0.03 nats/token aggregate NLL and +0.06 on each declared slice for candidate minus the Q4_K_M llama.cpp reference. EVAL-01 defines the frozen DS4-derived inputs, generated-answer graders, two-percentage-point capability regression screen and paired uncertainty, qualitative review, and mandatory versus deferred context coverage. Deterministic outputs are inspected for failures and repetition, not required to match token-for-token across models or schedules. These are engineering acceptance budgets, not thresholds established by the dossier. Freeze source continuations and input/scorer identities before comparing quantizers. Failure blocks candidate quality acceptance under TASK-022/026; candidate precision choices follow OVERALL-01 and must pass the unchanged gates.
 
-Measure batch-one decode at populated lengths 512, 4096, and 32768; prefill at 256, 4096, and 32768 tokens; and a request that prefills then generates 128 tokens. Exercise the maximum supported context separately when memory permits, and report any untested long-context coverage. Record artifact/binary hashes, GPU and resource limits, capacity versus populated length, clocks, graph mode, warmups, repetitions, and token/output policy. Warm up five runs, collect at least twenty timed repetitions with restored identical incoming state, and report median, p99, and uncertainty. Setup, upload, warmup, and state restore are outside steady-state timing and reported separately; the first generated token belongs to TTFT, not subsequent decode throughput.
+For final TASK-030 validation, measure batch-one populated decode at
+512/4096/32768 and prefill/complete requests at 256/4096/32768 with 128-token
+continuations. The 2026-09-26 PERF-01 amendment supersedes the former five
+warmups/twenty repetitions protocol: one execution per workload/engine, zero
+warmups, no medians, p99 or performance confidence intervals. Reuse request
+prompt phases for prefill/TTFT and eligible historical comparator rows under
+TASK-030's identity/timing checks. Report cold setup, instrumentation, first-use
+costs, resident/transient memory and remaining context limits separately.
+Record commands, artifact metadata/binary identity, inputs, GPU, resource and
+power settings, capacity/population, graph mode and token policy.
 
-Use node/kernel profiles, actual memory traffic, spills, and occupancy to explain end-to-end measurements. Do not add parent graph durations to their child kernel times. A local speedup is insufficient if the matching end-to-end request regresses. PERF-01 governs the matched performance comparison: the parity target is a ratio of at least 1.00 for every required row's median, with paired 95% interval classification and explicit memory accounting. No additional 5% improvement threshold applies.
+TASK-027 already supplies the detailed baseline. Intermediate tasks need only
+their selected development checks and decision-relevant timing, not exhaustive
+profiles. Do not add host waits to GPU work or parent durations to child kernels.
+PERF-01's per-row ratio target remains 1.00; report observed met/unmet status
+without statistical significance claims. Local kernel speed alone does not
+establish a complete-request improvement. No extra 5% threshold applies.
 
 `models/Qwen3.8-27B-Q4_K_M.gguf` through llama.cpp is the **required black-box performance comparator** in PERF-01, with matching workloads, timing boundaries and a declared parity target. TASK-027 records the baseline and gaps; speed parity is not a prerequisite for the subsequent authorized optimization experiments. Quality, size and performance evidence together may support a Pareto comparison. GGUF is not compiler input. Q4_K_M through llama.cpp supplies EVAL-01's behavioral reference tokens and captured target-token/top-20 probabilities; fixed answer keys grade capabilities independently of teacher continuations. Candidate acceptance follows EVAL-01 without requiring identical logits or copying teacher errors. No quality or throughput result is claimed by this document.
 
@@ -408,7 +431,11 @@ Use node/kernel profiles, actual memory traffic, spills, and occupancy to explai
 
 # Experiments that can change Architecture V0
 
-Run these against the selected implementation, keeping unrelated choices fixed. Quality-affecting changes must pass the frozen behavioral gate; performance changes need both local evidence and matching end-to-end measurements. These eight experiments replace the broad backlog as V0's architecture decision queue.
+The table below preserves the historical V0 experiment rationale. It is not
+a mandatory queue under DELIVERY-01. TASK-028/029 use their focused development
+checks; TASK-030 owns the frozen combined behavioral gate before promotion and
+matched end-to-end performance. State precision/layout, extra views and broad
+precision comparisons are deferred, without prerequisite keep experiments.
 
 | Experiment | Selected design and first comparison | Decision affected and falsification |
 | --- | --- | --- |

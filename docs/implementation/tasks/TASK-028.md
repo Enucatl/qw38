@@ -1,123 +1,98 @@
-# TASK-028 — Conversion-minimized native FP4 path
+# TASK-028 — Reuse-oriented long-context attention
 
 ## Status
 
 TODO
 
-## Milestone
+## Milestone and dependency
 
-M10 — Measured refinement and promotion
+M10 — Fast attention and native projection integration.
+Depends on [TASK-027](TASK-027.md).
 
-## Purpose
+## Authority and delivered behavior
 
-Test whether native NVFP4 or MXFP4 computation can improve complete-request
-speed without losing the selected model's quality or exceeding its memory
-budget. Compare a real GPU conversion path with the accepted Q4_K/Q8 runtime;
-the TASK-019 CPU reference packer is not a production performance result.
+[DELIVERY-01](../task_ledger.md#delivery-amendment--delivery-01-2026-09-26)
+replaces this task's former FP4 experiment. Preserve the accepted weights,
+state ABI, FP32 arithmetic and BF16 KV/history. Deliver a production causal
+prefill attention path that reuses K/V across query rows and a cooperative
+decode scan. TASK-027 already establishes the bottleneck; no baseline rerun
+or algorithm bake-off is needed. This is development integration; final quality
+promotion belongs to [TASK-030](TASK-030.md).
 
-## Depends on
+## First implementation and code areas
 
-- [TASK-027](TASK-027.md)
+Use the existing CUDA online-softmax structure and cache API in
+`cuda/attention.cu/.hpp`, `src/runtime/prefill_attention.cpp` and
+`src/runtime/attention.cpp`. Start with a 32-query × 64-key tile per query
+head, BF16 QK tensor-core products with FP32 accumulators using the pinned
+CUDA/CUTLASS primitives, and cooperative FP32 softmax and probability-times-V
+accumulation. Keep softmax probabilities FP32; narrowing them for a faster PV
+MMA is not part of this first implementation. Retain local running maximum,
+sum and numerator rather than a global score matrix. K/V staging is shared
+across query rows; map the six query heads to each KV head without permanent
+GQA replication. Do not wrap an external inference framework or introduce a
+new attention library. The existing scalar Q1/Q4 kernels remain diagnostic
+controls, not the intended optimization.
 
-## Architecture decisions consumed
+For M=1, retain the current 256-key split and deterministic merge, replacing
+one thread's serial 256-element QK dot with a warp-cooperative reduction.
+Reuse existing segmented partial storage and gate/output epilogue. This is a
+separate decode consumer: do not pad one query to a prefill GEMM and assume
+it is faster. Leave current 256-token model chunks and GDN recurrence alone.
 
-| Decision | Contract for this task | Authority |
-| -------- | ---------------------- | --------- |
-| Q-01/Q-02, projection part of P-02 | Test FP4 weight and activation precision against the accepted candidate | FP4-01 / OVERALL-01 |
-| A-01/A-02/L-01 | Version any new packed view and account for its complete memory cost | FP4-01 / OVERALL-01 |
-| P-01, S-01/S-02 | Preserve FP32 arithmetic/state and unrelated semantics | Retained control |
+Likely additional touch points are runtime workspace sizing if needed,
+`tests/*attention*`, `benchmarks/attention_prefill_bench.cpp`,
+`benchmarks/attention_bench.cpp` and the existing request benchmark. Reuse
+available tensor-core primitives; select the tile from resource limits, not a
+sweep. If the initial tile spills or exceeds shared memory, halve the query
+tile once and record the reason. A further change needs a concrete failure or
+conversion-inclusive result, not proof that the first tile is optimal.
 
-## Normative references
+## Representation and lifetime contract
 
-- [Implementation ledger](../task_ledger.md) — OVERALL-01, FP4-01 and the task contract,
-  quality and performance decision rules.
-- [TASK-019](TASK-019.md) — demonstrated native SM120 instructions and the limits
-  of reference conversion timings.
-- [TASK-020](TASK-020.md) — FP4 family/activation error screening.
-- [EVAL-01 / PERF-01](../../architecture/evaluation-policy-v0.md) and the
-  [54-case core amendment](../../architecture/evaluation-policy-core-54.md).
-- [Technology baseline](../technology-baseline.md) and
-  [code standards](../code-standards.md).
+Keep 24 query heads, four KV heads, width 256, scale 1/16, the existing cache
+strides and BF16 Q/K/V. FP32 dot accumulators, softmax, output accumulation and
+sigmoid gating retain existing rounding to BF16 at attention output. New
+reduction order may change floating-point results; it does not change equations.
+Causality uses absolute `first_position + row`, including nonempty prefixes,
+masked query/key tails and separate populated length versus cache capacity.
 
-## Starting point
+Device KV persists across calls; Q/g/y and decode partials occupy bounded
+reusable device workspace. Local Q/K/V, scores and accumulators live only in
+registers/shared memory for the owning kernel. Never allocate T×T scores,
+replicate persistent KV six times, pin cache contents, or rely on values living
+in shared memory across launches. Preserve layer/session commit and poison,
+reset, restore and stream ownership contracts.
 
-TASK-027 provides an accepted Q4_K/Q8 full-request baseline and ranked costs.
-TASK-019 established native NVFP4/MXFP4 support, but its FP4 activation
-packing ran on the CPU. TASK-020 found quality losses in several FP4 families.
+## Smallest useful validation
 
-## Scope
+- Once: affected attention numerical/contract tests against independent FP32
+  references, covering causal tails around the new tiles, nonempty prefixes,
+  absolute positions, capacity rejection and short prefill-to-decode handoff.
+  Test identical-schedule replay and changed decode segmentation/reduction.
+  Reuse existing tolerances; investigate failures rather than widening them.
+- Once: production request-32768 with 128 generated tokens, using TASK-027
+  frozen inputs and timing boundaries, capturing its prompt phase, attention
+  timing and peak workspace. Also run populated decode-32768 once to check the
+  changed decode path. Compare with saved TASK-027 QW38 observations; no new
+  llama.cpp run. Label profiling/first-use differences and do not claim a
+  controlled speedup if instrumentation differs.
+- One short existing development prompt plus continuation verifies finite
+  outputs and the intended dispatch. This smoke is not core-54 acceptance.
 
-Build a bounded, executable native FP4 variant for at least one real projection
-family chosen from TASK-020 quality evidence and TASK-027 bottlenecks. Evaluate
-NVFP4 and MXFP4 for that family; document any format ruled out by its measured
-quality, memory or conversion cost. Quantize weights once from the pinned BF16
-source into a versioned resident native format. Do not repack full weights in
-the request hot path or silently retain duplicate weight views.
+## Completion and fallback
 
-Generate FP4 activation values and block scales on the GPU. Reuse a packed
-activation across compatible projections in the same decode step or prefill
-chunk where its scale and rounding contract permits. Compare separate conversion
-with a fused producer
-where a fused path is valid; count scale reductions, packing, launches, staging,
-padding, native MMA, epilogues and any BF16/GEMV decode fallback. Avoid CPU
-conversion in timed requests. Test native prefill and native small-M decode
-against a BF16-activation GEMV using the **same FP4 weight bytes**. Choose
-dispatch from conversion-inclusive measurements, including the case where GEMV
-is faster for one-token decode.
-
-## Out of scope
-
-CPU packing as a production path, synthetic-kernel speed as promotion evidence,
-hot-path full-weight repacking, unbudgeted duplicate resident weights and
-changes to unrelated state or scheduling policy.
-
-## Required interfaces and data representation
-
-Record the candidate's quantizer, scale, physical layout and activation policy
-identities. A production binding must identify the resident view, native and
-GEMV consumers, scratch lifetimes and output precision. Any retained extra view
-has an explicit size and load lifetime.
-
-## Tests and measurements required
-
-- Independent reconstruction and contraction checks for FP4 weights and
-  activations, including scales, tails, zero blocks and output precision;
-  instruction evidence for the native path on the project RTX 5090.
-- Weight-only, activation-only and joint error measurements for the selected
-  family. Preserve FP32 residual/state/logit semantics and session replay.
-- Per-stage GPU timing and matched prefill, populated-decode and complete-request
-  timing against the same Q4_K/Q8 baseline. Report cold weight preparation and
-  upload separately from steady-state conversion. Do not compare the CPU
-  reference packer with a production GPU kernel as if they were equivalent.
-- Artifact bytes, resident and peak transient memory, scale buffers,
-  workspace, cold-load time and any extra view costs within the capacity budget.
-- Complete applicable 54-case EVAL-01, selected-P100, long-context and
-  continuation checks before any FP4 variant becomes the selected policy.
-  The optional 216-case suite remains human-initiated only.
-
-## Acceptance criteria
-
-- [ ] At least one real model projection family runs a native NVFP4 or MXFP4
-  path with GPU activation conversion in both prefill and populated decode;
-  both formats receive an evidence-backed disposition.
-- [ ] Same-FP4-weight native/GEMV dispatch and reuse/fusion choices have
-  conversion-inclusive measurements, numerical checks and explicit identities.
-- [ ] Cold and steady-state time, artifact/resident/peak memory and full-request
-  effects are compared fairly against the accepted Q4_K/Q8 control.
-- [ ] Any promoted variant passes the applicable quality, long-context and
-  replay gates; rejected variants retain measured reasons.
-- [ ] The FP4 keep/change decision and remaining conversion bottlenecks are
-  recorded for TASK-029.
-
-## Architecture blocker rule
-
-A rejected FP4 candidate is a result and leaves the accepted Q4_K/Q8 control
-in place. Missing required comparison evidence prevents completion. A conflict
-outside the reopened decisions requires the ledger's full architecture-blocker
-report. A native kernel speedup alone does not justify promotion.
+Complete when the new prefill path runs through the full model, correctness
+and session checks pass, the selected long request demonstrates reduced
+attention/prefill cost, and changed decode cost and bounded memory are recorded.
+Keep the old decode scan if its cooperative replacement regresses. A failed
+prefill candidate requires a targeted repair or a documented concrete blocker;
+a keep-only report of the existing 177.87 s scan does not deliver this task.
+No numerical failure, unsupported required operation or capacity failure can
+be labeled success. No speed-parity or global-optimum proof is required.
 
 ## Completion report
 
-### Result
-
-TODO — no experiment or acceptance evidence recorded yet.
+TODO — no implementation or acceptance evidence recorded. Record changed
+paths, exact commands/results, identities, observed costs, limitations and the
+candidate handed to TASK-029. Do not launch the 216-case suite.

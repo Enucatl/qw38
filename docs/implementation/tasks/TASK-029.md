@@ -1,144 +1,122 @@
-# TASK-029 — Precision and representation refinement
+# TASK-029 — Integrated native NVFP4 MLP gate/up
 
 ## Status
 
 TODO
 
-## Milestone
+## Milestone and dependency
 
-M10 — Measured refinement and promotion
+M10 — Fast attention and native projection integration.
+Depends on [TASK-028](TASK-028.md).
 
-## Purpose
+## Authority and delivered behavior
 
-Refine consequential precision or representation choices using whole-request bottlenecks while preserving frozen quality and capacity requirements.
+[DELIVERY-01](../task_ledger.md#delivery-amendment--delivery-01-2026-09-26)
+merges the former FP4, representation and useful scheduling/fusion work here.
+Deliver one complete NVFP4 MLP gate/up path from compiler to both production
+phases. TASK-020's gate/up screen supports this hypothesis; it does not prove
+native W4A4 quality. Keep Q4_K MLP down, Q8 attention/GDN/head, BF16 controls,
+FP32 residual/accumulation/recurrent arithmetic and TASK-028 attention fixed.
+Final promotion belongs to [TASK-030](TASK-030.md).
 
-## Depends on
+## Chosen representation and consumers
 
-- [TASK-028](TASK-028.md)
+Use TASK-019's pinned CUTLASS SM120 native NVFP4 operation and layout utilities,
+not the GGUF UE4M3 encoder (TASK-020 documents its different boundary behavior).
+Define a new logical quantizer and physical-layout version: E2M1 weight codes,
+nonnegative E4M3 scale per 16 contiguous K values, and a FP32 tensor factor.
+Choose each weight tensor factor offline from its BF16 range to keep block
+scales representable. Record the exact reconstruction `factor × scale × code`,
+RNE/tie/saturation/zero behavior and native scale swizzle in the format spec.
+Compile directly from pinned BF16, preserving source transformations and
+metadata/manifest-only digest policy; never reinterpret Q4_K nibbles as FP4.
 
-## Normative references
+Use one kernel-compatible TN resident weight/scale layout for both consumers.
+Production GPU activation packing operates per token row and per 16 K values.
+Start with fixed FP32 activation factor 1, as in TASK-019 native operand
+feasibility; this keeps packing local and token independent. Freeze the recipe
+before development scoring. Use existing calibration inputs to diagnose range
+failures; do not fit scales to final evaluation answers. Encode
+local block scales dynamically, with explicit saturation, zero blocks, padding
+and nonfinite handling. Fold fixed activation/weight factors into the GEMM
+output scale. No chunk-wide scale: the same row must pack identically beside
+unrelated rows. The exact recipe is an implementation contract to document,
+not an invitation to search scaling policies. Unexpected saturation causing
+numerical/screen failure triggers a focused scale correction or Q4_K fallback.
 
-- [Implementation ledger](../task_ledger.md) — OVERALL-01, revised task contract,
-  overall decision rules, measurement envelope and migration of prior obligations.
-- [Architecture V0](../../architecture/architecture-v0.md) — retained model semantics
-  and controls; reopened decisions follow OVERALL-01.
-- [EVAL-01 / PERF-01](../../architecture/evaluation-policy-v0.md) — scoring
-  criteria and measurement definitions.
-- [54-case core amendment](../../architecture/evaluation-policy-core-54.md) —
-  routine coverage and manual-only full-suite execution.
-- [Technology baseline](../technology-baseline.md).
-- [Code standards](../code-standards.md).
+Start dispatch at M=1 → same-FP4-weight BF16-activation GEMV; M>=2 → native
+W4A4 GEMM, preserving FP32 accumulation. The GEMV decodes the same native
+codes/scales locally, with no second weight view or full-weight expansion.
+Tiny-M padding cost is acceptable initially; adjust the threshold only if a
+selected result exposes a regression. Native M=1 GEMM and an MXFP4 comparison
+are not required. Reuse TASK-019 native support evidence rather than repeating
+instruction audits unless the kernel/toolchain changes invalidate it.
 
-## Architecture decisions consumed
+## Producer/consumer integration and memory
 
-| Decision | Contract for this task | Authority |
-| -------- | ---------------------- | --------- |
-| Q-01/Q-02, projection part of P-02 | Revisit family/head precision and activation scaling where measured gaps justify it | OVERALL-01 |
-| A-01/A-02/L-01 | Evaluate selected extra views with explicit logical/layout identity | OVERALL-01 |
-| S-01/S-02, G-02 | Hold state and unrelated schedules fixed | Experimental control |
+FP32 residual → existing RMS/BF16 rounding → GPU codes/scales → gate and up
+GEMMs → FP32 SwiGLU → BF16 buffer → existing Q4_K down → FP32 residual add.
+Compute RMS once per row. Fuse RMS and packing into a single row producer
+where its reduction fits, preserving the BF16 rounding boundary. Reuse the
+packed row and scales across both projections until both finish. For decode,
+keep BF16 normalized input for GEMV; no unused FP4 activation conversion.
+Feed paired outputs into the existing SwiGLU epilogue, avoiding full separate
+BF16 gate/up materialization. Bounded FP32 output tiles in device workspace
+are allowed; registers/shared memory are only local to each kernel.
 
-OVERALL-01 supersedes conflicting restrictions in the former task sequence.
-Historical EXP-A–H ordering does not constrain this task. Decisions outside
-the reopened scope remain binding.
+Weights/scales persist for model lifetime. Packed activations, scale buffers,
+FP32 projection tiles and BF16 SwiGLU use reusable bounded device workspace,
+ordered by the session stream and released/reused after the last consumer.
+Retain 256-token chunks initially, existing requested-row head and GDN paths.
+Budget artifact bytes, padding, scale arrays, upload/transient allocations and
+workspace at 32K against the 2 GiB reserve. Load one selected artifact; fallback
+loads the accepted Q4_K/Q8 artifact rather than keeping duplicate views.
 
-## Starting point
+Likely code areas: `src/compiler/quantization/`, `src/compiler/compile.cpp`,
+`src/format/{constants,layout,pack,unpack,schema,reader}.*`, `cuda/prefill.*`,
+`cuda/decode_mmv.*`, `cuda/activation.*`, `src/runtime/{model,mlp,prefill}.*`
+and CUDA build wiring. Reuse existing artifact validation, binders, projection
+interfaces, CUTLASS pin from `scripts/task019_cutlass_sm120.sh` and numerical
+references. Add only needed format branches and typed bounded buffers.
 
-TASK-028 supplies a measured native FP4 keep/change decision alongside the
-TASK-027 matched baseline and ranked gaps.
+## Smallest useful validation
 
-## Scope
+- Once: independent weight/activation reconstruction and contractions for a
+  real early and late gate/up matrix, scales, zeros, tails, orientation,
+  nonfinite input and malformed/unknown layout rejection. Check fused producer
+  rounding, same-row chunk independence, packed input reuse and both consumers.
+  Existing TASK-020 ablations are reused; fresh ablations diagnose failures only.
+- Once: existing frozen eight-window development NLL screen with the
+  TASK-022 comparator-relative +0.03 nats/token bound, plus a short
+  continuation/session replay across M=1/2
+  and chunk tails. Report the W4A4/GEMV numerical transition explicitly.
+  This is development screening, not final EVAL-01 or human adjudication.
+- Once: request-4096 and populated decode-4096, each with 128 generated tokens
+  and existing TASK-027 inputs/boundaries. Include GPU packing, launches,
+  epilogues and cold preparation/upload separately; compare saved QW38 baseline
+  observations, labeling instrumentation. Confirm the selected dispatch runs.
+  The TASK-027 comparison measures combined attention/projection progress;
+  attention gains alone cannot justify retaining a slower FP4 path. No
+  intermediate comparator rerun or 32K quality sweep. If attribution cannot
+  resolve FP4 retention, use the existing layer harness for one full-MLP
+  observation per old/new consumer on identical inputs, including packing and
+  epilogues. No extra full-model control run is required. Record changed memory
+  and projected 32K capacity; final measurement belongs to TASK-030.
 
-Use TASK-027 gaps and the TASK-028 FP4 result to revisit only consequential choices: per-family precision,
-head precision, activation scaling, or selected additional packed views.
-Compare alternatives using identical workloads and calibration separation;
-account for added code/layout complexity, memory and cold-load costs. Expand
-to FP6/FP8 or mixed inputs only with demonstrated SM120 support and a concrete
-quality/performance reason. Keep unrelated state and schedules fixed.
+## Completion and fallback
 
-**Exit:** keep/change decisions backed by complete applicable 54-case EVAL-01 revalidation
-and whole-request measurements for the promoted variant. A documented decision
-to keep the initial representation is valid; exhaustive format combinations
-are not required. Unsuccessful variants remain evidence, not default paths.
-
-## Out of scope
-
-Exhaustive format sweeps without a measured reason, final-evaluation calibration, simultaneous unrelated state/schedule changes, unsupported FP6/FP8 mixtures and unbudgeted second views.
-
-## Required interfaces and data representation
-
-Each variant has a policy/quantizer/layout identity, changed-family list, calibration provenance, kernel/dispatch support and exact incremental artifact/resident/transient bytes. Reports pair quality and complete-request results against the accepted control and retain rejected variants as evidence.
-
-## Required semantics and constraints
-
-Keep model equations, evaluation criteria and calibration separation fixed. Isolate numerical-policy changes from lossless layout rearrangements and give each the appropriate correctness checks. Any additional view requires matching logical values and scale interpretation and explicit lifetime/load costs. Precision exceptions must be reflected in both phase consumers.
-
-Follow the code standards' identity and manifest-only digest policy. Keep
-benchmarks separate from correctness checks and record source, binary,
-artifact/policy, inputs, toolchain and hardware identities appropriate to each
-result. Partial or invalid evidence cannot establish quality acceptance.
-
-## Tuning defaults
-
-Use TASK-027's largest relevant gaps to select a bounded set of experiments. FP6/FP8 or mixed inputs require demonstrated SM120 support and a concrete quality/performance rationale. Retaining the current policy is valid when evidence does not justify a change.
-
-## Expected files/modules
-
-Only affected quantizer/calibration/policy, packer/consumer/binding paths and their focused checks; variant and keep/change reports.
-
-## Tests required
-
-### Unit and contract checks
-
-Changed encoding/scaling/family policy, layout/version/binding compatibility, independent reconstruction and extra-view memory accounting.
-
-### Reference and numerical checks
-
-Weight-only/activation-only diagnostics for numerical changes; exact logical value/scale equivalence for layout-only changes. Preserve established numerical controls.
-
-### Integration checks
-
-Complete applicable 54-case EVAL-01 revalidation for promoted variants, including selected-P100 review, required long-context and continuation/dispatch coverage. Rejected variants preserve failure evidence and do not become defaults. The optional 216-case suite is human-initiated interactive work only; agents must never launch it.
-
-## Benchmark required
-
-Matched complete requests, prefill, populated decode and memory, plus cold compiler/load/repack costs and diagnostic kernels. Report per-row losses and uncertainty; local speed alone cannot justify promotion.
-
-## Acceptance criteria
-
-- [ ] Each executed variant addresses a measured gap and has explicit policy/layout/calibration identity.
-- [ ] Kernel support, incremental memory and cold costs are demonstrated for every proposed representation.
-- [ ] Promoted variants pass the applicable 54-case quality/context/continuation gates.
-- [ ] Whole-request evidence supports each keep/change decision and reports individual regressions.
-- [ ] The accepted representation or evidence-backed keep decision is recorded with rejected variants and remaining gaps.
-
-## Architecture blocker rule
-
-A rejected candidate is a recorded result; use the eligible fallback within OVERALL-01 without relaxing acceptance criteria. Missing required exit evidence prevents completion. A conflict outside the reopened decisions requires the full architecture-blocker report defined in the ledger; obsolete Q4-only or experiment-order restrictions are not blockers.
+Complete when real gate/up weights run in both phases with GPU packing/reuse,
+independent checks and the development screen pass, and conversion-inclusive
+request/decode results and memory support handing the candidate to TASK-030.
+If native integration fails the screen, capacity or request-cost decision,
+record the observed failure, retain the tested Q4_K/Q8 production fallback and
+hand TASK-028's attention improvement to final validation. An implemented,
+checked rejection is a useful completed milestone; uncertainty alone does not
+justify skipping integration. Do not expand into sensitive families, require
+both FP4 formats, or begin a new precision research program.
 
 ## Completion report
 
-### Result
-
-TODO — no execution or acceptance evidence recorded for this revised task.
-
-### Changes made
-
-Record the concrete changes or measured keep decision, including decision and artifact/layout identities.
-
-### Tests run
-
-Record exact commands, outcomes, reference tolerances, covered boundaries and
-limits. Do not infer runtime correctness from documentation checks.
-
-### Benchmark results
-
-Record raw evidence paths, timing boundaries, quality context, memory and
-uncertainty, or the reason a benchmark is not required by this task.
-
-### Architecture blocker
-
-Record none or the complete ledger-defined blocker report.
-
-### Follow-up observations
-
-Record remaining coverage and performance gaps and their downstream owners.
+TODO — no implementation or acceptance evidence recorded. Record exact
+commands, observed results, selected representation/activation/dispatch
+identities, memory, fallback disposition and remaining limitations.

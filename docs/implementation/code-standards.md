@@ -1,6 +1,6 @@
 # Code standards
 
-This document is normative for implementation work. [Architecture V0](../architecture/architecture-v0.md) defines retained model semantics and controls, while the [technology baseline](technology-baseline.md) defines the reference platform, toolchain, build, and container environment. OVERALL-01, FP4-01 and [the task ledger](task_ledger.md) define candidate architecture authority and implementation order for TASK-018–032.
+This document is normative for implementation work. [Architecture V0](../architecture/architecture-v0.md) defines retained model semantics and controls, while the [technology baseline](technology-baseline.md) defines the reference platform, toolchain, build, and container environment. OVERALL-01, FP4-01, DELIVERY-01 and [the task ledger](task_ledger.md) define candidate architecture authority and implementation order for TASK-018–032.
 
 # Design philosophy
 
@@ -206,7 +206,7 @@ Future implementation task specifications must treat:
 - [Technology baseline](technology-baseline.md) as authority for platform, toolchain, build, and container assumptions;
 - this code standard as authority for C++/CUDA implementation conventions.
 
-If task instructions conflict with platform, toolchain, or code-boundary requirements in these documents, report the conflict. For candidate architecture and task ownership in TASK-018–032, follow OVERALL-01, FP4-01 and their revised ledger contracts; historical implementation choices do not override them.
+If task instructions conflict with platform, toolchain, or code-boundary requirements in these documents, report the conflict. For candidate architecture and task ownership in TASK-018–032, follow OVERALL-01, FP4-01, DELIVERY-01 and their revised ledger contracts; historical implementation choices do not override them.
 # Boundary, lifetime, and evidence contracts
 
 - Validate at the public bind/launch boundary: device and memory space,

@@ -9,6 +9,109 @@ the existing V0 implementation. From TASK-018 onward, select quantization,
 physical weight layout, and execution kernels together, using measured SM120
 capabilities before committing to the production representation.
 
+## Delivery amendment — DELIVERY-01 (2026-09-26)
+
+By user instruction in `astraprompt.md`, this amendment replaces the remaining
+TASK-028–032 contracts and supersedes OVERALL-01/FP4-01 where their future
+ordering, experiments or validation cadence conflict. TASK-001–027 records and
+results remain unchanged. No future implementation is complete. The executable
+sequence is **028 → 029 → 030**; 031/032 are retired cross-reference stubs.
+
+### Evidence and recommendation
+
+The accepted Q4_K MLP / Q8 attention, GDN and head engine remains the rollback
+control. [TASK-027](tasks/TASK-027.md#benchmark-results) and its compact
+`.cache/evaluation/qw38-language-v2/task027-support/single-run/{summary,profiles}.json`
+already establish the priorities:
+
+- At 32768 tokens prefill takes 208.46 s versus 12.37 s for llama.cpp;
+  the attention scan alone consumes 177.87 s of GPU time.
+- At populated decode 4096, projections consume 3.19 s of 4.28 s host time;
+  at 32768, projections and attention consume 3.24 s and 2.14 s respectively.
+- Capacity fits: tracked allocation peak is 24,196,583,696 bytes at 32K;
+  recorded free memory is 8,317,239,296 bytes, above the 2 GiB reserve.
+  These are different measurements, not additive memory categories.
+
+These instrumented, first-use-inclusive observations justify implementing a
+better attention schedule now. `cuda/attention.cu` currently uses one query
+row per block, 32-key staging and scalar QK/PV loops; its slower four-row
+control is not evidence against a substantially better tiled algorithm.
+TASK-028 replaces the prefill scan with multi-query reuse and cooperative
+computation and improves the serial dot products in segmented decode attention.
+
+TASK-029 integrates native NVFP4 for MLP gate/up, including compiler, GPU
+activation packing, both phase consumers and useful local fusion.
+[TASK-020 screening](task020-selection.md) found gate/up-only NVFP4 NLL
+change +0.000113 versus +0.025601 for dense NVFP4 and +0.034897 for dense
+MXFP4 against its controlled GGUF reference. This is a defensible hypothesis,
+not QW38 W4A4 acceptance. TASK-019 demonstrated native SM120 operation;
+its CPU activation packer is not production code. Retain Q4_K down and Q8
+sensitive families/head. TASK-030 validates the combined candidate and records
+a promote/retain-control decision with explicit remaining performance gaps.
+
+### Calculation chain and storage
+
+Compile weights from pinned BF16 directly into versioned consumer layouts;
+upload once and retain one device view per tensor. Native NVFP4 gate/up share
+that view between prefill GEMM and decode GEMV. No request-time full-weight
+repack, whole-model BF16 cache or duplicate fallback weights: rollback loads
+the separate accepted artifact. Other prefill families retain bounded unpack
+plus cuBLAS. TASK-023 already implements that path and bounded head readout.
+
+FP32 residual → RMS with existing BF16 rounding → GPU per-row NVFP4 codes
+and scales reused by gate/up → FP32 projection accumulators and SwiGLU →
+BF16 intermediate → existing Q4_K down → FP32 residual add. Native GEMM
+serves prefill; M=1 uses BF16-activation GEMV reading the same FP4 weights.
+Fuse RMS/packing where straightforward and feed paired outputs to one SwiGLU
+epilogue. Do not duplicate RMS per output tile or fuse the whole layer.
+Attention retains QK norm/RoPE, BF16 KV append, causal online softmax, gating
+and the output-residual contract.
+
+Weights, BF16 KV/history and FP32 recurrent state persist in device memory.
+Reusable bounded device workspace holds normalized/packed operands, scales,
+SwiGLU and split-attention partials until their last consumer. Registers/shared
+memory hold only local tiles, reductions and accumulators inside a kernel;
+they cannot survive arbitrary launches. Do not assume explicit cache pinning.
+Keep current 256-token chunks initially, final-position generation logits
+and bounded requested-row evaluation logits. Count padding, scales, library
+workspace, any extra view and transient load allocations against the 2 GiB
+reserve. Keep FP32 accumulation, residual, softmax/reductions and recurrence,
+BF16 KV/history, current state ABI, model/tokenizer identity, causality,
+complete-token commit, poison/reset/restore and primary-language scope.
+
+### Validation and completion
+
+TASK-028/029 are development integration milestones, not quality promotion.
+Run affected correctness/numerical/session checks once and the small workload
+set specified in each task. Development may proceed before full EVAL-01;
+observed correctness/capacity failures require repair or rollback. Missing
+proof of optimality is not a blocker. Reuse TASK-027 and authenticated unchanged
+references. Intermediate comparator reruns, complete context sweeps, repeated
+instruction audits, ablation matrices, tile searches and exhaustive stage
+attribution are not required. Add a focused measurement only for an immediate
+implementation decision or a specific failure.
+
+TASK-030 owns final core-54 (15 P100, 15 C92, 12 L12 and 12 R-512/R-4096),
+all selected P100 adjudications, the sole `R-32768-s0-d0.1` extension,
+required schedule/dispatch/session replay, 32K capacity and all PERF-01 rows.
+Thresholds, provenance and quality uncertainty/grading rules remain unchanged;
+quality resampling of saved case outputs is not repeated engine execution.
+Missing reviews or invalid, failed or inconclusive quality evidence blocks
+promotion. The optional 216-case suite stays human-initiated interactive work
+only, never required or launched by an agent.
+
+Performance uses one execution per selected workload/engine, zero warmups,
+no repetitions, medians, p99, bootstrap or confidence intervals. Reuse request
+prompt phases for prefill/TTFT; label instrumentation and first-use costs.
+Record commands, observations and source/binary/artifact/policy/input identities
+and hardware context in existing reports, without a new evidence framework.
+
+Deferred without prerequisite experiments: MXFP4/FP6/FP8 comparisons,
+sensitive-family/head requantization, extra persistent views, state precision
+or layout changes, GDN algorithm reopening, CUDA graphs and broad fusion or
+autotuning. Reconsider only for a concrete remaining bottleneck or failure;
+this plan does not silently add a fourth task or promise a percentage of peak.
+
 ## Replan authority — OVERALL-01 (2026-09-24)
 
 The user explicitly requested reconsideration of TASK-018 onward, including
@@ -18,7 +121,7 @@ its representation. NVFP4 is the leading candidate to investigate, not an
 accepted quality or performance result.
 
 **This ledger's revised task rows and task contracts below are authoritative
-for TASK-018–032.** The corresponding `tasks/TASK-018.md` through `TASK-032.md`
+for TASK-018–027; DELIVERY-01 governs the remaining tasks.** The corresponding `tasks/TASK-018.md` through `TASK-032.md`
 now expand these contracts with matching titles, dependencies, scopes and
 acceptance criteria. Their former specifications are superseded; the earlier
 TASK-018 report is explicitly preserved as historical evidence, valid only
@@ -33,8 +136,8 @@ operand part of P-02 (activation quantization), A-01/L-01 (weight views/packing)
 and the associated M-01/T-01–03 schedules and materialization choices. It
 permits early GDN prefill algorithm comparison under G-02. FP32 residuals,
 accumulation/reductions and recurrent arithmetic, BF16 KV/history, and FP32
-GDN state remain initial controls; TASK-031 may separately test state precision
-and ownership. Model equations, tensor identities, tokenizer, causal behavior,
+GDN state remain initial controls; DELIVERY-01 defers state precision
+and ownership experiments. Model equations, tensor identities, tokenizer, causal behavior,
 and primary-language scope remain binding. MTP execution and vision are not
 added by this amendment.
 
@@ -44,7 +147,7 @@ all experiments are superseded by the migration table below. Candidate
 screening may precede routine core quality acceptance; production promotion may not.
 
 The [54-case core amendment](../architecture/evaluation-policy-core-54.md)
-governs routine TASK-022–032 evaluation: 15 frozen P100, 15 frozen C92, all
+governs completed TASK-022/026 and final TASK-030 routine evaluation: 15 frozen P100, 15 frozen C92, all
 12 L12 and all 12 R-512/R-4096 cases. TASK-026 and later applicable gates
 retain the six R-32768 fixtures, while running only the fixed
 `R-32768-s0-d0.1` case. The 216-case suite is optional, strictly
@@ -55,9 +158,9 @@ historical and is not relabeled as a 54-case result.
 
 ## Normative authority
 
-- OVERALL-01 and the revised contracts in this ledger for TASK-018 onward
+- DELIVERY-01 for remaining tasks; OVERALL-01 for completed TASK-018–027 contracts
 - `docs/architecture/architecture-v0.md` for retained semantics and controls;
-  reopened decisions are governed by OVERALL-01
+  reopened decisions are governed by OVERALL-01/DELIVERY-01
 - `docs/architecture/evaluation-policy-v0.md` — EVAL-01 / PERF-01
 - `docs/architecture/evaluation-policy-core-54.md` — routine coverage and
   manual-only full-suite execution
@@ -78,23 +181,28 @@ Correctness and quality criteria remain unchanged; execute applicable checks onc
 
 - Execute tasks sequentially; accept every listed prerequisite before starting a task.
 - Completion requires the revised ledger contract and its reconciled task file.
-  TASK-001–017 completion records are historical and unchanged.
-- A conflict outside OVERALL-01's reopened decisions stops the sequence with
+  TASK-001–027 completion records are historical and unchanged.
+- A conflict outside OVERALL-01/DELIVERY-01's authorized decisions stops the sequence with
   `ARCHITECTURE_BLOCKER`; the obsolete Q4-only restrictions do not block the
   investigations explicitly authorized here.
 - Every blocker report contains: `Decision ID`, `Attempted implementation`, `Observed problem`, `Evidence`, `Why this is architectural rather than tuning`, `Smallest plausible alternative`, and `Affected downstream tasks`.
 - TASK-018–020 establish controls, feasibility, and a provisional candidate;
-  TASK-021–026 implement and validate it; TASK-027–032 measure, tune, and decide
-  promotion. Keep unrelated variables fixed in comparisons. Joint format/kernel
-  choices are allowed, with weight-only and activation-only error ablations.
+  TASK-021–026 implement and validate it; TASK-027 records the baseline;
+  TASK-028/029 integrate improvements and TASK-030 decides promotion. Reuse
+  existing ablations; new ablations need a specific diagnostic question.
 - Keep benchmarks separate from correctness tests. Preserve exact commands, results, artifact/binary identities, and hardware context in each completion report.
-- Status values are `TODO`, `IN_PROGRESS`, `BLOCKED`, and `DONE`. TASK-018 is
-  `DONE`; downstream contracts remain `TODO`.
+- Executable status values are `TODO`, `IN_PROGRESS`, `BLOCKED`, and `DONE`.
+  TASK-001–027 are `DONE`; TASK-028–030 remain `TODO`. `SUPERSEDED` denotes
+  retired TASK-031/032 cross-references, never implementation completion.
 - A rejected candidate is a useful experiment result. Record the reason and
   select the next eligible candidate without weakening acceptance criteria.
   Missing required evidence cannot be described as a pass.
 
-## Overall strategy and decision rules
+## Prior strategy and decision rules (TASK-018–027 evidence)
+
+These sections preserve the completed feasibility/selection rationale. Their
+broad experiment envelopes are not recurring requirements for TASK-028 onward;
+DELIVERY-01 and the three remaining contracts define that work.
 
 ### Compute-compatible quantization first
 
@@ -221,9 +329,10 @@ an achieved performance target.
   complete candidate quality evidence including the 32768 extension.
 - **M9 — Whole-request measurement:** reproducible matched decode, prefill,
   request, memory, and kernel baseline with explicit gaps.
-- **M10 — Measured refinement and promotion:** targeted precision, scheduling,
-  fusion and state experiments followed by a consolidated quality/performance
-  decision and reconciled architecture documentation.
+- **M10 — Fast attention and native projection integration:** improved long-context
+  attention, integrated NVFP4 gate/up or checked fallback, development evidence.
+- **M11 — Validated delivery candidate:** consolidated quality, replay, capacity
+  and matched performance decision with reconciled documentation.
 
 ## Task ledger
 
@@ -256,11 +365,11 @@ an achieved performance target.
 | TASK-025 | Causal attention prefill and layer integration | M8 | TASK-024 | Tiled attention, GQA/cache/position correctness and validated complete attention layer | DONE |
 | TASK-026 | Full-model prefill, handoff and quality gate | M8 | TASK-025 | End-to-end candidate, core suite plus fixed 32768 retrieval, chunk/dispatch boundary validation | DONE |
 | TASK-027 | Matched whole-request performance baseline | M9 | TASK-026 | PERF-01 comparison, cold/warm costs, peak memory and bottleneck-ranked gap report | DONE |
-| TASK-028 | Conversion-minimized native FP4 path | M10 | TASK-027 | Real-family NVFP4/MXFP4 path with GPU activation conversion, native prefill/decode comparison, quality, capacity and complete-request evidence | TODO |
-| TASK-029 | Precision and representation refinement | M10 | TASK-028 | Targeted head/family/activation/view tradeoffs with complete quality and request evidence | TODO |
-| TASK-030 | Scheduling, dispatch and fusion refinement | M10 | TASK-029 | Measured chunk/crossover, normalization/quantization/epilogue and launch-overhead decisions | TODO |
-| TASK-031 | State and long-context bottleneck refinement | M10 | TASK-030 | Evidence-led GDN ownership/state-precision and attention-traffic decisions | TODO |
-| TASK-032 | Consolidated validation and architecture promotion | M10 | TASK-031 | Final reproducible artifact/runtime, quality/performance decision, reconciled docs and remaining gaps | TODO |
+| TASK-028 | Reuse-oriented long-context attention | M10 | TASK-027 | Multi-query prefill reuse and cooperative segmented decode with bounded memory | TODO |
+| TASK-029 | Integrated native NVFP4 MLP gate/up | M10 | TASK-028 | Compiler/layout, GPU packing/reuse, GEMM/GEMV and local fusion; checked fallback allowed | TODO |
+| TASK-030 | Combined validation and delivery decision | M11 | TASK-029 | Core-54, fixed long case, replay, capacity, matched performance and promotion decision | TODO |
+| TASK-031 | Retired state-refinement task | — | — | Attention moved to TASK-028; state experiments deferred | SUPERSEDED |
+| TASK-032 | Retired final-promotion task | — | — | Final obligations merged into TASK-030 | SUPERSEDED |
 
 TASK-024 completed on 2026-09-25. The selected ordered FP32 state-resident
 recurrence uses 64-token intervals, supported by complete-layer measurements;
@@ -516,77 +625,37 @@ individual losses. Missing parity does not block refinement; missing required
 comparison evidence does. No synthetic throughput or old slow prompt loop may
 stand in for these production measurements.
 
-### TASK-028 — Conversion-minimized native FP4 path
+### TASK-028 — Reuse-oriented long-context attention
 
-Build and measure a real native NVFP4/MXFP4 projection path after the matched
-TASK-027 baseline. Prepare resident FP4 weights once from the pinned BF16
-source; generate and reuse activation codes/scales on the GPU, avoiding CPU
-packing and hot-path weight repacking. Include conversion, launches, native
-MMA, epilogues and any same-weight decode GEMV in both phases. Compare complete
-requests, quality, peak memory and cold costs with the accepted Q4_K/Q8
-control. Use TASK-020 family error evidence to bound the experiment, but test
-at least one actual model family rather than relying on synthetic kernels.
+Depends on TASK-027. Implement multi-query tiled prefill with native BF16 QK
+and FP32 online softmax/PV; improve segmented decode's serial dot products.
+Keep BF16 KV, causal/cache/session contracts and bounded workspace. One affected
+numerical/session check set, request-32768 and decode-32768 establish the
+production path and observed improvement. See [the task](tasks/TASK-028.md)
+for defaults, completion and targeted fallback.
 
-**Exit:** native instruction, numerical and conversion-inclusive evidence plus
-a quality/capacity/performance keep/change decision. A failed FP4 experiment is
-a recorded result; native kernel speed alone does not promote a new format.
+### TASK-029 — Integrated native NVFP4 MLP gate/up
 
-### TASK-029 — Precision and representation refinement
+Depends on TASK-028. Compile consumer-compatible gate/up weights once, pack
+activations on GPU, reuse across gate/up, integrate native prefill and same-view
+GEMV decode plus useful RMS/packing/SwiGLU fusion. Keep down/sensitive families
+and state precision. One focused correctness/development screen and
+request-4096/decode-4096 support the candidate or a checked Q4_K/Q8 fallback.
+See [the task](tasks/TASK-029.md); final quality is not claimed here.
 
-Use TASK-027 gaps and the TASK-028 FP4 result to revisit only consequential choices: per-family precision,
-head precision, activation scaling, or selected additional packed views.
-Compare alternatives using identical workloads and calibration separation;
-account for added code/layout complexity, memory and cold-load costs. Expand
-to FP6/FP8 or mixed inputs only with demonstrated SM120 support and a concrete
-quality/performance reason. Keep unrelated state and schedules fixed.
+### TASK-030 — Combined validation and delivery decision
 
-**Exit:** keep/change decisions backed by complete applicable 54-case EVAL-01 revalidation
-and whole-request measurements for the promoted variant. A documented decision
-to keep the initial representation is valid; exhaustive format combinations
-are not required. Unsuccessful variants remain evidence, not default paths.
+Depends on TASK-029, including its fallback outcome. Freeze the combined
+candidate; retain core-54, selected P100 reviews, fixed long-context case,
+replay, capacity and all PERF-01 rows once, with valid comparator reuse.
+Document promotion or retention and all unmet targets. Missing acceptance
+evidence prevents completion. See [the task](tasks/TASK-030.md).
 
-### TASK-030 — Scheduling, dispatch and fusion refinement
+### Retired TASK-031/032
 
-Address measured chunk-size, small-M crossover, activation reuse, normalization
-plus quantization, epilogue, launch and synchronization costs. Consider CUDA
-graphs only if launch overhead warrants them and stable-address/state/error
-contracts remain valid. Include redundant normalization, occupancy, scale
-generation and workspace costs when deciding fusion. Keep weights fixed.
-
-**Exit:** justified scheduling/fusion decisions and verified full-request gains
-or a measured keep decision. Rerun affected numerical/continuation gates and
-the applicable 54-case behavioral gates for arithmetic changes; replay covers graph/dispatch
-boundaries and failure recovery. Optimize both prefill and populated decode.
-
-### TASK-031 — State and long-context bottleneck refinement
-
-Use the post-refinement profile to decide whether GDN layout/ownership,
-persistent-state traffic/precision or attention KV rereads warrant work.
-The 144 MiB FP32 GDN state is small beside weights; narrowing it is not an
-automatic priority. If testing BF16 persistent state, retain FP32 recurrence
-arithmetic, change only storage, and require long-horizon quality and complete
-snapshot/continuation evidence. Version any changed state ABI. Preserve BF16
-KV/history in this sequence.
-
-**Exit:** isolated keep/change decisions with populated long-context decode,
-prefill/request, quality and memory evidence. If no material state bottleneck
-exists, document retention of current precision/layout instead of undertaking
-the former obligatory experiments.
-
-### TASK-032 — Consolidated validation and architecture promotion
-
-Freeze the final compiler/calibration/artifact/runtime/toolchain/dispatch
-identities and rerun the 54-case EVAL-01 core plus long-context extension and all PERF-01
-rows on the combined candidate. Individually passing experiments do not imply
-their combination passes. Publish final precision/layout/scale/dispatch and
-memory policies, supported contexts, reproducible commands, rollback control,
-and remaining performance or coverage limits.
-
-**Exit:** reconciled architecture/format/task documents and a supported
-promote/retain-control decision. A quality failure prevents promotion. If
-quality passes but performance targets remain unmet or uncertain, report that
-explicitly; completing the experiment sequence does not assert speed parity
-or global optimality. No further experiment is silently added to this ledger.
+These are superseded cross-references, not pending milestones or dependencies.
+Attention moves to TASK-028, state experiments are deferred, and all applicable
+final validation moves to TASK-030. No future implementation is marked complete.
 
 ## Migration of former tasks and acceptance obligations
 
@@ -599,11 +668,11 @@ or global optimality. No further experiment is silently added to this ledger.
 | TASK-021 attention | TASK-025 |
 | TASK-022 production-prefill core rerun, handoff and 32768 extension | TASK-026 |
 | TASK-023 matched performance baseline | TASK-027 |
-| TASK-024 / EXP-A weights, TASK-025 / EXP-B head, TASK-028 / EXP-E activation transport | TASK-019–022 initial decisions; TASK-028 native FP4 experiment and TASK-029 measured refinement |
-| TASK-030 / EXP-G extra weight view | TASK-019–021 capacity/layout selection; TASK-029 if measurements justify refinement |
-| TASK-029 / EXP-F normalization/projection fusion | TASK-023 integration and TASK-030 measured refinement |
-| TASK-026 / EXP-C state precision, TASK-027 / EXP-D ownership | TASK-031, conditional on measured importance |
-| Final combined quality/performance reassessment | TASK-032 |
+| TASK-024 / EXP-A weights, TASK-025 / EXP-B head, TASK-028 / EXP-E activation transport | TASK-019–022 historical decisions; TASK-029 integrates gate/up NVFP4; other precision changes deferred |
+| TASK-030 / EXP-G extra weight view | TASK-019–021 historical selection; one resident view retained, extra views deferred |
+| TASK-029 / EXP-F normalization/projection fusion | TASK-023 historical integration; useful producer/consumer fusion in TASK-029 |
+| TASK-026 / EXP-C state precision, TASK-027 / EXP-D ownership | Deferred by DELIVERY-01; current state precision/ownership retained |
+| Final combined quality/performance reassessment | TASK-030; includes all applicable former TASK-028–032 promotion obligations |
 
 ## Critical path
 
@@ -620,7 +689,7 @@ TASK-001 → 002 → 003 → 004 → 005 → 006
                                               ↓
                                       023 → 024 → 025 → 026  (prefill and complete quality)
                                                         ↓
-                                      027 → 028 → 029 → 030 → 031 → 032  (measure, test FP4, refine, decide)
+                                      027 (complete baseline) → 028 (attention) → 029 (native gate/up) → 030 (validate/deliver)
 ```
 
 ## Architecture blocker log
@@ -677,6 +746,7 @@ and gate required fixed-key answers. See
 | EVAL-01 / PERF-01 | 2026-09-23 | Historical V0 validation policy and task ownership | The original decision selected DS4-derived language fixtures/scoring, staged context coverage, and llama.cpp Q4_K_M versus V0 as the former TASK-018 behavior pair. OVERALL-01 preserves the quality criteria, remaps candidate acceptance to TASK-022/026, and matched performance to TASK-027. See [evaluation policy](../architecture/evaluation-policy-v0.md). |
 | OVERALL-01 | 2026-09-24 | Q-01/Q-02, projection operands in P-02, A-01/L-01, related M-01/T-01–03, GDN prefill algorithm under G-02; S-01/S-02 originally assigned to TASK-030 | User-directed replan originally covered TASK-018–031 with compute-compatible quantization selection before production commitment, native NVFP4/MXFP4 feasibility, calibration and family policy, both execution phases, full quality gates and whole-request measurement. This ledger supersedes conflicting old task scopes/order; TASK-018 reconciles the other documents. Evidence and quality/performance standards are retained under the migration table. |
 | FP4-01 | 2026-09-25 | Q-01/Q-02, projection operands in P-02, A-01/L-01 | User-directed TASK-028 adds an end-to-end, conversion-minimized native NVFP4/MXFP4 experiment after the matched baseline. Original future TASK-028–031 shift to TASK-029–032, with the final promotion decision still last. |
+| DELIVERY-01 | 2026-09-26 | Remaining TASK-028–032 ordering, representation/dataflow and validation cadence | Attention first, integrated NVFP4 gate/up second, consolidated promotion in TASK-030; TASK-031/032 retired without completion. Retains historical evidence, semantics and quality thresholds; removes mandatory format contests and repeated full gates. |
 
 ## Repair index
 

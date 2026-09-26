@@ -662,8 +662,8 @@ TASK-027 must deliver the complete matched baseline and gap report even if the
 candidate is slower. **Missing comparison evidence blocks TASK-027; missing speed parity
 does not block the subsequent authorized optimization experiments.** Otherwise
 requiring a faster baseline would prevent the work intended to improve it.
-Carry the measured gaps through TASK-028–032 and reassess after the final
-experiment. Experiment completion and achievement of the performance target
+Carry the measured gaps through TASK-028/029 and reassess in final
+TASK-030 under DELIVERY-01; TASK-031/032 are retired cross-references. Experiment completion and achievement of the performance target
 are separate statuses; an unmet target stays explicitly unmet. A speed gap
 never authorizes a quality relaxation or an experiment out of order.
 
@@ -683,6 +683,12 @@ The implementation sequence below applies to the selected candidate under
 OVERALL-01. Existing TASK-018 harnesses and partial V0 evidence remain
 development controls. TASK-022/026 own quality acceptance and TASK-027 owns
 matched PERF-01 execution; the acceptance standards below remain unchanged.
+DELIVERY-01 assigns final combined quality, replay, capacity and all PERF-01
+rows to TASK-030, after focused development checks in TASK-028/029. Preserve
+completed evidence and reuse authenticated matching comparator rows; refresh
+only rows whose inputs, identities, hardware/settings or timing boundaries
+no longer match, once per workload/engine. Full routine quality acceptance is
+required for final promotion, not after each development change.
 
 Deliver, in this order:
 

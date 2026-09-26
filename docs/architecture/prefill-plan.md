@@ -4,7 +4,9 @@
 > is a semantic control and comparison reference, not a production schedule or
 > fixed chunk/tile commitment. TASK-019 measures candidate projection paths;
 > TASK-023–026 select, implement, and validate production prefill and handoff.
-> The ledger permits an early measured GDN recurrence comparison under G-02.
+> TASK-028/029 now improve attention and gate/up projections under DELIVERY-01;
+> TASK-030 owns combined validation. Existing GDN recurrence stays fixed.
+> Earlier GDN algorithm comparisons remain TASK-024 historical evidence.
 > Former TASK-15/17/18 sequencing below is historical provenance and does not
 > constrain the revised sequence.
 
