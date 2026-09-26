@@ -3,6 +3,12 @@
 The actual bounded production schedules and TASK-030 retention decision are
 documented in the [runtime delivery guide](../implementation/task030-delivery.md).
 
+Future TASK-033–036 follow [FAST-01](../implementation/post-task030-plan.md):
+local tensor-core PV, compact projection consumers and prepared FP8 shared
+operands, with final validation in TASK-036. Those explicit precision/layout
+experiments supersede conflicting historical staging defaults below; the
+TASK-030 candidate remains unpromoted. GDN recurrence and state ABI stay fixed.
+
 > **OVERALL-01 authority:** This Phase 1 hardware-independent serial schedule
 > is a semantic control and comparison reference, not a production schedule or
 > fixed chunk/tile commitment. TASK-019 measures candidate projection paths;

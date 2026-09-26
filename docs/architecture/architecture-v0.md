@@ -1,5 +1,16 @@
 # Architecture thesis
 
+**FAST-01 (2026-09-26), post-TASK-030 authority:** the
+[new plan](../implementation/post-task030-plan.md) and
+[ledger](../implementation/task_ledger.md#fast-engine-amendment--fast-01-2026-09-26)
+govern future TASK-033–036. They explicitly reopen local BF16 attention-P
+operands, prepared groupwise FP8 projection weights/activations and compact
+consumer layouts/fusion under Q-01/Q-02, P-02, A-01/L-01 and M-01/T-01–03.
+Below, earlier V0/OVERALL-01/DELIVERY-01 choices remain historical controls
+where superseded. FP32 residual/reduction/accumulation/recurrence and BF16
+KV/history remain defaults; model/session semantics and quality gates are
+unchanged. TASK-030 retained control, and TASK-036 owns the next final decision.
+
 - Build a single-GPU, single-sequence Qwen3.8-27B language inference engine, compiling the BF16 Transformers checkpoint in `.cache/authorities/qwen3.8-27b-transformers` offline. Preserve MTP weights and semantic descriptors, but enable its execution only after its unresolved forward semantics are established.
 - Emit a versioned, **CUDA-oriented custom artifact**, with one physical weight view shared by decode and prefill. Keep equations, tensor identities, and semantic graph contracts independent of CUDA; specialize packed bytes and execution plans.
 - Use three weight-storage classes: symmetric **INT4/G64** for large projections, symmetric **INT8/G32** for `lm_head`, and **BF16** for embeddings, norms, convolution weights, and GDN's small gate/time parameters. Start with deterministic absmax quantization, without outlier sidecars.

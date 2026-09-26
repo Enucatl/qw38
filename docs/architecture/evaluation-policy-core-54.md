@@ -61,3 +61,15 @@ performance runs. Missing, failed or inconclusive quality evidence and
 unresolved reviews still prevent promotion. Reuse authenticated matching
 comparator evidence with explicit identities; never relabel historical
 candidate outputs as the new candidate's validation.
+
+## FAST-01 timing amendment — 2026-09-26
+
+TASK-030's RETAIN_CONTROL decision and all completed evidence remain unchanged.
+Under the [post-milestone plan](../implementation/post-task030-plan.md),
+TASK-033–035 use short affected numerical/session and development checks;
+TASK-036 owns the next frozen candidate's complete core-54, all selected P100
+reviews, fixed 32K case and replay. The thresholds, frozen selection, grading,
+uncertainty, provenance and manual-only full-216 rules above remain binding.
+Early diagnosis of the lost C92 case is not calibration or acceptance evidence
+for the complete core. Repeating deterministic cases cannot waive the point-loss
+gate. Missing, failed or inconclusive evidence still blocks promotion.
