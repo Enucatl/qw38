@@ -1078,9 +1078,16 @@ def main() -> int:
         0x0401: "QW38 V0",
         0x0402: "QW38 CandidateV1",
         0x0403: "QW38 CandidateV2",
+        0x0405: "QW38 FP8MixerV1",
     }
     candidate_name = candidate_names[candidate_policy]
-    task_name = "TASK-018" if candidate_policy == 0x0401 else "TASK-022"
+    task_name = (
+        "TASK-036"
+        if candidate_policy == 0x0405
+        else "TASK-018"
+        if candidate_policy == 0x0401
+        else "TASK-022"
+    )
     text_outputs = [
         {"id": row["id"], "llama": row["llama_text_file"], "v0": row["v0_text_file"]}
         for row in per_case
@@ -1093,7 +1100,7 @@ def main() -> int:
         "schedule": {
             "core_cases": f"{len(cases)} frozen {scope} P100/C92/L12/R512/R4096 cases once; reset at document boundaries",
             "target_alignment": "same frozen Q4_K_M teacher IDs for P100/C92; frozen fixed keys for L12/R",
-            "retrieval_32768": "frozen now; execution assigned to TASK-026",
+            "retrieval_32768": "fixed 32768 extension reported separately",
         },
         "precision": {
             "teacher_probability": "llama.cpp REST top-20 selected target logprobs only",
@@ -1239,7 +1246,7 @@ def main() -> int:
         f"Status: **{overall_status}**.\n\n"
         f"Mode: `language-only`; MTP enabled: `false`. Comparator: Q4_K_M llama.cpp. Candidate: {candidate_name}. "
         f"Schedule: all {len(cases)} {scope} cases once, using frozen teacher IDs for P100/C92 and fixed keys for L12/R; "
-        "R32768 execution is assigned to TASK-026. Precision: teacher top-20 selected target logprobs; candidate FP32 full-vocabulary logits.\n\n"
+        "The fixed R32768 extension is reported separately. Precision: teacher top-20 selected target logprobs; candidate FP32 full-vocabulary logits.\n\n"
         f"Core coverage: {len(per_case)}/{len(cases)}. Teacher-forced NLL: {nll_total[2]} aligned P100/C92 tokens; "
         f"Candidate minus llama = {nll_point:.6f} nats/token. Full-vocabulary KL is unavailable.\n\n"
         f"C92: llama {c92_llama}/{len(c92_rows)}, candidate {c92_v0}/{len(c92_rows)}; R/L fixed-key grades and per-case details are in `cases.jsonl`.\n\n"

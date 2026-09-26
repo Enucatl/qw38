@@ -2,7 +2,7 @@
 
 ## Status
 
-TODO
+DONE
 
 ## Milestone and dependency
 
@@ -66,3 +66,71 @@ delivery with speed gaps; it must explicitly state that the fast-engine goal
 remains unmet. Missing required evidence/reviews leaves the task incomplete.
 If gaps remain, rank the measured costs and name the next smallest justified
 change; do not automatically launch another broad experiment sequence.
+
+## Completion Report
+
+**Decision: RETAIN_CONTROL.** The FP8 candidate is not promoted, and the fast-engine
+goal remains unmet. Production remains the TASK-026/027 Q4_K/Q8 engine at
+`d2f02e2`; TASK-030's historical decision is unchanged. The frozen candidate
+source is `aacdffe72b1a72f62afd8001784ad78d03025f5b`. The full delivery record,
+including compiler/artifact identities, hardware, precision and lifetime
+contracts, all nine latency rows and six memory rows, cold costs, bottlenecks,
+reproduction and rollback instructions, is in [TASK-036 delivery](../task036-delivery.md).
+
+Core-54 completed 54/54. Aggregate NLL delta was
+`+0.0036741931935621993` over 701 teacher targets; aggregate and every slice
+passed their limits. C92 scored 7/15 versus 8/15 and is INCONCLUSIVE, with loss
+interval `[0, 0.20]`; L12 scored 12/12, both R-512 and R-4096 scored 6/6, and the
+fixed 32K case scored 1/1 in both arms. All 15 P100 outputs received reviews,
+but the P100 gate is FAIL because candidate-only case_077 contains a factual
+residency-accounting error. Eleven changed outputs were reviewed by GPT-6
+Codex, an AI reviewer; four unchanged candidate and fifteen comparator reviews
+were reused only with matching text hashes and prompts. All 15 outputs are
+bound to their reviews. All replay checkpoints and seven partitions passed,
+as did full-model integration 1/1 in 14.76 seconds. The 97 retained TASK-035
+source/evidence identities matched. Capacity preserved 32,896 slots and
+8,782,807,040 bytes free; tracked peak allocation and sampled resident growth
+remain distinct measurements. C92 uncertainty and the P100 failure prevent
+promotion.
+
+The main-thread GPT-6 Codex agent implemented the candidate and collected its
+evidence. GPT-6 Astra, at high reasoning, independently reviewed the
+implementation and evidence and returned PASS on pass 1 of 2 permitted review passes, with no findings,
+evidence gaps, or requests. The main thread confirmed the reviewed
+implementation and evidence hashes remained unchanged. GPT-6 Luna completed
+this documentation and delivery bookkeeping.
+
+Acceptance commands and results, from the repository root:
+
+1. `bash .cache/evaluation/qw38-language-v2/task036-support/validation.sh` —
+   PASS: pinned Release build, language-model integration, 54/54 core cases,
+   default decode replay, seven partition replays, and one long execution.
+2. `bash .cache/evaluation/qw38-language-v2/task036-support/score-and-measure.sh` —
+   exit 2: long scoring passed, then core reporting was INVALID with
+   `KeyError(1029)`; performance had not launched. The attempt is retained as
+   `scoring-attempt1-invalid.json`.
+3. `bash .cache/evaluation/qw38-language-v2/task036-support/resume-scoring.sh` —
+   exit 0: corrected candidate-label scoring and four focused scoring tests
+   passed in 0.60 seconds; the paired quality report failed its quality gates
+   as described above. All six captures completed and analysis/memory ratios
+   were generated.
+4. `bash .cache/evaluation/qw38-language-v2/task036-support/finalize-evidence.sh` —
+   exit 0: profile-attribution regression passed in 0.01 seconds; GEMV
+   classification and stale task labels were corrected. Saved evidence was
+   rescored/reanalyzed without repeating inference, and frozen binary and
+   comparator hashes passed.
+
+Logs are retained in the support directory as `wake-60dce20f643f.log`,
+`wake-77068293a730.log`, `wake-55d8d7b12c47.log`, and
+`wake-6a27767f619b.log`. The paired run is
+`.cache/evaluation/qw38-language-v2/paired/llama-20260925T103522Z-694370-task036-core54-20260926T214414Z-1191180`;
+the core run is
+`.cache/evaluation/qw38-language-v2/runs/task036-core54-20260926T214414Z-1191180`.
+Comparator reuse authentication is recorded in `comparator-reuse.md` and
+`comparator-reuse.sha256` under the support directory. Astra's pass-1 review is
+`.cache/evaluation/qw38-language-v2/task036-support/astra-pass1.md`.
+
+**FOLLOW_UP_REQUIRED:** resolve C92 uncertainty and resolve the candidate
+quality failure before any promotion decision. All nine latency parity
+targets remain unmet; the measured costs and smallest justified next change are
+ranked in the delivery record. No new task or experiment was started.

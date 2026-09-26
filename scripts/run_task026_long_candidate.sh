@@ -3,8 +3,8 @@ set -euo pipefail
 
 fixture_dir=.cache/evaluation/qw38-language-v2
 run_dir="${2:-$fixture_dir/runs/task026-prefill-r32768-$(date -u +%Y%m%dT%H%M%SZ)-$$}"
-artifact=.cache/candidates/candidate-v2-q4k-rope-fixed.qw38
-binary=build/pinned-release/src/qw38-evaluate
+artifact="${QW38_EVAL_ARTIFACT:-.cache/candidates/candidate-v2-q4k-rope-fixed.qw38}"
+binary="${QW38_EVAL_BINARY:-build/pinned-release/src/qw38-evaluate}"
 if [[ "${1:-}" == "--finalize" ]]; then
   [[ -n "${2:-}" && -d "$run_dir" ]] || exit 2
 else
