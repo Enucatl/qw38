@@ -134,6 +134,7 @@ int main() {
   if (!session->reset()) return fail("reset before prefill");
   std::array<std::uint64_t, 2> const rows{0, 1};
   std::uint32_t delivered = 0;
+  void const* requested_head_codes = nullptr;
   auto prefilled = plan->prefill_tokens(prompt, rows,
       [&](std::uint64_t row, std::span<float const> logits)
           -> std::expected<void, Error> {
@@ -142,8 +143,15 @@ int main() {
           return std::unexpected(make_error(ErrorCode::Internal, "prefill.test",
                                             "requested row mismatch"));
         ++delivered;
+        if (row == 1) {
+          // A second final readout would now fail. Restore after the call.
+          requested_head_codes = LanguageModelPlanTestAccess::prefill_head_codes(*plan);
+          LanguageModelPlanTestAccess::set_prefill_head_codes(*plan, nullptr);
+        }
         return {};
       });
+  if (requested_head_codes)
+    LanguageModelPlanTestAccess::set_prefill_head_codes(*plan, requested_head_codes);
   if (!prefilled || delivered != 2) {
     if (!prefilled) std::cerr << error_message(prefilled.error()) << '\n';
     return fail("full-model prefill requested rows");

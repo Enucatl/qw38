@@ -13,8 +13,10 @@
 
 namespace qw38::cuda {
 
-// NVFP4 gate/up reuse packed activations in the bounded weight-tile buffer.
-// Other projections retain BF16 normalized activations.
+// NVFP4 gate/up reuse packed activations in the bounded weight-tile buffer
+// and one full-width accumulator pair per engine. Other projections retain
+// BF16 normalized activations and bounded unpack/cuBLAS after TASK-034's
+// local-unpack experiment regressed the integrated request.
 inline constexpr std::uint32_t kPrefillMaxTokens = 1024;
 inline constexpr std::uint32_t kPrefillDefaultTokens = 1024;
 inline constexpr std::uint32_t kPrefillDefaultWeightRows = 512;
@@ -48,6 +50,8 @@ enum class PrefillEpilogue : std::uint8_t {
 
 enum class PrefillDispatch : std::uint8_t {
   BoundedUnpackBf16Cublas = 1,
+  // TASK-034 diagnostic: correct but slower in the complete 256-token request.
+  LocalQ4K = 2,
 };
 
 // All arrays are device resident and token-major. output has physical stride
@@ -60,7 +64,6 @@ struct PrefillProjection {
   float const* residual{};
   std::uint32_t valid_tokens{};
   std::uint64_t first_position{};
-  PrefillDispatch dispatch{PrefillDispatch::BoundedUnpackBf16Cublas};
   PrefillEpilogue epilogue{PrefillEpilogue::StoreBf16};
 };
 
@@ -79,7 +82,8 @@ class PrefillEngine {
 
   [[nodiscard]] static std::expected<PrefillEngine, Error> create(
       Stream const& stream, std::uint32_t token_capacity = kPrefillDefaultTokens,
-      std::uint32_t weight_rows = kPrefillDefaultWeightRows);
+      std::uint32_t weight_rows = kPrefillDefaultWeightRows,
+      PrefillDispatch dispatch = PrefillDispatch::BoundedUnpackBf16Cublas);
 
   [[nodiscard]] std::expected<void, Error> project(
       PrefillProjection const& projection);
@@ -147,6 +151,8 @@ class PrefillEngine {
   std::uint32_t weight_rows_{};
   cudaStream_t native_stream_{};
   int device_{-1};
+  int nvfp4_sm_count_{};
+  PrefillDispatch dispatch_{PrefillDispatch::BoundedUnpackBf16Cublas};
 };
 
 }  // namespace qw38::cuda

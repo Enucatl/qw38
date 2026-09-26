@@ -141,6 +141,34 @@ void exercise(LogicalQuantizerId quantizer, PhysicalLayoutId layout,
   expect(bool(st) && bool(stream.sync()), "download residual");
   for (std::size_t i = 0; i < got.size(); ++i)
     expect(std::fabs(added[i] - (got[i] + 0.25f)) < 1.0e-4f, "residual epilogue");
+  if (quantizer == LogicalQuantizerId::Q4KCandidateV2) {
+    auto up_source=make_bf16(static_cast<std::size_t>(n)*k,19);
+    auto up_logical=qw38::compiler::quantize_bf16(quantizer,n,k,bytes(up_source));
+    auto up_packed=qw38::format::pack_cuda_v0(quantizer,layout,*up_logical);
+    auto up_dense=qw38::compiler::dequantize_to_bf16(*up_logical);
+    auto uc=qw38::cuda::upload(up_packed->codes,stream);
+    auto us=qw38::cuda::upload(up_packed->scales,stream);
+    if (!uc || !us || !up_dense) { expect(false,"paired uploads"); return; }
+    auto up=w; up.codes=uc->data(); up.scales=us->data();
+    auto before=qw38::cuda::malloc_count();
+    st=engine.paired_swiglu(w,up,static_cast<std::uint16_t const*>(dx->data()),
+        static_cast<std::uint16_t*>(dy->data()),m,317);
+    expect(bool(st) && before==qw38::cuda::malloc_count(),"paired local contraction reuses workspace");
+    std::vector<std::uint16_t> paired(got.size());
+    st=qw38::cuda::copy_d2h(paired.data(),dy->data(),paired.size()*2,stream);
+    expect(bool(st) && bool(stream.sync()),"paired download");
+    for (unsigned t=0;t<m;++t) for (unsigned row=0;row<n;++row) {
+      float u=0;
+      for (unsigned col=0;col<k;++col)
+        u=std::fma(qw38::format::bf16_to_fp32(input[t*k+col]),
+            qw38::format::bf16_to_fp32((*up_dense)[row*k+col]),u);
+      float g=got[t*n+row];
+      float sigmoid=g>=0 ? 1.f/(1.f+std::exp(-g)) : std::exp(g)/(1.f+std::exp(g));
+      float ref=qw38::format::bf16_to_fp32(qw38::format::fp32_to_bf16_rne(g*sigmoid*u));
+      float actual=qw38::format::bf16_to_fp32(paired[t*n+row]);
+      expect(std::fabs(actual-ref)<=.001f+.008f*std::fabs(ref),"asymmetric local SwiGLU reference");
+    }
+  }
   d.valid_tokens = 0;
   expect(!engine.project(d), "reject zero tokens");
   d.valid_tokens = m;
@@ -215,19 +243,21 @@ int main() {
   auto stream = qw38::cuda::Stream::create();
   expect(bool(stream), "stream creation");
   if (!stream) return 1;
-  auto engine = PrefillEngine::create(*stream, 128);
+  auto engine = PrefillEngine::create(*stream, 128, 512, qw38::cuda::PrefillDispatch::LocalQ4K);
   expect(bool(engine), "prefill workspace creation");
   if (!engine) return 1;
   exercise(LogicalQuantizerId::Q4KCandidateV2,
            PhysicalLayoutId::CudaQ4KCandidateV2, 5, 256, 3, *engine, *stream);
+  exercise(LogicalQuantizerId::Q4KCandidateV2,
+           PhysicalLayoutId::CudaQ4KCandidateV2, 65, 512, 33, *engine, *stream);
   exercise(LogicalQuantizerId::Q8G32CandidateV1,
            PhysicalLayoutId::CudaQ8G32CandidateV1, 13, 512, 17, *engine, *stream);
   exercise(LogicalQuantizerId::Q8G32CandidateV1,
            PhysicalLayoutId::CudaQ8G32CandidateV1, 513, 256, 128, *engine, *stream);
   exercise_dense(*engine, *stream);
-  expect(engine->workspace_bytes() < 32u * 1024u * 1024u,
-         "bounded workspace below 32 MiB");
-  auto large_engine = PrefillEngine::create(*stream, 1024, 512);
+  expect(engine->workspace_bytes() == 45613056u,
+         "bounded workspace includes one full-width accumulator pair");
+  auto large_engine = PrefillEngine::create(*stream, 1024, 512, qw38::cuda::PrefillDispatch::LocalQ4K);
   expect(bool(large_engine), "1024-token workspace creation");
   if (large_engine) {
     exercise(LogicalQuantizerId::Q4KCandidateV2,

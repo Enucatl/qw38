@@ -244,7 +244,7 @@ Correctness and quality criteria remain unchanged; execute applicable checks onc
   existing ablations; new ablations need a specific diagnostic question.
 - Keep benchmarks separate from correctness tests. Preserve exact commands, results, artifact/binary identities, and hardware context in each completion report.
 - Executable status values are `TODO`, `IN_PROGRESS`, `BLOCKED`, and `DONE`.
-  TASK-001–030 and TASK-033 are `DONE`; TASK-034–036 are `TODO`.
+  TASK-001–030 and TASK-033–034 are `DONE`; TASK-035–036 are `TODO`.
   `SUPERSEDED` denotes
   retired TASK-031/032 cross-references, never implementation completion.
 - A rejected candidate is a useful experiment result. Record the reason and
@@ -432,7 +432,7 @@ an achieved performance target.
 | TASK-031 | Retired state-refinement task | — | — | Attention moved to TASK-028; state experiments deferred | SUPERSEDED |
 | TASK-032 | Retired final-promotion task | — | — | Final obligations merged into TASK-030 | SUPERSEDED |
 | TASK-033 | Attention probability reuse and tensor-core PV | M12 | TASK-030 | Shared decode probabilities, local tensor-core prefill PV and bounded quality diagnosis | DONE |
-| TASK-034 | Compact projection consumers without global weight expansion | M13 | TASK-033 | Full-width native gate/up, efficient phase dispatch, local Q4_K unpack and readout reuse | TODO |
+| TASK-034 | Compact projection consumers without global weight expansion | M13 | TASK-033 | Full-width native gate/up, efficient phase dispatch, local Q4_K unpack and readout reuse; Q4_K/Q8 selected after rejecting slower native M=1 and integrated local-unpack regression; bounded-unpack/cuBLAS retained | DONE |
 | TASK-035 | Prepared FP8 weights and activation reuse | M14 | TASK-034 | Versioned FP8 large Q8-family weights, shared codes/scales and direct narrow producer outputs | TODO |
 | TASK-036 | Fast-engine validation and delivery decision | M15 | TASK-035 | New core-54/replay/capacity/PERF-01 decision and explicit speed-goal status | TODO |
 

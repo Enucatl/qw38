@@ -41,6 +41,26 @@ __global__ void pack_kernel(std::uint16_t const* input, std::uint8_t* codes,
                  codes, scales, blockIdx.x, k, pk, valid);
 }
 }
+std::expected<int, Error> prepare_nvfp4_gemm(std::uint32_t max_m,
+    std::uint64_t workspace_bytes, Stream const& stream) {
+  if (!max_m || max_m > 1024 || stream.empty())
+    return std::unexpected(make_error(ErrorCode::InvalidArgument,"nvfp4.prepare","invalid capacity"));
+  auto guard = stream.activate();
+  if (!guard) return std::unexpected(guard.error());
+  Gemm::Arguments args{};
+  int sm_count=0;
+  if (auto st=check(cudaDeviceGetAttribute(&sm_count,cudaDevAttrMultiProcessorCount,stream.device()),"nvfp4.prepare"); !st)
+    return std::unexpected(st.error());
+  args.hw_info.device_id=stream.device();
+  args.hw_info.sm_count=sm_count;
+  args.problem_shape = make_shape(int(max_m),17408,5120,1);
+  if (Gemm::get_workspace_size(args) > workspace_bytes)
+    return std::unexpected(make_error(ErrorCode::InvalidArgument,"nvfp4.prepare","workspace too small"));
+  if (auto st=check(cudaFuncSetAttribute(cutlass::device_kernel<Kernel>,
+      cudaFuncAttributeMaxDynamicSharedMemorySize, Kernel::SharedStorageSize),"nvfp4.prepare"); !st)
+    return std::unexpected(st.error());
+  return sm_count;
+}
 std::expected<void, Error> launch_pack_nvfp4(std::uint16_t const* input,
     std::uint8_t* codes, std::uint8_t* scales, std::uint32_t m, std::uint32_t k,
     Stream const& stream) {
@@ -54,10 +74,10 @@ std::expected<void, Error> launch_pack_nvfp4(std::uint16_t const* input,
 std::expected<void, Error> nvfp4_gemm_tile(void const* codes, void const* scales,
     std::uint8_t const* activation, std::uint8_t const* activation_scales,
     std::uint32_t m, std::uint32_t n, std::uint32_t k, std::uint32_t row_start,
-    float* output, void* workspace, std::uint64_t workspace_bytes, Stream const& stream) {
+    float* output, void* workspace, std::uint64_t workspace_bytes, int sm_count, Stream const& stream) {
   if (!codes || !scales || !activation || !activation_scales || !output ||
-      !workspace || !m || m > 1024 || !n || n > 512 || n % 8 || !k || k > 17408 ||
-      k % 256 || row_start % 128 || stream.empty())
+      !workspace || !m || m > 1024 || !n || n > 17408 || n % 8 || !k || k > 5120 ||
+      k % 256 || row_start % 128 || sm_count<=0 || stream.empty())
     return std::unexpected(make_error(ErrorCode::InvalidArgument, "nvfp4.gemm", "invalid tile"));
   auto guard = stream.activate();
   if (!guard) return std::unexpected(guard.error());
@@ -74,11 +94,16 @@ std::expected<void, Error> nvfp4_gemm_tile(void const* codes, void const* scales
        reinterpret_cast<cutlass::float_ue4m3_t const*>(weight_scales), Sf::tile_atom_to_shape_SFB(shape)},
       {{1.f,0.f}, nullptr,sd,output,sd}};
   args.epilogue.thread.alpha_ptr = static_cast<float const*>(scales);
-  Gemm gemm;
-  if (auto st = status(gemm.can_implement(args)); !st) return st;
+  args.hw_info.device_id=stream.device();
+  args.hw_info.sm_count=sm_count;
+  if (auto st = status(Gemm::can_implement(args)); !st) return st;
   if (Gemm::get_workspace_size(args) > workspace_bytes)
     return std::unexpected(make_error(ErrorCode::InvalidArgument,"nvfp4.workspace","workspace too small"));
-  if (auto st = status(gemm.initialize(args,workspace,stream.native())); !st) return st;
-  return status(gemm.run(stream.native()));
+  // Patch dynamic operands/shape without repeating device queries or kernel
+  // attribute setup. Honor CUTLASS's workspace contract for the pinned schedule.
+  static_assert(Kernel::ArchTag::kMinComputeCapability == 120);
+  if (auto st=status(Kernel::initialize_workspace(args,workspace,stream.native())); !st) return st;
+  auto params = Kernel::to_underlying_arguments(args,workspace);
+  return status(Gemm::run(params,stream.native()));
 }
 }  // namespace qw38::cuda

@@ -447,6 +447,7 @@ std::expected<DecodeResult, Error> LanguageModelPlan::prefill_tokens(
       }
       return argmax;
     };
+    bool final_readout = false;
     while (row_index < requested_rows.size() &&
            requested_rows[row_index] < position + count) {
       auto const row = static_cast<std::uint32_t>(requested_rows[row_index] - position);
@@ -466,9 +467,13 @@ std::expected<DecodeResult, Error> LanguageModelPlan::prefill_tokens(
                                "requested-row sink threw"));
       }
       if (!delivered) return fail(delivered.error());
+      if (row == count - 1u) {
+        best = *result;
+        final_readout = true;
+      }
       ++row_index;
     }
-    if (offset + count == token_ids.size()) {
+    if (offset + count == token_ids.size() && !final_readout) {
       auto result = readout(count - 1u);
       if (!result) return fail(result.error());
       best = *result;

@@ -2,7 +2,7 @@
 
 ## Status
 
-TODO
+DONE
 
 ## Milestone and dependency
 
@@ -67,3 +67,77 @@ extra complexity. Record any retained slow fallback honestly.
 Complete with working production callers, one selected artifact/dispatch,
 actual workspace budget and short results. No full quality rerun or long
 request matrix here; TASK-036 owns promotion and matched final performance.
+
+## Completion Report
+
+Selected the existing Q4_K/Q8 artifact (`candidate-v2-q4k-rope-fixed.qw38`,
+artifact manifest `41c1f5e673bb24eb2fb283aa6044dbccdebecc7cd85f847815b3c02a6763fc43`)
+for both phases. The one-row Q8 head uses decode GEMV, and the requested
+final-position readout supplies generation logits without a second projection.
+Full FP32 evaluation logits, finite checks, greedy ties, complete-token commit,
+and session failure/recovery behavior remain covered by production integration
+checks. GPT-6 Codex implemented the task and collected evidence in the main
+thread; GPT-6 Luna prepared this completion report and delivery bookkeeping.
+
+The full-N NVFP4 repair and M=1 experiment passed independent encoding,
+reconstruction, contraction, tail and SwiGLU checks. Native M=1 was rejected at
+8.27418 ms versus 0.16144 ms for paired Q4_K decode; native M=256 measured
+0.274528 ms. Q4_K remains selected, so this task makes no selected-NVFP4
+precision-screen or quality-promotion claim.
+
+The custom local-unpack Q4_K tensor-core consumer passed asymmetric-weight,
+tail, residual, SwiGLU, workspace-reuse and artifact-reference checks. Although
+isolated M=256 gate/up and down measured 9.10621 ms and 3.13184 ms, respectively,
+the integrated prompt regressed from 273.404 ms to 910.958 ms. It remains
+available only through explicit diagnostic dispatch. Production retains the
+bounded-unpack/cuBLAS fallback, leaving repeated global BF16 expansion as
+`FOLLOW_UP_REQUIRED` for compact-consumer cost evaluation.
+
+On the selected production path, the same frozen 256-token prompt and all eight
+generated IDs matched the baseline. Prompt ingestion measured 271.235 ms and
+seven continuation steps 206.543 ms, compared with 273.404 ms and 208.573 ms at
+baseline. These single observations do not establish a statistical speedup.
+The isolated head measurement fell from 48.7715 ms to 1.13766 ms including
+first-use cost; that difference is not attributed as integrated savings.
+
+At capacity 256, engine workspace is 69,206,016 bytes: bounded weight tile
+17,825,792; full-N accumulator pair 35,651,584; normalized BF16 2,621,440;
+SwiGLU 8,912,896; library workspace 4,194,304. One accumulator pair is reused
+per session across all layers, including the selected Q4 fallback. Native
+NVFP4 packed input/scales alias the bounded weight tile. Workspace is up
+34,603,008 bytes from baseline. Projecting that delta from TASK-030's 32K
+free-memory sample gives 8,282,636,288 bytes; this is not fresh capacity
+evidence. C92 remains inconclusive, no quality promotion is claimed, and the
+overall fast-engine goal remains unmet. Final quality/performance acceptance
+remains with TASK-036. No full suite or 32K rerun was done here, and TASK-035
+is not activated.
+
+Checks ran on NVIDIA GeForce RTX 5090, driver 590.48.01, using pinned image
+`sha256:3844dc9c37087cecd40f96e62bd4f305ad405408f0d63312bda8aff8651f2b49`.
+The exact commands and logs are in
+`.cache/evaluation/qw38-language-v2/task034-support/`:
+
+- `bash .cache/evaluation/qw38-language-v2/task034-support/baseline.sh` exited
+  0: built benchmark/decode targets; captured baseline
+  MLP/head timings and integrated request.
+- `bash .cache/evaluation/qw38-language-v2/task034-support/first-check.sh`
+  exited 0: `git diff --check`, focused build, and
+  `QW38_AUTHORITY_CHECKPOINT=/workspace/.cache/authorities/qwen3.8-27b-transformers ctest --test-dir build/pinned-release --output-on-failure -V -R "^(prefill_projection|nvfp4)$"`
+  passed; measured Q4_K and NVFP4 complete consumers.
+- `bash .cache/evaluation/qw38-language-v2/task034-support/integration.sh`
+  exited 0: the integrated rejected local-Q4 request completed, and
+  `QW38_AUTHORITY_ARTIFACT=/workspace/.cache/candidates/candidate-v2-q4k-rope-fixed.qw38 ctest --test-dir build/pinned-release --output-on-failure -V -R "^(prefill_artifact_integration|language_model_integration)$"`
+  passed; kernel resources were recorded.
+- `bash .cache/evaluation/qw38-language-v2/task034-support/fallback.sh` exited
+  0: `git diff --check`, selected-path focused build,
+  `QW38_AUTHORITY_ARTIFACT=/workspace/.cache/candidates/candidate-v2-q4k-rope-fixed.qw38 ctest --test-dir build/pinned-release --output-on-failure -V -R "^(prefill_projection|prefill_artifact_integration|language_model_integration)$"`
+  passed, the integrated selected-path request completed, and explicit local-Q4
+  diagnostic selector smoke passed.
+
+Final source and executable identities are recorded in `final-source.sha256`
+and `final-binaries.sha256`; the selected artifact and hardware details are in
+`artifact-stat.txt` and `hardware.txt`. Independent GPT-6 Astra high review
+passed in one pass with no findings, acceptance gaps or evidence requests
+(`astra-review.md`).
+No task-specific `.cache/task*` directories existed for cleanup; the nested
+evaluation evidence directory was preserved.

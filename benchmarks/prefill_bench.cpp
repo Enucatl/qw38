@@ -43,7 +43,7 @@ bool parse_u32(char const* text, std::uint32_t& out) {
 
 int run(char const* artifact, std::uint32_t tile_rows,
         std::string_view selected_family, std::uint32_t selected_m,
-        std::uint32_t repetitions) {
+        std::uint32_t repetitions, qw38::cuda::PrefillDispatch dispatch) {
   using namespace qw38;
   using namespace qw38::runtime;
   auto runtime = Runtime::create();
@@ -55,7 +55,7 @@ int run(char const* artifact, std::uint32_t tile_rows,
   auto attn = bind_prefill_layer_projections(*model, 3, stream);
   auto head = bind_prefill_head(*model, stream);
   std::uint32_t const capacity = std::max(selected_m, 128u);
-  auto engine = cuda::PrefillEngine::create(stream, capacity, tile_rows);
+  auto engine = cuda::PrefillEngine::create(stream, capacity, tile_rows, dispatch);
   if (!gdn || !attn || !head || !engine) {
     std::cerr << "prefill plan binding failed\n";
     return 1;
@@ -103,7 +103,9 @@ int run(char const* artifact, std::uint32_t tile_rows,
     for (std::uint32_t i = 0; i < capacity; ++i)
       std::copy_n(source.data() + (i % captured) * width, width,
                   out.data() + i * width);
-    return cuda::upload(bytes(out), stream);
+    auto uploaded = cuda::upload(bytes(out), stream);
+    if (auto st = stream.sync(); !st) return decltype(uploaded)(std::unexpected(st.error()));
+    return uploaded;
   };
   auto x_hidden = repeat_bf16(hidden, kHidden);
   auto x_gdn_out = repeat_bf16(gdn_out, kGdnZWidth);
@@ -173,7 +175,8 @@ int run(char const* artifact, std::uint32_t tile_rows,
         auto const label = std::string(name) + ":m=" + std::to_string(m);
         (void)nvtxRangePushA(label.c_str());
       }
-      for (std::uint32_t rep = 0; rep < repetitions + 5u; ++rep) {
+      auto const warmups = repetitions == 1 ? 0u : 5u;
+      for (std::uint32_t rep = 0; rep < repetitions + warmups; ++rep) {
         if (!stream.sync()) return false;
         auto host_start = std::chrono::steady_clock::now();
         if (!start->record(stream)) return false;
@@ -182,11 +185,11 @@ int run(char const* artifact, std::uint32_t tile_rows,
         auto host_end = std::chrono::steady_clock::now();
         auto ms = cuda::elapsed_ms(*start, *end);
         if (!ms) return false;
-        if (rep >= 5u) {
+        if (rep >= warmups) {
           auto host_ms = std::chrono::duration<double, std::milli>(
               host_end - host_start).count();
           std::cout << "sample," << name << ',' << m << ',' << n << ',' << k
-                    << ',' << tile_rows << ',' << rep - 5u << ',' << *ms
+                    << ',' << tile_rows << ',' << rep - warmups << ',' << *ms
                     << ',' << host_ms << '\n';
         }
       }
@@ -204,6 +207,35 @@ int run(char const* artifact, std::uint32_t tile_rows,
       };
       if (!bench(c.name, c.weight.n, c.weight.k, launch)) return 1;
     }
+    auto pair = [&] {
+      if (m == 1 && gdn->mlp_gate.layout == cuda::kDecodeLayoutQ4KCandidateV2) {
+        auto desc = [&](cuda::PrefillWeight const& w) {
+          cuda::DecodeMmvDesc d;
+          d.layout=w.layout; d.quantizer=w.quantizer; d.n=w.n; d.k=w.k;
+          d.padded_n=w.padded_n; d.padded_k=w.padded_k;
+          d.codes=cuda::decode_matrix_view(const_cast<void*>(w.codes),cuda::DecodeDtype::Q4,
+              w.layout,w.n,w.k,w.padded_n,w.padded_k,w.codes_bytes,16);
+          auto units=static_cast<std::uint32_t>(w.scales_bytes/w.padded_n/2);
+          d.scales=cuda::decode_matrix_view(const_cast<void*>(w.scales),cuda::DecodeDtype::Fp16,
+              w.layout,w.padded_n,units,w.padded_n,units,w.scales_bytes,2);
+          d.input=cuda::decode_vector_view(const_cast<std::uint16_t*>(hidden_ptr),
+              cuda::DecodeDtype::Bf16,cuda::kDecodeLayoutBf16VectorV0,w.k,w.k*2u,2,false);
+          d.epilogue=cuda::DecodeEpilogue::SwigluStoreBf16;
+          return d;
+        };
+        cuda::DecodeMmvPairedDesc d{.a=desc(gdn->mlp_gate),.b=desc(gdn->mlp_up)};
+        d.a.output=cuda::decode_vector_view(output->data(),cuda::DecodeDtype::Bf16,
+            cuda::kDecodeLayoutBf16VectorV0,d.a.n,d.a.n*2u,2,true);
+        auto st=cuda::launch_decode_mmv_paired(d,stream);
+        if (!st) std::cerr << cuda::error_message(st.error()) << '\n';
+        return bool(st);
+      }
+      auto st=engine->paired_swiglu(gdn->mlp_gate,gdn->mlp_up,hidden_ptr,
+          static_cast<std::uint16_t*>(output->data()),m,512);
+      if (!st) std::cerr << cuda::error_message(st.error()) << '\n';
+      return bool(st);
+    };
+    if (!bench("mlp_pair", kFfnWidth, kHidden, pair)) return 1;
     auto mlp = [&] {
       auto st = engine->mlp(gdn->mlp_gate, gdn->mlp_up, gdn->mlp_down,
                             residual_ptr, gdn->mlp_gamma, 1.0e-6f,
@@ -237,13 +269,15 @@ int run(char const* artifact, std::uint32_t tile_rows,
 }  // namespace
 
 int main(int argc, char** argv) {
-  if (argc < 3 || argc > 6) {
-    std::cerr << "usage: qw38_bench_prefill ARTIFACT TILE_ROWS [FAMILY|all [M|0 [REPS]]]\n";
+  if (argc < 3 || argc > 7) {
+    std::cerr << "usage: qw38_bench_prefill ARTIFACT TILE_ROWS [FAMILY|all [M|0 [REPS [local-q4k]]]]\n";
     return 2;
   }
   std::uint32_t tile_rows = 0, m = 0, reps = 20;
   if (!parse_u32(argv[2], tile_rows) ||
       (argc >= 5 && !parse_u32(argv[4], m)) ||
-      (argc == 6 && !parse_u32(argv[5], reps)) || reps == 0) return 2;
-  return run(argv[1], tile_rows, argc >= 4 ? argv[3] : "all", m, reps);
+      (argc >= 6 && !parse_u32(argv[5], reps)) || reps == 0 ||
+      (argc == 7 && std::string_view(argv[6]) != "local-q4k")) return 2;
+  return run(argv[1], tile_rows, argc >= 4 ? argv[3] : "all", m, reps,
+      argc == 7 ? qw38::cuda::PrefillDispatch::LocalQ4K : qw38::cuda::PrefillDispatch::BoundedUnpackBf16Cublas);
 }

@@ -4,6 +4,8 @@
 #include "cuda/activation.hpp"
 
 #include <cuda.h>
+#include <cuda_bf16.h>
+#include <mma.h>
 
 #include <algorithm>
 #include <cmath>
@@ -55,6 +57,23 @@ __device__ __forceinline__ float fp16_to_fp32(std::uint16_t bits) {
   return __uint_as_float(result);
 }
 
+__device__ __forceinline__ std::uint16_t q4k_bf16(
+    std::uint8_t const* codes, std::uint8_t const* scales,
+    std::uint64_t tile_row, unsigned in_tile) {
+  auto const code = (codes[tile_row * 128u + in_tile / 2u] >> (4u * (in_tile & 1u))) & 15u;
+  auto const* meta = scales + tile_row * 16u;
+  auto const* super = reinterpret_cast<std::uint16_t const*>(meta);
+  auto const* packed = meta + 4u;
+  unsigned const group = in_tile / 32u;
+  unsigned const scale = group < 4 ? packed[group] & 63u
+      : (packed[group + 4u] & 15u) | ((packed[group - 4u] >> 6u) << 4u);
+  unsigned const minimum = group < 4 ? packed[group + 4u] & 63u
+      : (packed[group + 4u] >> 4u) | ((packed[group] >> 6u) << 4u);
+  float const d = __fmul_rn(fp16_to_fp32(super[0]), static_cast<float>(scale));
+  float const m = __fmul_rn(fp16_to_fp32(super[1]), static_cast<float>(minimum));
+  return fp32_to_bf16_rne(__fsub_rn(__fmul_rn(d, static_cast<float>(code)), m));
+}
+
 __global__ void unpack_tile_kernel(std::uint8_t const* codes,
                                    std::uint8_t const* scales,
                                    std::uint16_t* output,
@@ -76,18 +95,8 @@ __global__ void unpack_tile_kernel(std::uint8_t const* codes,
       ((static_cast<std::uint64_t>(row) / 8u) * (padded_k / 256u) + tile_k) * 8u + row % 8u;
   float decoded = 0.0f;
   if (layout == kDecodeLayoutQ4KCandidateV2) {
-    auto const code = (codes[tile_row * 128u + in_tile / 2u] >> (4u * (in_tile & 1u))) & 15u;
-    auto const* meta = scales + tile_row * 16u;
-    auto const* super = reinterpret_cast<std::uint16_t const*>(meta);
-    auto const* packed = meta + 4u;
-    unsigned const group = in_tile / 32u;
-    unsigned const scale = group < 4 ? packed[group] & 63u
-        : (packed[group + 4u] & 15u) | ((packed[group - 4u] >> 6u) << 4u);
-    unsigned const minimum = group < 4 ? packed[group + 4u] & 63u
-        : (packed[group + 4u] >> 4u) | ((packed[group] >> 6u) << 4u);
-    float const d = __fmul_rn(fp16_to_fp32(super[0]), static_cast<float>(scale));
-    float const m = __fmul_rn(fp16_to_fp32(super[1]), static_cast<float>(minimum));
-    decoded = __fsub_rn(__fmul_rn(d, static_cast<float>(code)), m);
+    output[idx] = q4k_bf16(codes, scales, tile_row, in_tile);
+    return;
   } else if (layout == kDecodeLayoutQ8G32CandidateV1 ||
              layout == kDecodeLayoutQ8G32V0) {
     auto const code = static_cast<std::int8_t>(codes[tile_row * 256u + in_tile]);
@@ -128,6 +137,68 @@ __device__ __forceinline__ float sigmoid(float x) {
   return e / (1.0f + e);
 }
 
+// Q32/N64/K64: reconstruct compact weights only in shared memory. Eight
+// warps each own one 16x16 accumulator; sibling gate/up reuse the input tile.
+template<bool Paired>
+__global__ void q4k_prefill_kernel(PrefillWeight weight, PrefillWeight up,
+    std::uint16_t const* input, void* output, float const* residual,
+    unsigned m, PrefillEpilogue epilogue) {
+  namespace wmma = nvcuda::wmma;
+  __shared__ __align__(32) std::uint16_t x[32*64];
+  __shared__ __align__(32) std::uint16_t w[(Paired ? 2 : 1)*64*64];
+  __shared__ __align__(32) float result[(Paired ? 2 : 1)*32*64];
+  unsigned const warp = threadIdx.x / 32;
+  wmma::fragment<wmma::accumulator,16,16,16,float> acc[Paired ? 2 : 1];
+  for (auto& a : acc) wmma::fill_fragment(a,0.f);
+  for (unsigned start=0; start<weight.k; start+=64) {
+    for (unsigned i=threadIdx.x; i<32*64; i+=blockDim.x) {
+      unsigned row=blockIdx.y*32+i/64;
+      x[i]=row<m ? input[std::uint64_t(row)*weight.k+start+i%64] : 0;
+    }
+    for (unsigned i=threadIdx.x; i<64*64; i+=blockDim.x) {
+      unsigned row=blockIdx.x*64+i/64, col=start+i%64;
+      auto tile_row=(std::uint64_t(row/8)*(weight.padded_k/256)+col/256)*8+row%8;
+      w[i]=row<weight.n ? q4k_bf16(static_cast<std::uint8_t const*>(weight.codes),
+          static_cast<std::uint8_t const*>(weight.scales),tile_row,col%256) : 0;
+      if constexpr (Paired)
+        w[64*64+i]=row<weight.n ? q4k_bf16(static_cast<std::uint8_t const*>(up.codes),
+            static_cast<std::uint8_t const*>(up.scales),tile_row,col%256) : 0;
+    }
+    __syncthreads();
+    for (unsigned k=0;k<64;k+=16) {
+      wmma::fragment<wmma::matrix_a,16,16,16,__nv_bfloat16,wmma::row_major> a;
+      wmma::fragment<wmma::matrix_b,16,16,16,__nv_bfloat16,wmma::col_major> b;
+      wmma::load_matrix_sync(a,reinterpret_cast<__nv_bfloat16*>(x)+(warp/4)*16*64+k,64);
+      #pragma unroll
+      for (unsigned p=0;p<(Paired ? 2u : 1u);++p) {
+        wmma::load_matrix_sync(b,reinterpret_cast<__nv_bfloat16*>(w)+p*64*64+(warp%4)*16*64+k,64);
+        wmma::mma_sync(acc[p],a,b,acc[p]);
+      }
+    }
+    __syncthreads();
+  }
+  #pragma unroll
+  for (unsigned p=0;p<(Paired ? 2u : 1u);++p)
+    wmma::store_matrix_sync(result+p*32*64+(warp/4)*16*64+(warp%4)*16,
+        acc[p],64,wmma::mem_row_major);
+  __syncthreads();
+  for (unsigned i=threadIdx.x;i<32*64;i+=blockDim.x) {
+    unsigned row=blockIdx.y*32+i/64, col=blockIdx.x*64+i%64;
+    if (row>=m || col>=weight.n) continue;
+    auto dst=std::uint64_t(row)*weight.n+col;
+    float value=result[i];
+    if constexpr (Paired) {
+      static_cast<std::uint16_t*>(output)[dst]=fp32_to_bf16_rne(
+          (value*sigmoid(value))*result[32*64+i]);
+    } else if (epilogue==PrefillEpilogue::StoreBf16) {
+      static_cast<std::uint16_t*>(output)[dst]=fp32_to_bf16_rne(value);
+    } else {
+      static_cast<float*>(output)[dst]=epilogue==PrefillEpilogue::ResidualAddFp32
+          ? residual[dst]+value : value;
+    }
+  }
+}
+
 __global__ void swiglu_kernel(float const* gate, float const* up,
                               std::uint16_t* output, std::uint32_t rows,
                               std::uint32_t n, std::uint32_t tile_rows,
@@ -143,7 +214,7 @@ __global__ void swiglu_kernel(float const* gate, float const* up,
 
 bool layout_ok(PrefillWeight const& w) {
   if (w.layout == kDecodeLayoutNvFp4V1)
-    return w.quantizer == kDecodeQuantizerNvFp4V1 && w.k <= 5120 && w.n % 8 == 0;
+    return w.quantizer == kDecodeQuantizerNvFp4V1 && w.k <= 5120 && w.n <= 17408 && w.n % 8 == 0;
   if (w.layout == kDecodeLayoutQ4KCandidateV2)
     return w.quantizer == kDecodeQuantizerQ4KCandidateV2;
   if (w.layout == kDecodeLayoutQ8G32CandidateV1)
@@ -155,16 +226,18 @@ bool layout_ok(PrefillWeight const& w) {
   return false;
 }
 
-DecodeMmvDesc nvfp4_decode(PrefillWeight const& w, std::uint16_t const* input,
+DecodeMmvDesc prefill_decode(PrefillWeight const& w, std::uint16_t const* input,
                             void* output, DecodeEpilogue epilogue) {
   DecodeMmvDesc d;
   d.layout=w.layout; d.quantizer=w.quantizer; d.n=w.n; d.k=w.k;
   d.padded_n=w.padded_n; d.padded_k=w.padded_k; d.epilogue=epilogue;
-  d.codes=decode_matrix_view(const_cast<void*>(w.codes),DecodeDtype::NvFp4,w.layout,
+  auto const dtype=w.layout==kDecodeLayoutNvFp4V1 ? DecodeDtype::NvFp4 : DecodeDtype::Q8;
+  d.codes=decode_matrix_view(const_cast<void*>(w.codes),dtype,w.layout,
       w.n,w.k,w.padded_n,w.padded_k,w.codes_bytes,16);
-  auto units=static_cast<std::uint32_t>(w.scales_bytes/2);
+  auto rows=w.layout==kDecodeLayoutNvFp4V1 ? 1u : w.padded_n;
+  auto units=static_cast<std::uint32_t>(w.scales_bytes/rows/2);
   d.scales=decode_matrix_view(const_cast<void*>(w.scales),DecodeDtype::Fp16,w.layout,
-      1,units,1,units,w.scales_bytes,16);
+      rows,units,rows,units,w.scales_bytes,w.layout==kDecodeLayoutNvFp4V1 ? 16u : 2u);
   d.input=decode_vector_view(const_cast<std::uint16_t*>(input),DecodeDtype::Bf16,
       kDecodeLayoutBf16VectorV0,w.k,std::uint64_t(w.k)*2,2,false);
   bool bf16=epilogue==DecodeEpilogue::StoreBf16 || epilogue==DecodeEpilogue::SwigluStoreBf16;
@@ -274,6 +347,8 @@ PrefillEngine& PrefillEngine::operator=(PrefillEngine&& other) noexcept {
     weight_rows_ = std::exchange(other.weight_rows_, 0);
     native_stream_ = std::exchange(other.native_stream_, nullptr);
     device_ = std::exchange(other.device_, -1);
+    nvfp4_sm_count_ = std::exchange(other.nvfp4_sm_count_, 0);
+    dispatch_ = other.dispatch_;
   }
   return *this;
 }
@@ -286,9 +361,10 @@ void PrefillEngine::release() noexcept {
 
 std::expected<PrefillEngine, Error> PrefillEngine::create(
     Stream const& stream, std::uint32_t token_capacity,
-    std::uint32_t weight_rows) {
+    std::uint32_t weight_rows, PrefillDispatch dispatch) {
   if (stream.empty() || token_capacity == 0 || token_capacity > kPrefillMaxTokens ||
-      (weight_rows != 128 && weight_rows != 256 && weight_rows != 512)) {
+      (weight_rows != 128 && weight_rows != 256 && weight_rows != 512) ||
+      (dispatch != PrefillDispatch::BoundedUnpackBf16Cublas && dispatch != PrefillDispatch::LocalQ4K)) {
     return std::unexpected(make_error(ErrorCode::InvalidArgument, "prefill.create",
                                       "invalid stream or token capacity"));
   }
@@ -297,7 +373,7 @@ std::expected<PrefillEngine, Error> PrefillEngine::create(
   std::uint64_t const weight_bytes =
       static_cast<std::uint64_t>(weight_rows) * kPrefillMaxK * 2u;
   std::uint64_t const accum_bytes =
-      static_cast<std::uint64_t>(token_capacity) * weight_rows * 4u;
+      static_cast<std::uint64_t>(token_capacity) * kPrefillMaxK * 4u;
   std::uint64_t const normalized_bytes =
       static_cast<std::uint64_t>(token_capacity) * 5120u * 2u;
   std::uint64_t const swiglu_bytes =
@@ -313,6 +389,7 @@ std::expected<PrefillEngine, Error> PrefillEngine::create(
   result.device_ = stream.device();
   result.token_capacity_ = token_capacity;
   result.weight_rows_ = weight_rows;
+  result.dispatch_ = dispatch;
   result.workspace_ = std::move(*buffer);
   auto* ptr = result.workspace_.as_bytes();
   result.weight_tile_ = reinterpret_cast<std::uint16_t*>(ptr);
@@ -333,6 +410,9 @@ std::expected<PrefillEngine, Error> PrefillEngine::create(
   st = cublas_check(cublasSetWorkspace(result.handle_, result.library_workspace_,
                                        kCublasWorkspaceBytes), "cublasSetWorkspace");
   if (!st) return std::unexpected(st.error());
+  auto prepared=prepare_nvfp4_gemm(token_capacity,kCublasWorkspaceBytes,stream);
+  if (!prepared) return std::unexpected(prepared.error());
+  result.nvfp4_sm_count_=*prepared;
   return result;
 }
 
@@ -373,11 +453,12 @@ std::expected<void, Error> PrefillEngine::contract(
 std::expected<void, Error> PrefillEngine::gemm_tile(
     PrefillWeight const& w, std::uint16_t const* input,
     std::uint32_t valid_tokens, std::uint32_t row_start, float* accum) {
-  std::uint32_t const tile_rows = std::min(weight_rows_, w.n - row_start);
+  std::uint32_t const tile_rows = w.layout == kDecodeLayoutNvFp4V1
+      ? w.n : std::min(weight_rows_, w.n - row_start);
   if (w.layout == kDecodeLayoutNvFp4V1)
     return nvfp4_gemm_tile(w.codes,w.scales,packed_input(),packed_scales(),
         valid_tokens,tile_rows,w.k,row_start,accum,library_workspace_,
-        kCublasWorkspaceBytes,*stream_);
+        kCublasWorkspaceBytes,nvfp4_sm_count_,*stream_);
   auto guard = stream_->activate();
   if (!guard) return std::unexpected(guard.error());
   std::uint64_t const elements = static_cast<std::uint64_t>(tile_rows) * w.k;
@@ -408,7 +489,6 @@ std::expected<void, Error> PrefillEngine::project(PrefillProjection const& d) {
   if (auto st = contract(d.weight, d.valid_tokens); !st) return st;
   if (!d.input || !d.output ||
       d.first_position > std::numeric_limits<std::uint64_t>::max() - d.valid_tokens ||
-      d.dispatch != PrefillDispatch::BoundedUnpackBf16Cublas ||
       (d.epilogue == PrefillEpilogue::ResidualAddFp32 && !d.residual) ||
       (d.epilogue != PrefillEpilogue::ResidualAddFp32 && d.residual) ||
       (d.epilogue != PrefillEpilogue::StoreBf16 &&
@@ -426,7 +506,7 @@ std::expected<void, Error> PrefillEngine::project(PrefillProjection const& d) {
   auto codes = region(d.weight.codes, d.weight.codes_bytes);
   auto workspace = region(workspace_.data(),
       static_cast<std::uint64_t>(weight_rows_) * kPrefillMaxK * 2u +
-      2u * static_cast<std::uint64_t>(token_capacity_) * weight_rows_ * 4u);
+      2u * static_cast<std::uint64_t>(token_capacity_) * kPrefillMaxK * 4u);
   if (!input || !output || !codes || !workspace) {
     return std::unexpected(make_error(ErrorCode::InvalidArgument, "prefill.project",
                                       "invalid live range"));
@@ -452,17 +532,25 @@ std::expected<void, Error> PrefillEngine::project(PrefillProjection const& d) {
     ranges[count++] = *residual;
   }
   if (auto st = distinct(std::span<Region const>{ranges.data(), count}); !st) return st;
-  if (d.weight.layout == kDecodeLayoutNvFp4V1) {
-    if (d.valid_tokens == 1) {
-      auto desc = nvfp4_decode(d.weight,d.input,d.output,static_cast<DecodeEpilogue>(d.epilogue));
+  if (d.valid_tokens == 1 &&
+      (d.weight.layout == kDecodeLayoutQ8G32CandidateV1 || d.weight.layout == kDecodeLayoutQ8G32V0) &&
+      d.weight.n == 248320 && d.weight.k == 5120) {
+      auto desc = prefill_decode(d.weight,d.input,d.output,static_cast<DecodeEpilogue>(d.epilogue));
       if (d.residual) desc.residual=decode_vector_view(const_cast<float*>(d.residual),
           DecodeDtype::Fp32,kDecodeLayoutFp32VectorV0,d.weight.n,std::uint64_t(d.weight.n)*4,4,false);
       return launch_decode_mmv(desc,*stream_);
-    }
+  }
+  if (d.weight.layout == kDecodeLayoutQ4KCandidateV2 && dispatch_ == PrefillDispatch::LocalQ4K) {
+    q4k_prefill_kernel<false><<<dim3((d.weight.n+63)/64,(d.valid_tokens+31)/32),256,0,stream_->native()>>>(
+        d.weight,{},d.input,d.output,d.residual,d.valid_tokens,d.epilogue);
+    return check(cudaGetLastError(),"prefill.q4k_local");
+  }
+  if (d.weight.layout == kDecodeLayoutNvFp4V1) {
     if (auto st=launch_pack_nvfp4(d.input,packed_input(),packed_scales(),d.valid_tokens,d.weight.k,*stream_); !st) return st;
   }
-  for (std::uint32_t start = 0; start < d.weight.n; start += weight_rows_) {
-    std::uint32_t const rows = std::min(weight_rows_, d.weight.n - start);
+  auto const width=d.weight.layout==kDecodeLayoutNvFp4V1 ? d.weight.n : weight_rows_;
+  for (std::uint32_t start = 0; start < d.weight.n; start += width) {
+    std::uint32_t const rows = std::min(width, d.weight.n - start);
     if (auto st = gemm_tile(d.weight, d.input, d.valid_tokens, start, accum_a_); !st)
       return st;
     std::uint64_t const elems = static_cast<std::uint64_t>(rows) * d.valid_tokens;
@@ -508,7 +596,7 @@ std::expected<void, Error> PrefillEngine::paired_swiglu_impl(
   auto up_codes = region(up.codes, up.codes_bytes);
   auto workspace = region(workspace_.data(),
       static_cast<std::uint64_t>(weight_rows_) * kPrefillMaxK * 2u +
-      2u * static_cast<std::uint64_t>(token_capacity_) * weight_rows_ * 4u);
+      2u * static_cast<std::uint64_t>(token_capacity_) * kPrefillMaxK * 4u);
   if (!x || !y || !gate_codes || !up_codes || !workspace) {
     return std::unexpected(make_error(ErrorCode::InvalidArgument, "prefill.swiglu",
                                       "invalid live range"));
@@ -532,19 +620,18 @@ std::expected<void, Error> PrefillEngine::paired_swiglu_impl(
     ranges[count++] = *scales;
   }
   if (auto st = distinct(std::span<Region const>{ranges.data(), count}); !st) return st;
+  if (gate.layout == kDecodeLayoutQ4KCandidateV2 && dispatch_ == PrefillDispatch::LocalQ4K) {
+    q4k_prefill_kernel<true><<<dim3((gate.n+63)/64,(valid_tokens+31)/32),256,0,stream_->native()>>>(
+        gate,up,normalized,swiglu,nullptr,valid_tokens,PrefillEpilogue::StoreBf16);
+    return check(cudaGetLastError(),"prefill.q4k_pair_local");
+  }
   if (gate.layout == kDecodeLayoutNvFp4V1) {
-    if (valid_tokens == 1) {
-      DecodeMmvPairedDesc d;
-      d.a=nvfp4_decode(gate,normalized,swiglu,DecodeEpilogue::SwigluStoreBf16);
-      d.b=nvfp4_decode(up,normalized,swiglu,DecodeEpilogue::SwigluStoreBf16);
-      d.b.output={};
-      return launch_decode_mmv_paired(d,*stream_);
-    }
     if (!packed)
       if (auto st=launch_pack_nvfp4(normalized,packed_input(),packed_scales(),valid_tokens,gate.k,*stream_); !st) return st;
   }
-  for (std::uint32_t start = 0; start < gate.n; start += weight_rows_) {
-    std::uint32_t const rows = std::min(weight_rows_, gate.n - start);
+  auto const width=gate.layout==kDecodeLayoutNvFp4V1 ? gate.n : weight_rows_;
+  for (std::uint32_t start = 0; start < gate.n; start += width) {
+    std::uint32_t const rows = std::min(width, gate.n - start);
     if (auto st = gemm_tile(gate, normalized, valid_tokens, start, accum_a_); !st)
       return st;
     if (auto st = gemm_tile(up, normalized, valid_tokens, start, accum_b_); !st)
@@ -608,7 +695,7 @@ std::expected<void, Error> PrefillEngine::mlp(
       }
     }
   }
-  bool const packed = gate.layout == kDecodeLayoutNvFp4V1 && valid_tokens >= 2;
+  bool const packed = gate.layout == kDecodeLayoutNvFp4V1;
   if (packed) {
     if (auto st=launch_hidden_rms_nvfp4(h_mid,gamma,eps,valid_tokens,
                                        packed_input(),packed_scales(),*stream_); !st) return st;

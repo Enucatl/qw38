@@ -174,7 +174,7 @@ void contractions(std::span<std::byte const> source,unsigned n,unsigned k,
       .quantizer=qw38::cuda::kDecodeQuantizerNvFp4V1,.n=n,.k=k,.padded_n=unsigned(p.padded_n),
       .padded_k=unsigned(p.padded_k),.codes_bytes=p.codes.size(),.scales_bytes=p.scales.size()};
   float previous=0;
-  for(unsigned m: {1u,2u,3u,129u}) {
+  for(unsigned m: {1u,2u,3u,129u,256u}) {
     if(n>1024 && m==129) continue;
     auto x=input(m,k,13); auto dx=take(qw38::cuda::upload(bytes(x),stream));
     std::vector<float> init(std::size_t(m+1)*n,123.f); auto dy=take(qw38::cuda::upload(bytes(init),stream));
@@ -191,7 +191,7 @@ void contractions(std::span<std::byte const> source,unsigned n,unsigned k,
         unsigned sf=nearest(peak/6,true); if(peak && !sf) sf=1;
         for(unsigned j=0;j<16;++j) {
           unsigned col=b*16+j; float a=format::bf16_to_fp32(x[r*k+col]);
-          if(m>=2) a=peak?format::nvfp4_e4m3(sf)*format::nvfp4_e2m1(nearest(a/format::nvfp4_e4m3(sf),false)):0;
+          a=peak?format::nvfp4_e4m3(sf)*format::nvfp4_e2m1(nearest(a/format::nvfp4_e4m3(sf),false)):0;
           expected=std::fma(a,decoded(p,row,col),expected);
         }
       }
@@ -200,7 +200,10 @@ void contractions(std::span<std::byte const> source,unsigned n,unsigned k,
     }
     for(unsigned i=m*n;i<(m+1)*n;++i) require(got[i]==123.f,"logical output guard");
     std::cout<<label<<" M="<<m<<" max_abs="<<max_error<<" first_output="<<got[0];
-    if(m==2) std::cout<<" W4A4_minus_GEMV="<<got[0]-previous;
+    if(m==2) {
+      require(got[0]==previous,"native M=1/M=2 phase handoff");
+      std::cout<<" W4A4_handoff="<<got[0]-previous;
+    }
     std::cout<<'\n'; previous=got[0];
     auto bad=w; bad.layout=0x02ff;
     require(!engine.project({.weight=bad,.input=static_cast<std::uint16_t const*>(dx.data()),.output=dy.data(),.valid_tokens=m}),"bad layout launch rejected");
@@ -272,7 +275,7 @@ void paired(qw38::cuda::PrefillEngine& engine, qw38::cuda::Stream const& stream)
 }
 int main() {
   host_checks(); auto stream=take(qw38::cuda::Stream::create()); packing(stream);
-  auto engine=take(qw38::cuda::PrefillEngine::create(stream,129,512));
+  auto engine=take(qw38::cuda::PrefillEngine::create(stream,256,512));
   paired(engine,stream);
   auto x=input(136,5120,27); contractions(bytes(x),136,5120,engine,stream,"synthetic");
   if(auto root=std::getenv("QW38_AUTHORITY_CHECKPOINT")) {
