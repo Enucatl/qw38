@@ -38,10 +38,13 @@ inline constexpr unsigned kQ8MlpMaxTokens = 256;
 
 // Borrowed workspace, weights and activations remain live until return.
 // Completes the entire MLP and returns a typed error for nonfinite producers.
+// Internal submission may supply a sticky unit failure flag, cleared/read back
+// by its owner; in that case this operation only enqueues and never waits.
 // submitted is false for prelaunch rejection, true once device work is attempted.
 [[nodiscard]] std::expected<void, Error> q4k_q8_mlp(
     PrefillWeight const& gate, PrefillWeight const& up,
     PrefillWeight const& down, float const* residual,
     std::uint16_t const* gamma, float eps, float* output, unsigned m,
-    std::span<std::byte> workspace, Stream const& stream, bool& submitted);
+    std::span<std::byte> workspace, Stream const& stream, bool& submitted,
+    int* pending_failure = nullptr);
 }  // namespace qw38::cuda

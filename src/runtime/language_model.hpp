@@ -3,6 +3,8 @@
 #include "runtime/language_layer.hpp"
 #include "runtime/prefill.hpp"
 #include "cuda/decode_mmv.hpp"
+#include "cuda/decode_control.hpp"
+#include "cuda/graph.hpp"
 
 #include <cstdint>
 #include <expected>
@@ -23,6 +25,8 @@ struct DecodeResult {
   std::uint32_t argmax{};
 };
 
+enum class DecodeSubmission { Eager, Graph };
+
 // The model and session allocations must outlive this borrowed plan;
 // reset/restore and Session movement may be used between calls.
 class LanguageModelPlan {
@@ -32,6 +36,11 @@ class LanguageModelPlan {
 
   [[nodiscard]] std::expected<DecodeResult, Error> decode_token(
       std::uint32_t token_id, std::uint64_t position);
+  // Explicit diagnostic selection; changing mode does not execute or commit.
+  void set_decode_submission(DecodeSubmission mode) noexcept { submission_ = mode; }
+  [[nodiscard]] std::optional<Error> const& graph_fallback() const noexcept {
+    return graph_failure_;
+  }
   [[nodiscard]] std::expected<DecodeResult, Error> setup_prompt_slow(
       std::span<std::uint32_t const> token_ids);
   // Logits passed to the sink are valid only during the callback. A returned
@@ -53,10 +62,16 @@ class LanguageModelPlan {
     qw38::cuda::PrefillWeight head;
   };
   [[nodiscard]] std::expected<void, Error> initialize_prefill();
+  [[nodiscard]] std::expected<qw38::cuda::DecodeControl, Error> pending(
+      std::uint32_t token, std::uint64_t position, std::uint32_t count) const;
+  [[nodiscard]] std::expected<void, Error> enqueue_decode(
+      qw38::cuda::DecodeControl const&, qw38::cuda::DecodeControl const*, std::uint64_t);
+  [[nodiscard]] std::expected<void, Error> prepare_graph(qw38::cuda::DecodeControl const&);
   friend struct LanguageModelPlanTestAccess;
   std::vector<LanguageLayerPlan> layers_;
   std::vector<std::variant<PrefillGdnLayerPlan, PrefillAttentionLayerPlan>> prefill_layers_;
-  std::vector<float> logits_;
+  qw38::cuda::HostBuffer readback_;
+  std::span<float> logits_;
   Model const* model_{};
   qw38::cuda::Stream const* stream_{};
   SessionExecutionState* state_{};
@@ -69,6 +84,15 @@ class LanguageModelPlan {
   std::uint64_t kv_capacity_{};
   qw38::cuda::DecodeMmvDesc head_{};
   std::optional<PrefillState> prefill_;
+  qw38::cuda::DeviceBuffer unit_failure_;
+  [[nodiscard]] std::expected<void, Error> complete_unit();
+  DecodeSubmission submission_{DecodeSubmission::Graph};
+  qw38::cuda::DeviceBuffer controls_;
+  qw38::cuda::Graph graph_;
+  std::uint64_t graph_bucket_{};
+  std::uint64_t graph_builds_{};
+  std::uint64_t graph_replays_{};
+  std::optional<Error> graph_failure_;
 };
 
 }  // namespace qw38::runtime

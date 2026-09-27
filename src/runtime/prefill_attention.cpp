@@ -1,3 +1,6 @@
+#include "runtime/submission.hpp"
+#include "cuda/graph.hpp"
+
 #include "runtime/prefill.hpp"
 
 #include "cuda/activation.hpp"
@@ -73,72 +76,74 @@ PrefillAttentionSlices PrefillAttentionWorkspace::slices() noexcept {
           next(2u * kAttnOutWidth)};
 }
 
-std::expected<void, Error> execute_prefill_attention_layer(
+std::expected<void, Error> detail::Submission::prefill_attention(
     PrefillAttentionLayerPlan const& plan, PrefillAttentionWorkspace& workspace,
     qw38::cuda::PrefillEngine& engine, float const* residual,
     float* h_mid, float* next_h, std::uint32_t valid_tokens,
-    std::uint64_t first_position) {
+    std::uint64_t first_position, bool complete, int* failure) {
   auto const& prep = plan.prep_;
   auto const& p = plan.projections_;
   auto const* stream = prep.stream;
-  if (!stream || stream->empty() || engine.stream() != stream ||
-      !prep.session_state || prep.session_state->is_poisoned() ||
-      p.gdn || p.layer != prep.language_layer ||
-      valid_tokens == 0 || valid_tokens > workspace.token_capacity() ||
-      valid_tokens > engine.token_capacity() ||
-      workspace.device() != stream->device() ||
-      first_position > std::numeric_limits<std::int32_t>::max() ||
-      valid_tokens - 1u >
-          static_cast<std::uint64_t>(std::numeric_limits<std::int32_t>::max()) -
-              first_position ||
-      first_position >= prep.kv_capacity ||
-      valid_tokens > prep.kv_capacity - first_position)
-    return std::unexpected(make_error(ErrorCode::InvalidArgument,
-                                      "prefill.attention", "plan, stream or chunk mismatch"));
-  auto populated = prep.populated.value();
-  if (!populated) return std::unexpected(populated.error());
-  if (*populated != first_position)
-    return std::unexpected(make_error(ErrorCode::InvalidPopulatedLength,
-                                      "prefill.attention", "chunk must append at populated length"));
+  if (complete) {
+    if (!stream || stream->empty() || engine.stream() != stream ||
+        !prep.session_state || prep.session_state->is_poisoned() ||
+        p.gdn || p.layer != prep.language_layer ||
+        valid_tokens == 0 || valid_tokens > workspace.token_capacity() ||
+        valid_tokens > engine.token_capacity() ||
+        workspace.device() != stream->device() ||
+        first_position > std::numeric_limits<std::int32_t>::max() ||
+        valid_tokens - 1u >
+            static_cast<std::uint64_t>(std::numeric_limits<std::int32_t>::max()) -
+                first_position ||
+        first_position >= prep.kv_capacity ||
+        valid_tokens > prep.kv_capacity - first_position)
+      return std::unexpected(make_error(ErrorCode::InvalidArgument,
+                                        "prefill.attention", "plan, stream or chunk mismatch"));
+    auto populated = prep.populated.value();
+    if (!populated) return std::unexpected(populated.error());
+    if (*populated != first_position)
+      return std::unexpected(make_error(ErrorCode::InvalidPopulatedLength,
+                                        "prefill.attention", "chunk must append at populated length"));
 
-  std::uint64_t const residual_bytes =
-      static_cast<std::uint64_t>(valid_tokens) * kHidden * 4u;
-  for (void const* ptr : {static_cast<void const*>(residual),
-                          static_cast<void const*>(h_mid),
-                          static_cast<void const*>(next_h)}) {
-    auto st = qw38::cuda::validate_prefill_device_span(
-        ptr, residual_bytes, 4u, stream->device());
-    if (!st) return std::unexpected(from_cuda(st.error()));
+    std::uint64_t const residual_bytes =
+        static_cast<std::uint64_t>(valid_tokens) * kHidden * 4u;
+    for (void const* ptr : {static_cast<void const*>(residual),
+                            static_cast<void const*>(h_mid),
+                            static_cast<void const*>(next_h)}) {
+      auto st = qw38::cuda::validate_prefill_device_span(
+          ptr, residual_bytes, 4u, stream->device());
+      if (!st) return std::unexpected(from_cuda(st.error()));
+    }
+    std::array<Region, 4> active{region(residual, residual_bytes),
+        region(h_mid, residual_bytes), region(next_h, residual_bytes),
+        region(workspace.data(), workspace.bytes())};
+    for (std::size_t i = 0; i < active.size(); ++i)
+      for (std::size_t j = i + 1; j < active.size(); ++j)
+        if (overlaps(active[i], active[j]))
+          return std::unexpected(make_error(ErrorCode::InvalidArgument,
+                                            "prefill.attention.alias", "activation buffers overlap"));
+    std::array<std::pair<void const*, std::uint64_t>, 6> resident{{
+        {prep.kv.pointer, 16u * 2u * kKvHeads * prep.kv_capacity *
+                              kHeadDim * 2u},
+        {prep.gamma.pointer, kHidden * 2u},
+        {prep.gamma_q.pointer, kHeadDim * 2u},
+        {prep.gamma_k.pointer, kHeadDim * 2u},
+        {prep.inv_freq.pointer, 32u * 4u},
+        {p.mlp_gamma, kHidden * 2u}}};
+    for (auto const& [ptr, bytes] : resident)
+      for (Region a : active)
+        if (overlaps(a, region(ptr, bytes)))
+          return std::unexpected(make_error(ErrorCode::InvalidArgument,
+                                            "prefill.attention.alias", "buffer overlaps resident model or state"));
+    for (auto const& weight : {p.first, p.second, p.third, p.mixer_out,
+                               p.mlp_gate, p.mlp_up, p.mlp_down})
+      for (Region a : active)
+        if (overlaps(a, region(weight.codes, weight.codes_bytes)) ||
+            (weight.scales_bytes && overlaps(a, region(weight.scales, weight.scales_bytes))))
+          return std::unexpected(make_error(ErrorCode::InvalidArgument,
+                                            "prefill.attention.alias", "buffer overlaps weight"));
+
   }
-  std::array<Region, 4> active{region(residual, residual_bytes),
-      region(h_mid, residual_bytes), region(next_h, residual_bytes),
-      region(workspace.data(), workspace.bytes())};
-  for (std::size_t i = 0; i < active.size(); ++i)
-    for (std::size_t j = i + 1; j < active.size(); ++j)
-      if (overlaps(active[i], active[j]))
-        return std::unexpected(make_error(ErrorCode::InvalidArgument,
-                                          "prefill.attention.alias", "activation buffers overlap"));
-  std::array<std::pair<void const*, std::uint64_t>, 6> resident{{
-      {prep.kv.pointer, 16u * 2u * kKvHeads * prep.kv_capacity *
-                            kHeadDim * 2u},
-      {prep.gamma.pointer, kHidden * 2u},
-      {prep.gamma_q.pointer, kHeadDim * 2u},
-      {prep.gamma_k.pointer, kHeadDim * 2u},
-      {prep.inv_freq.pointer, 32u * 4u},
-      {p.mlp_gamma, kHidden * 2u}}};
-  for (auto const& [ptr, bytes] : resident)
-    for (Region a : active)
-      if (overlaps(a, region(ptr, bytes)))
-        return std::unexpected(make_error(ErrorCode::InvalidArgument,
-                                          "prefill.attention.alias", "buffer overlaps resident model or state"));
-  for (auto const& weight : {p.first, p.second, p.third, p.mixer_out,
-                             p.mlp_gate, p.mlp_up, p.mlp_down})
-    for (Region a : active)
-      if (overlaps(a, region(weight.codes, weight.codes_bytes)) ||
-          (weight.scales_bytes && overlaps(a, region(weight.scales, weight.scales_bytes))))
-        return std::unexpected(make_error(ErrorCode::InvalidArgument,
-                                          "prefill.attention.alias", "buffer overlaps weight"));
-
   auto s = workspace.slices();
   auto fail = [&](Error error) -> std::expected<void, Error> {
     prep.session_state->poison();
@@ -192,13 +197,26 @@ std::expected<void, Error> execute_prefill_attention_layer(
           const_cast<std::uint8_t*>(packed.codes.data()),const_cast<float*>(packed.scales.data()))); !st) return st;
   if (auto st = project(p.mixer_out, s.y, h_mid,
                         PrefillEpilogue::ResidualAddFp32, residual); !st) return st;
-  if (auto st = execute_prefill_mlp(p, engine, h_mid, next_h,
-                                    valid_tokens, first_position, prep.eps); !st)
+  if (auto st = detail::Submission::prefill_mlp(p, engine, h_mid, next_h,
+                                    valid_tokens, first_position, prep.eps, failure); !st)
     return fail(st.error());
+  if (!complete) return {};
   if (auto st = stream->sync(); !st) return fail(from_cuda(st.error()));
   if (auto st = prep.populated.commit_chunk(first_position, valid_tokens); !st)
     return fail(st.error());
   return {};
+}
+
+std::expected<void, Error> execute_prefill_attention_layer(
+    PrefillAttentionLayerPlan const& plan, PrefillAttentionWorkspace& workspace,
+    qw38::cuda::PrefillEngine& engine, float const* residual,
+    float* h_mid, float* next_h, std::uint32_t valid_tokens,
+    std::uint64_t first_position) {
+  if (plan.prep_.stream) {
+    if (auto st = qw38::cuda::require_uncaptured(*plan.prep_.stream); !st)
+      return std::unexpected(from_cuda(st.error()));
+  }
+  return detail::Submission::prefill_attention(plan, workspace, engine, residual, h_mid, next_h, valid_tokens, first_position, true);
 }
 
 }  // namespace qw38::runtime

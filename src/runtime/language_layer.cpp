@@ -1,3 +1,5 @@
+#include "runtime/submission.hpp"
+
 #include "runtime/language_layer.hpp"
 #include "runtime/profiling.hpp"
 
@@ -58,6 +60,22 @@ std::expected<TensorView, Error> execute_decode_language_layer(
     if (session_state != nullptr) session_state->poison();
     return std::unexpected(mlp.error());
   }
+  return plan.mlp_.next_h;
+}
+
+std::expected<TensorView, Error> detail::Submission::layer(
+    LanguageLayerPlan const& plan, qw38::cuda::DecodeControl const& pending,
+    qw38::cuda::DecodeControl const* control, std::uint64_t bucket, int* failure) {
+  if (plan.kind_ == LanguageMixerKind::Gdn) {
+    auto st = gdn(plan.gdn_, pending, control);
+    if (!st) return st;
+  } else {
+    auto st = attention_prep(plan.attention_.prep, pending.position, false, control);
+    if (!st) return std::unexpected(st.error());
+    auto mixed = attention_core(plan.attention_.core, pending.populated, control, bucket);
+    if (!mixed) return mixed;
+  }
+  if (auto st = mlp(plan.mlp_, failure); !st) return std::unexpected(st.error());
   return plan.mlp_.next_h;
 }
 

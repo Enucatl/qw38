@@ -19,7 +19,8 @@ RETAIN_CONTROL decisions, remain unchanged. The development starting point
 is TASK-036's FP8 mixer runtime/artifact; production remains TASK-026/027 at
 `d2f02e2`. Development dependencies do not assert production quality acceptance.
 
-The next sequence is **037 → 038 → 039 → 040**; all four start `TODO`:
+The next sequence was **037 → 038 → 039 → 040**; all four started `TODO` at
+the FAST-02 amendment:
 
 | Task | Name | Delivered milestone |
 | --- | --- | --- |
@@ -160,8 +161,9 @@ pass. The prefill regression and its unresolved cause remain recorded;
 diagnostic timings are not substituted for acceptance evidence. The sole
 blocker in Astra review pass 1 is resolved by this explicit authority change,
 not by a new review or performance result. TASK-040's final quality, replay,
-capacity and performance gates remain unchanged. TASK-039 is eligible but
-remains TODO. See the [completion report](tasks/TASK-038.md#completion-report).
+capacity and performance gates remain unchanged. TASK-039 subsequently
+completed; see its [completion report](tasks/TASK-039.md#completion-report) and
+the [TASK-038 completion report](tasks/TASK-038.md#completion-report).
 
 ## Fast-engine amendment — FAST-01 (2026-09-26)
 
@@ -406,7 +408,7 @@ Correctness and quality criteria remain unchanged; execute applicable checks onc
   existing ablations; new ablations need a specific diagnostic question.
 - Keep benchmarks separate from correctness tests. Preserve exact commands, results, artifact/binary identities, and hardware context in each completion report.
 - Executable status values are `TODO`, `IN_PROGRESS`, `BLOCKED`, and `DONE`.
-  TASK-001–030 and TASK-033–038 are `DONE`; TASK-039–040 are `TODO`.
+  TASK-001–030 and TASK-033–039 are `DONE`; TASK-040 is `TODO`.
   `SUPERSEDED` denotes
   retired TASK-031/032 cross-references, never implementation completion.
 - A rejected candidate is a useful experiment result. Record the reason and
@@ -607,14 +609,16 @@ an achieved performance target.
 | TASK-036 | Fast-engine validation and delivery decision | M15 | TASK-035 | New core-54/replay/capacity/PERF-01 decision and explicit speed-goal status | DONE |
 | TASK-037 | Integer Q4_K MLP consumers for prefill and decode | M16 | TASK-036 | Retained policy-1030 candidate; complete M=256 MLP and matched integrated prefill/decode improve; M=1 regression deferred by user-directed amendment | DONE |
 | TASK-038 | Pipelined attention with shared KV reuse | M17 | TASK-037 | Retained by explicit user acceptance; attention costs and numerical/quality checks pass; matched prefill regression 247.119085 → 270.714379 ms remains recorded | DONE |
-| TASK-039 | Token-boundary submission and decode graph replay | M18 | TASK-038 | Internal enqueue with safe completion commits, reduced waits and bounded graph/eager dispatch | TODO |
+| TASK-039 | Token-boundary submission and decode graph replay | M18 | TASK-038 | Internal enqueue with safe completion commits, reduced waits and bounded graph/eager dispatch | DONE |
 | TASK-040 | Quantized engine validation and delivery decision | M19 | TASK-039 | Frozen core-54/replay/capacity/PERF-01 evidence and promotion/retention with explicit speed gaps | TODO |
 
 TASK-037's original M=1 gate was superseded by the user-directed retention
 decision above. Its M=1 regression and review history remain recorded. TASK-038
-is also complete under its user-directed acceptance decision; TASK-039 is now
-eligible. See the [TASK-037 completion report](tasks/TASK-037.md#completion-report)
-and [TASK-038 completion report](tasks/TASK-038.md#completion-report).
+is also complete under its user-directed acceptance decision, and TASK-039 is
+complete with its tested graph default. See the
+[TASK-037 completion report](tasks/TASK-037.md#completion-report),
+[TASK-038 completion report](tasks/TASK-038.md#completion-report), and
+[TASK-039 completion report](tasks/TASK-039.md#completion-report).
 
 TASK-024 completed on 2026-09-25. The selected ordered FP32 state-resident
 recurrence uses 64-token intervals, supported by complete-layer measurements;
@@ -972,7 +976,7 @@ TASK-001 → 002 → 003 → 004 → 005 → 006
 
 | Task | Blocker | Evidence | Required follow-up |
 | ---- | ------- | -------- | ------------------ |
-| TASK-038 | Resolved by explicit user acceptance on 2026-09-27: matched integrated prefill regressed 9.55% despite lower complete attention costs in both phases. | Independent Astra review pass 2: PASS; pass 1's sole finding was the now-waived matched-prefill criterion. Candidate, exact commands and logs preserved under `.cache/evaluation/qw38-language-v2/task038-support/`; see [completion report](tasks/TASK-038.md#completion-report). | DONE under the user-directed acceptance amendment. Regression and unresolved cause remain recorded; final TASK-040 gates remain unchanged. TASK-039 is eligible and remains TODO. |
+| TASK-038 | Resolved by explicit user acceptance on 2026-09-27: matched integrated prefill regressed 9.55% despite lower complete attention costs in both phases. | Independent Astra review pass 2: PASS; pass 1's sole finding was the now-waived matched-prefill criterion. Candidate, exact commands and logs preserved under `.cache/evaluation/qw38-language-v2/task038-support/`; see [completion report](tasks/TASK-038.md#completion-report). | DONE under the user-directed acceptance amendment. Regression and unresolved cause remain recorded; final TASK-040 gates remain unchanged. TASK-039 completed next; see its [completion report](tasks/TASK-039.md#completion-report). |
 | TASK-017 | Resolved: stale compiler executable reported a graph-binding failure. | Current compiler source already assigns retained MTP layer bindings index 0; rebuilding produced both production and BF16 identity artifacts. | Completed primary-language decode and independent BF16/source validation; see [`TASK-017`](tasks/TASK-017.md). |
 | TASK-018 | Resolved: authority and sampler reproducibility findings were corrected and independently reviewed. | Fresh Sol high review of commit `bc3e33823b2a638004a00d30e15260990861a76` returned PASS with no findings or evidence requests. | TASK-020 materializes calibration/development token manifests before fitting; TASK-022/026 rebind preserved evaluation inputs to the reconciled policy identity before acceptance. |
 | TASK-022 | Resolved: corrected CandidateV2 passed the 54-case language-v2 core, including the repository owner's output-bound P100 review; independent Astra review passed on pass 2. The user accepted measured Q4_K/Q8 GEMV where no same-weight native W4A4 consumer exists. | The reviewed pair at `.cache/evaluation/qw38-language-v2/paired/llama-20260925T103522Z-694370-candidate-v2-core54-20260925T135734Z-740788-reviewed/summary.json` reports overall PASS, NLL +0.001365, C92 8/15 in both arms, L12 12/12 in both arms, both retrieval horizons 6/6, P100 review PASS, and state replay PASS. The original language-v1 failure remains historical evidence; the optional full-216 report remains inconclusive for P100 and is not acceptance evidence. See [`TASK-022`](tasks/TASK-022.md). | Completed; TASK-023 may proceed according to its dependency. |

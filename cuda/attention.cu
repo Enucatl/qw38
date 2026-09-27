@@ -125,7 +125,8 @@ __global__ void attention_prepare_kernel(
     std::uint16_t const* gamma_k, float const* inv_freq, float eps,
     float position, std::uint16_t* q_out, std::uint16_t* g_out,
     std::uint16_t* kv, std::uint32_t attn_layer, std::uint64_t capacity,
-    std::uint64_t token) {
+    std::uint64_t token, DecodeControl const* control = nullptr) {
+  if (control) { position = static_cast<float>(control->position); token = control->position; }
   std::size_t const row = blockIdx.y;
   qg += row * kAttnQueryHeads * 2u * kAttnHeadDim;
   k_raw += row * kAttnKvHeads * kAttnHeadDim;
@@ -173,7 +174,8 @@ __global__ void attention_prepare_kernel(
 // deterministic partition order. No barrier is needed inside that order.
 __global__ void attention_merge_kernel(
     float const* partials, std::uint16_t const* g, std::uint32_t n_segments,
-    std::uint16_t* y_out) {
+    std::uint16_t* y_out, DecodeControl const* control, std::uint32_t partition_limit) {
+  if (control) n_segments = min(static_cast<std::uint32_t>((control->populated + 255) / 256), partition_limit);
   __shared__ float maxima[kAttnMaxPartitions], sums[kAttnMaxPartitions];
   __shared__ float weights[kAttnMaxPartitions], denominator;
   unsigned const tid = threadIdx.x, h = blockIdx.x;
@@ -442,7 +444,15 @@ __global__ void attention_mma_kernel(
     std::uint64_t capacity, std::uint64_t first_position,
     std::uint32_t valid_tokens, std::uint16_t* y,
     std::uint8_t* fp8_codes, float* fp8_scales,
-    float* partials = nullptr, std::uint32_t partitions = 0) {
+    float* partials = nullptr, std::uint32_t partitions = 0,
+    DecodeControl const* control = nullptr, std::uint32_t partition_limit = 0) {
+  if constexpr (Decode) {
+    if (control) {
+      first_position = control->populated;
+      partitions = min(static_cast<std::uint32_t>((first_position + 255) / 256), partition_limit);
+      if (blockIdx.y >= partitions) return;
+    }
+  }
   constexpr int D = 256, K = 64, Q = 32;
   constexpr int ValueTiles = Decode ? 4 : 16;
   extern __shared__ __align__(16) unsigned char storage[];
@@ -631,7 +641,7 @@ std::expected<void, Error> launch_attention_prepare(
     std::uint16_t const* gamma_k, float const* inv_freq, float eps,
     std::int32_t position, std::uint16_t* q_out, std::uint16_t* g_out,
     std::uint16_t* kv, std::uint32_t attn_layer, std::uint64_t capacity,
-    std::uint64_t token, Stream const& stream) {
+    std::uint64_t token, Stream const& stream, DecodeControl const* control) {
   auto st = require_stream(stream, "attention_prepare");
   if (!st) {
     return st;
@@ -675,7 +685,7 @@ std::expected<void, Error> launch_attention_prepare(
   attention_prepare_kernel<<<kAttnPrepBlocks, kAttnPrepThreads, 0,
                              stream.native()>>>(
       qg, k_raw, v_raw, gamma_q, gamma_k, inv_freq, eps, pos, q_out, g_out, kv,
-      attn_layer, capacity, token);
+      attn_layer, capacity, token, control);
   return check(cudaGetLastError(), "attention_prepare_kernel");
 }
 
@@ -852,7 +862,8 @@ std::expected<AttentionPrefillResources, Error> attention_decode_resources() {
 std::expected<void, Error> launch_attention_scan(
     std::uint16_t const* q, std::uint16_t const* kv, std::uint32_t attn_layer,
     std::uint64_t capacity, std::uint64_t populated, float* partials,
-    std::uint32_t n_segments, Stream const& stream) {
+    std::uint32_t n_segments, Stream const& stream, DecodeControl const* control,
+    std::uint32_t partition_limit) {
   auto st = require_stream(stream, "attention_scan");
   if (!st) return st;
   if (q == nullptr || kv == nullptr || partials == nullptr) {
@@ -875,22 +886,27 @@ std::expected<void, Error> launch_attention_scan(
   constexpr auto kv_bytes_per_token = 16ull * 2 * kAttnKvHeads * kAttnHeadDim * 2;
   if (capacity > std::numeric_limits<std::size_t>::max() / kv_bytes_per_token)
     return std::unexpected(make_error(ErrorCode::Overflow, "attention_scan", "KV bytes overflow"));
+  if (!control) {
   if (auto st = validate_prefill_device_span(kv, capacity * kv_bytes_per_token, 16, stream.device()); !st) return st;
   if (auto st = validate_prefill_device_span(q, kAttnQueryHeads * kAttnHeadDim * 2u, 2, stream.device()); !st) return st;
   if (auto st = validate_prefill_device_span(partials,
       std::size_t(kAttnQueryHeads) * n_segments * kAttnPartialStride * 4u, 4, stream.device()); !st) return st;
+  }
   auto guard = stream.activate();
   if (!guard) return std::unexpected(guard.error());
-  if (auto st = configure_prefill_mma<true>(); !st) return st;
+  if (!control) {
+    if (auto st = configure_prefill_mma<true>(); !st) return st;
+  }
   attention_mma_kernel<true><<<dim3(kAttnKvHeads, n_segments), kPrefillThreads,
       kPrefillSharedBytes, stream.native()>>>(q, nullptr, kv, attn_layer, capacity,
-          populated, 1, nullptr, nullptr, nullptr, partials, n_segments);
+          populated, 1, nullptr, nullptr, nullptr, partials, n_segments, control, partition_limit);
   return check(cudaGetLastError(), "attention_mma_kernel<true>");
 }
 
 std::expected<void, Error> launch_attention_merge(
     float const* partials, std::uint16_t const* g, std::uint32_t n_segments,
-    std::uint16_t* y_out, Stream const& stream) {
+    std::uint16_t* y_out, Stream const& stream, DecodeControl const* control,
+    std::uint32_t partition_limit) {
   auto st = require_stream(stream, "attention_merge");
   if (!st) return st;
   if (partials == nullptr || g == nullptr || y_out == nullptr || n_segments > kAttnMaxPartitions) {
@@ -904,7 +920,7 @@ std::expected<void, Error> launch_attention_merge(
   auto guard = stream.activate();
   if (!guard) return std::unexpected(guard.error());
   attention_merge_kernel<<<kAttnQueryHeads, kAttnMergeThreads, 0, stream.native()>>>(
-      partials, g, n_segments, y_out);
+      partials, g, n_segments, y_out, control, partition_limit);
   return check(cudaGetLastError(), "attention_merge_kernel");
 }
 

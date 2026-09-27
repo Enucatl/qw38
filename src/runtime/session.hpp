@@ -113,11 +113,26 @@ class SessionExecutionState {
 
  private:
   friend class Session;
+  friend class LanguageModelPlan;
+  struct Unit {
+    explicit Unit(SessionExecutionState& s) : state(s) { state.busy_ = true; }
+    ~Unit() { state.busy_ = false; }
+    Unit(Unit const&) = delete;
+    Unit& operator=(Unit const&) = delete;
+    SessionExecutionState& state;
+  };
+  void commit_unit(std::uint32_t count) noexcept {
+    token_position_ += count;
+    for (auto& p : gdn_position) p += count;
+    for (auto& p : kv_populated) p += count;
+    for (auto& c : conv_cursor) c = (c + count) % kConvTaps;
+  }
   std::array<std::uint32_t, kConvLayers> conv_cursor{};
   std::array<std::uint64_t, kGdnLayers> gdn_position{};
   std::array<std::uint64_t, kAttnLayers> kv_populated{};
   std::uint64_t token_position_{};
   bool poisoned_{};
+  bool busy_{};
 };
 
 class Session {

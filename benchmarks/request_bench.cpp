@@ -224,6 +224,10 @@ struct Engine {
         }()),
         session(take(runtime.create_session(model, capacity))),
         plan(take(LanguageModelPlan::bind(model, session, runtime.stream()))) {
+    auto const* mode = std::getenv("QW38_DECODE_SUBMISSION");
+    bool const graph = !mode || std::string_view(mode) == "graph";
+    check(!mode || graph || std::string_view(mode) == "eager", "invalid decode submission");
+    plan.set_decode_submission(graph ? DecodeSubmission::Graph : DecodeSubmission::Eager);
     std::ostringstream digest;
     for (auto byte : model.schema().integrity.back().digest.bytes)
       digest << std::hex << std::setw(2) << std::setfill('0') << unsigned(byte);
@@ -244,7 +248,7 @@ struct Engine {
         << ",\"chunk\":256,\"kv_type\":\"BF16\",\"state_type\":\"FP32\""
         << ",\"activation_type\":\"" << (q8_mlp ? "BF16;E4M3 mixer prefill;Q8 K32 MLP" : fp8 ? "BF16;E4M3 mixer prefill" :
             nvfp4 ? "BF16;NVFP4 gate/up prefill" : "BF16")
-        << "\",\"graph_mode\":\"none\"";
+        << "\",\"graph_mode\":\"" << (graph ? "graph" : "eager") << "\"";
   }
   unsigned prefill(std::span<std::uint32_t const> ids) {
     auto result = take(plan.prefill_tokens(ids));
@@ -254,6 +258,7 @@ struct Engine {
   }
   unsigned decode(unsigned token) {
     auto result = take(plan.decode_token(token, position));
+    if (plan.graph_fallback()) fail(error_message(*plan.graph_fallback()));
     ++position;
     logits = result.logits;
     return result.argmax;

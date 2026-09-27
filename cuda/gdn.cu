@@ -110,7 +110,9 @@ __global__ void gdn_conv_silu_kernel(std::uint16_t const* qkv,
                                      std::uint16_t const* taps,
                                      std::uint16_t* history,
                                      std::uint32_t cursor,
-                                     std::uint16_t* convolved) {
+                                     std::uint16_t* convolved, DecodeControl const* control,
+    std::uint32_t cursor_index) {
+  if (control) cursor = control->cursor[cursor_index];
   std::uint32_t const c = blockIdx.x * blockDim.x + threadIdx.x;
   if (c >= kGdnQkvWidth) {
     return;
@@ -393,7 +395,8 @@ __global__ void gdn_prefill_recurrence_kernel(
 
 std::expected<void, Error> launch_gdn_conv_silu(
     std::uint16_t const* qkv, std::uint16_t const* taps, std::uint16_t* history,
-    std::uint32_t cursor, std::uint16_t* convolved, Stream const& stream) {
+    std::uint32_t cursor, std::uint16_t* convolved, Stream const& stream,
+    DecodeControl const* control, std::uint32_t cursor_index) {
   auto st = require_stream(stream, "gdn_conv_silu");
   if (!st) {
     return st;
@@ -417,7 +420,7 @@ std::expected<void, Error> launch_gdn_conv_silu(
   auto guard = stream.activate();
   if (!guard) return std::unexpected(guard.error());
   gdn_conv_silu_kernel<<<blocks, kGdnConvThreads, 0, stream.native()>>>(
-      qkv, taps, history, cursor, convolved);
+      qkv, taps, history, cursor, convolved, control, cursor_index);
   return check(cudaGetLastError(), "gdn_conv_silu_kernel");
 }
 

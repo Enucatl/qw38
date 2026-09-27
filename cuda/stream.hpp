@@ -6,6 +6,7 @@
 #include <cuda_runtime.h>
 
 #include <expected>
+#include <cstdint>
 
 namespace qw38::cuda {
 
@@ -48,6 +49,7 @@ namespace testing {
 // synchronization still completes so tests can deterministically exercise
 // deferred-failure metadata handling without leaving work in flight.
 void fail_next_stream_sync() noexcept;
+std::uint64_t stream_sync_count() noexcept;
 
 }  // namespace testing
 

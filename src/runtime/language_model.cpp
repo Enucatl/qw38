@@ -1,4 +1,6 @@
 #include "runtime/language_model.hpp"
+#include "runtime/submission.hpp"
+#include "cuda/attention.hpp"
 
 #include "cuda/activation.hpp"
 #include "cuda/copy.hpp"
@@ -7,6 +9,7 @@
 
 #include <algorithm>
 #include <array>
+#include <bit>
 #include <cmath>
 #include <limits>
 #include <new>
@@ -168,7 +171,14 @@ std::expected<LanguageModelPlan, Error> LanguageModelPlan::bind(
         plan.prefill_layers_.emplace_back(std::move(*bound));
       }
     }
-    plan.logits_.resize(kVocab);
+    auto readback = qw38::cuda::HostBuffer::allocate(kLogitsBytesPerToken +
+                                                    sizeof(qw38::cuda::DecodeControl) + sizeof(int));
+    if (!readback) return std::unexpected(from_cuda(readback.error()));
+    plan.readback_ = std::move(*readback);
+    auto failure = qw38::cuda::DeviceBuffer::allocate(sizeof(int), stream.device());
+    if (!failure) return std::unexpected(from_cuda(failure.error()));
+    plan.unit_failure_ = std::move(*failure);
+    plan.logits_ = {static_cast<float*>(plan.readback_.data()), kVocab};
     plan.model_ = &model;
     plan.stream_ = &stream;
     plan.state_ = state;
@@ -237,68 +247,146 @@ std::expected<LanguageModelPlan, Error> LanguageModelPlan::bind(
   }
 }
 
+std::expected<qw38::cuda::DecodeControl, Error> LanguageModelPlan::pending(
+    std::uint32_t token, std::uint64_t position, std::uint32_t count) const {
+  if (!state_ || state_->is_poisoned() || state_->busy_ || !stream_ || stream_->empty() ||
+      layers_.size() != kLanguageLayers)
+    return std::unexpected(make_error(ErrorCode::InvalidArgument, "session",
+                                      "session or plan is poisoned, moved or closed"));
+  if (auto st = qw38::cuda::require_uncaptured(*stream_); !st)
+    return std::unexpected(from_cuda(st.error()));
+  if (token >= kVocab)
+    return std::unexpected(make_error(ErrorCode::InvalidArgument, "token_id",
+                                      "token ID exceeds language vocabulary"));
+  if (!count || position >= kv_capacity_ || count > kv_capacity_ - position ||
+      position > std::numeric_limits<std::int32_t>::max() ||
+      count - 1u > std::numeric_limits<std::int32_t>::max() - position)
+    return std::unexpected(make_error(ErrorCode::InvalidCapacity, "position",
+                                      "position exceeds session or RoPE capacity"));
+  if (position != state_->token_position() || !state_->layers_at(position))
+    return std::unexpected(make_error(ErrorCode::InvalidPopulatedLength, "position",
+                                      "session is not at a complete token boundary"));
+  qw38::cuda::DecodeControl result{.position = position,
+                                   .populated = position + count, .token = token};
+  for (std::size_t i = 0; i < state_->conv_cursor.size(); ++i) {
+    auto c = state_->conv_cursor[i];
+    if (c >= kConvTaps)
+      return std::unexpected(make_error(ErrorCode::InvalidArgument, "cursor",
+                                        "convolution cursor exceeds ring"));
+    result.cursor[i] = c;
+  }
+  return result;
+}
+
+std::expected<void, Error> LanguageModelPlan::enqueue_decode(
+    qw38::cuda::DecodeControl const& p, qw38::cuda::DecodeControl const* controls,
+    std::uint64_t bucket) {
+  if (auto st = qw38::cuda::zero(unit_failure_, *stream_); !st)
+    return std::unexpected(from_cuda(st.error()));
+  if (auto st = qw38::cuda::launch_embed_gather(
+          embedding_, kVocab, p.token, residual_, *stream_, controls); !st)
+    return std::unexpected(from_cuda(st.error()));
+  for (auto const& layer : layers_) {
+    auto result = detail::Submission::layer(layer, p, controls, bucket,
+        static_cast<int*>(unit_failure_.data()));
+    if (!result) return std::unexpected(result.error());
+  }
+  if (auto st = qw38::cuda::launch_hidden_rms(
+          residual_, final_gamma_, kMlpRmsEps, 1, normalized_, *stream_); !st)
+    return std::unexpected(from_cuda(st.error()));
+  if (auto st = qw38::cuda::launch_decode_mmv(head_, *stream_); !st)
+    return std::unexpected(from_cuda(st.error()));
+  return {};
+}
+
+std::expected<void, Error> LanguageModelPlan::complete_unit() {
+  auto* host = reinterpret_cast<int*>(static_cast<std::byte*>(readback_.data()) +
+      kLogitsBytesPerToken + sizeof(qw38::cuda::DecodeControl));
+  if (auto st = qw38::cuda::copy_d2h(host, unit_failure_.data(), sizeof(int), *stream_); !st)
+    return std::unexpected(from_cuda(st.error()));
+  if (auto st = stream_->sync(); !st) return std::unexpected(from_cuda(st.error()));
+  if (*host)
+    return std::unexpected(from_cuda(qw38::cuda::make_error(
+        qw38::cuda::ErrorCode::InvalidArgument, "q8.producer",
+        "nonfinite producer or invalid Q8 scale")));
+  return {};
+}
+
+std::expected<void, Error> LanguageModelPlan::prepare_graph(
+    qw38::cuda::DecodeControl const& p) {
+  auto const bucket = std::min(kv_capacity_,
+      std::bit_ceil(std::max<std::uint64_t>(256, p.populated)));
+  if (!graph_.empty() && graph_bucket_ == bucket) return {};
+  // Calls occur only at completed token boundaries. No warmup inference.
+  graph_ = {};
+  graph_bucket_ = 0;
+  if (controls_.empty()) {
+    auto buffer = qw38::cuda::DeviceBuffer::allocate(sizeof(p), stream_->device());
+    if (!buffer) return std::unexpected(from_cuda(buffer.error()));
+    controls_ = std::move(*buffer);
+  }
+  auto guard = stream_->activate();
+  if (!guard) return std::unexpected(from_cuda(guard.error()));
+  if (auto resources = qw38::cuda::attention_decode_resources(); !resources)
+    return std::unexpected(from_cuda(resources.error()));
+  auto captured = qw38::cuda::Graph::begin(*stream_);
+  if (!captured) return std::unexpected(from_cuda(captured.error()));
+  auto enqueued = enqueue_decode(p,
+      static_cast<qw38::cuda::DecodeControl const*>(controls_.data()), bucket);
+  auto finished = captured->finish(); // End even an invalidated capture.
+  if (!enqueued) {
+    // Capture recorded work only; no persistent bytes were mutated.
+    state_->recover();
+    return std::unexpected(enqueued.error());
+  }
+  if (!finished) return std::unexpected(from_cuda(finished.error()));
+  graph_ = std::move(*captured);
+  graph_bucket_ = bucket;
+  ++graph_builds_;
+  return {};
+}
+
 std::expected<DecodeResult, Error> LanguageModelPlan::decode_token(
     std::uint32_t token_id, std::uint64_t position) {
   profiling::ScopedRange token_range("decode_token");
-  if (state_ == nullptr || state_->is_poisoned()) {
-    return std::unexpected(make_error(ErrorCode::InvalidArgument, "session",
-                                      "session is poisoned or closed"));
-  }
-  if (token_id >= kVocab) {
-    return std::unexpected(make_error(ErrorCode::InvalidArgument, "token_id",
-                                      "token ID exceeds language vocabulary"));
-  }
-  if (position >= kv_capacity_ ||
-      position > static_cast<std::uint64_t>(std::numeric_limits<std::int32_t>::max())) {
-    return std::unexpected(make_error(ErrorCode::InvalidCapacity, "position",
-                                      "position exceeds session or RoPE capacity"));
-  }
-  if (position != state_->token_position() || !state_->layers_at(position)) {
-    return std::unexpected(make_error(ErrorCode::InvalidPopulatedLength,
-                                      "position", "session is not at a complete token boundary"));
-  }
+  auto p = pending(token_id, position, 1);
+  if (!p) return std::unexpected(p.error());
   auto fail = [&](Error error) -> std::expected<DecodeResult, Error> {
     state_->poison();
+    (void)stream_->sync(); // Drain before any borrowed/owned staging may die.
     return std::unexpected(std::move(error));
   };
-  profiling::ScopedRange embedding_range("embedding");
-  if (auto st = qw38::cuda::launch_embed_gather(
-          embedding_, kVocab, token_id, residual_, *stream_); !st) {
-    return fail(from_cuda(st.error()));
+  SessionExecutionState::Unit unit(*state_);
+  bool replay = submission_ == DecodeSubmission::Graph && !graph_failure_;
+  if (replay) {
+    if (auto st = prepare_graph(*p); !st) {
+      graph_failure_ = st.error();
+      replay = false; // Construction failed before execution; eager is safe.
+    }
   }
-  embedding_range.close();
-  profiling::ScopedRange layers_range("language_layers");
-  for (auto const& layer : layers_) {
-    auto result = execute_decode_language_layer(layer, position);
-    if (!result) return fail(result.error());
-  }
-  layers_range.close();
-  if (!state_->layers_at(position + 1u)) {
-    return fail(make_error(ErrorCode::Internal, "position",
-                           "a language layer did not advance its state"));
-  }
-  profiling::ScopedRange readout_range("vocabulary_readout");
-  if (auto st = qw38::cuda::launch_hidden_rms(
-          residual_, final_gamma_, kMlpRmsEps, 1, normalized_, *stream_); !st) {
-    return fail(from_cuda(st.error()));
-  }
-  if (auto st = qw38::cuda::launch_decode_mmv(head_, *stream_); !st) {
-    return fail(from_cuda(st.error()));
+  if (replay) {
+    auto* host = reinterpret_cast<qw38::cuda::DecodeControl*>(
+        static_cast<std::byte*>(readback_.data()) + kLogitsBytesPerToken);
+    *host = *p;
+    if (auto st = qw38::cuda::copy_h2d(controls_.data(), host, sizeof(*host), *stream_); !st)
+      return fail(from_cuda(st.error()));
+    if (auto st = graph_.launch(*stream_); !st) return fail(from_cuda(st.error()));
+    ++graph_replays_;
+  } else {
+    if (auto st = enqueue_decode(*p, nullptr, 0); !st) return fail(st.error());
   }
   if (auto st = qw38::cuda::copy_d2h(logits_.data(), device_logits_,
-                                     kLogitsBytesPerToken, *stream_); !st) {
+                                     kLogitsBytesPerToken, *stream_); !st)
     return fail(from_cuda(st.error()));
-  }
-  if (auto st = stream_->sync(); !st) return fail(from_cuda(st.error()));
+  if (auto st = complete_unit(); !st) return fail(st.error());
   std::uint32_t best = 0;
   for (std::uint32_t i = 0; i < kVocab; ++i) {
-    if (!std::isfinite(logits_[i])) {
+    if (!std::isfinite(logits_[i]))
       return fail(make_error(ErrorCode::Internal, "logits",
                              "language head produced a non-finite logit"));
-    }
     if (logits_[i] > logits_[best]) best = i;
   }
-  state_->commit_token();
+  state_->commit_unit(1);
   return DecodeResult{.logits = logits_, .argmax = best};
 }
 
@@ -359,7 +447,7 @@ std::expected<DecodeResult, Error> LanguageModelPlan::prefill_tokens(
     std::span<std::uint32_t const> token_ids,
     std::span<std::uint64_t const> requested_rows,
     LogitRowSink const& sink) {
-  if (!state_ || state_->is_poisoned() || !stream_ || stream_->empty()) {
+  if (!state_ || state_->is_poisoned() || state_->busy_ || !stream_ || stream_->empty()) {
     return std::unexpected(make_error(ErrorCode::InvalidArgument, "session",
                                       "session is poisoned or closed"));
   }
@@ -388,12 +476,16 @@ std::expected<DecodeResult, Error> LanguageModelPlan::prefill_tokens(
       return std::unexpected(make_error(ErrorCode::InvalidArgument, "prefill.rows",
                                         "requested rows must be unique and increasing"));
   }
+  auto initial_pending = pending(token_ids.front(), first,
+      static_cast<std::uint32_t>(token_ids.size()));
+  if (!initial_pending) return std::unexpected(initial_pending.error());
   if (auto st = initialize_prefill(); !st) return std::unexpected(st.error());
   auto fail = [&](Error error) -> std::expected<DecodeResult, Error> {
     state_->poison();
     (void)stream_->sync();
     return std::unexpected(std::move(error));
   };
+  SessionExecutionState::Unit unit(*state_);
   auto& p = *prefill_;
   std::size_t row_index = 0;
   std::uint32_t best = 0;
@@ -401,6 +493,13 @@ std::expected<DecodeResult, Error> LanguageModelPlan::prefill_tokens(
     auto const count = static_cast<std::uint32_t>(std::min<std::size_t>(
         kArenaTokenCapacity, token_ids.size() - offset));
     auto const position = first + offset;
+    auto chunk_pending = *initial_pending;
+    chunk_pending.position = position;
+    chunk_pending.populated = position + count;
+    for (auto& cursor : chunk_pending.cursor)
+      cursor = (cursor + offset % kConvTaps) % kConvTaps;
+    if (auto st = qw38::cuda::zero(unit_failure_, *stream_); !st)
+      return fail(from_cuda(st.error()));
     if (auto st = qw38::cuda::copy_h2d(p.token_ids.data(), token_ids.data() + offset,
                                        count * sizeof(std::uint32_t), *stream_); !st)
       return fail(from_cuda(st.error()));
@@ -414,21 +513,19 @@ std::expected<DecodeResult, Error> LanguageModelPlan::prefill_tokens(
     for (auto& layer : prefill_layers_) {
       std::expected<void, Error> status;
       if (auto* gdn = std::get_if<PrefillGdnLayerPlan>(&layer))
-        status = execute_prefill_gdn_layer(*gdn, p.gdn_workspace, p.engine,
-                                           residual, h_mid, next, count, position);
+        status = detail::Submission::prefill_gdn(*gdn, p.gdn_workspace, p.engine,
+                                           residual, h_mid, next, count, position, 64, false, static_cast<int*>(unit_failure_.data()), &chunk_pending);
       else
-        status = execute_prefill_attention_layer(
+        status = detail::Submission::prefill_attention(
             std::get<PrefillAttentionLayerPlan>(layer), p.attention_workspace,
-            p.engine, residual, h_mid, next, count, position);
+            p.engine, residual, h_mid, next, count, position, false, static_cast<int*>(unit_failure_.data()));
       if (!status) return fail(status.error());
       auto* old = residual;
       residual = next;
       next = h_mid;
       h_mid = old;
     }
-    if (!state_->layers_at(position + count))
-      return fail(make_error(ErrorCode::Internal, "prefill.position",
-                             "a language layer did not advance its state"));
+    bool completed = false;
     auto readout = [&](std::uint32_t row) -> std::expected<std::uint32_t, Error> {
       if (auto st = qw38::cuda::launch_hidden_rms(
               residual + static_cast<std::uint64_t>(row) * kHidden,
@@ -440,7 +537,8 @@ std::expected<DecodeResult, Error> LanguageModelPlan::prefill_tokens(
       if (auto st = qw38::cuda::copy_d2h(logits_.data(), device_logits_,
                                          kLogitsBytesPerToken, *stream_); !st)
         return std::unexpected(from_cuda(st.error()));
-      if (auto st = stream_->sync(); !st) return std::unexpected(from_cuda(st.error()));
+      if (auto st = complete_unit(); !st) return std::unexpected(st.error());
+      completed = true;
       std::uint32_t argmax = 0;
       for (std::uint32_t i = 0; i < kVocab; ++i) {
         if (!std::isfinite(logits_[i]))
@@ -481,7 +579,10 @@ std::expected<DecodeResult, Error> LanguageModelPlan::prefill_tokens(
       if (!result) return fail(result.error());
       best = *result;
     }
-    for (std::uint32_t i = 0; i < count; ++i) state_->commit_token();
+    if (!completed) {
+      if (auto st = complete_unit(); !st) return fail(st.error());
+    }
+    state_->commit_unit(count);
     offset += count;
   }
   return DecodeResult{.logits = logits_, .argmax = best};

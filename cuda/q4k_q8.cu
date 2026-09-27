@@ -1,4 +1,5 @@
 #include "cuda/q4k_q8.hpp"
+#include "cuda/graph.hpp"
 #include "cuda/activation.hpp"
 #include "cuda/prefill.hpp"
 #include "cuda/q8_device.cuh"
@@ -204,8 +205,11 @@ std::expected<void,Error> q4k_q8_project(PrefillWeight const& w,Q8Input x,
 
 std::expected<void,Error> q4k_q8_mlp(PrefillWeight const& gate,PrefillWeight const& up,
     PrefillWeight const& down,float const* residual,std::uint16_t const* gamma,
-    float eps,float* output,unsigned m,std::span<std::byte> workspace,Stream const& stream,bool& submitted) {
+    float eps,float* output,unsigned m,std::span<std::byte> workspace,Stream const& stream,bool& submitted, int* pending_failure) {
   submitted=false;
+  if (!pending_failure) {
+    if (auto st = require_uncaptured(stream); !st) return st;
+  }
   if (!m || m>256 || workspace.size()<q8_mlp_workspace_bytes(m) ||
       !std::isfinite(eps) || eps<=0 || gate.n!=17408 || gate.k!=5120 ||
       up.n!=gate.n || up.k!=gate.k || down.n!=5120 || down.k!=17408)
@@ -215,18 +219,20 @@ std::expected<void,Error> q4k_q8_mlp(PrefillWeight const& gate,PrefillWeight con
       Region{up.codes,up.codes_bytes,4},Region{up.scales,up.scales_bytes,2},
       Region{down.codes,down.codes_bytes,4},Region{down.scales,down.scales_bytes,2},
       Region{residual,std::uint64_t(m)*5120*4,4},Region{gamma,5120*2,2},
-      Region{output,std::uint64_t(m)*5120*4,4},Region{workspace.data(),workspace.size(),4}};
-  if(auto st=distinct(regions,stream);!st)return st;
+      Region{output,std::uint64_t(m)*5120*4,4},Region{workspace.data(),workspace.size(),4},
+      Region{pending_failure,4,4}};
+  if(auto st=distinct(std::span(regions).first(pending_failure ? 11 : 10),stream);!st)return st;
   auto guard=stream.activate();if(!guard)return std::unexpected(guard.error());
   auto* codes=reinterpret_cast<std::int8_t*>(workspace.data());
   auto* scales=reinterpret_cast<float*>(codes+std::size_t(m)*17408);
   auto* sums=reinterpret_cast<int*>(scales+std::size_t(m)*544);
   auto* g=reinterpret_cast<float*>(sums+std::size_t(m)*544);
   auto* u=g+std::size_t(m)*17408;
-  auto* failure=reinterpret_cast<int*>(u+std::size_t(m)*17408);
-  auto fail=[&](Error e)->std::expected<void,Error> { (void)stream.sync();return std::unexpected(std::move(e)); };
+  auto* failure=pending_failure ? pending_failure : reinterpret_cast<int*>(u+std::size_t(m)*17408);
+  auto fail=[&](Error e)->std::expected<void,Error> { if (!pending_failure) (void)stream.sync();return std::unexpected(std::move(e)); };
   submitted=true;
-  if(auto st=check(cudaMemsetAsync(failure,0,4,stream.native()),"q8.clear_failure");!st)return fail(st.error());
+  if (!pending_failure)
+    if(auto st=check(cudaMemsetAsync(failure,0,4,stream.native()),"q8.clear_failure");!st)return fail(st.error());
   if(auto st=launch_hidden_rms_q8(residual,gamma,eps,m,codes,scales,sums,failure,stream);!st)return fail(st.error());
   Q8Input x{{codes,std::size_t(m)*5120},{scales,std::size_t(m)*160},{sums,std::size_t(m)*160},m,5120,5120};
   project(gate,x,g,nullptr,stream);
@@ -238,6 +244,7 @@ std::expected<void,Error> q4k_q8_mlp(PrefillWeight const& gate,PrefillWeight con
   x={{codes,std::size_t(m)*17408},{scales,std::size_t(m)*544},{sums,std::size_t(m)*544},m,17408,17408};
   project(down,x,output,residual,stream);
   if(auto st=check(cudaGetLastError(),"q8.down");!st)return fail(st.error());
+  if (pending_failure) return {};
   int bad=0;
   if(auto st=check(cudaMemcpyAsync(&bad,failure,4,cudaMemcpyDeviceToHost,stream.native()),"q8.failure");!st)return fail(st.error());
   if(auto st=stream.sync();!st)return st;

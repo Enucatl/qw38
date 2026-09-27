@@ -1,3 +1,6 @@
+#include "runtime/submission.hpp"
+#include "cuda/graph.hpp"
+
 #include "runtime/prefill.hpp"
 
 #include "cuda/activation.hpp"
@@ -92,73 +95,76 @@ PrefillGdnSlices PrefillGdnWorkspace::slices() noexcept {
   return v;
 }
 
-std::expected<void, Error> execute_prefill_gdn_layer(
+std::expected<void, Error> detail::Submission::prefill_gdn(
     PrefillGdnLayerPlan const& plan, PrefillGdnWorkspace& workspace,
     qw38::cuda::PrefillEngine& engine, float const* residual,
     float* h_mid, float* next_h, std::uint32_t valid_tokens,
-    std::uint64_t first_position, std::uint32_t recurrence_interval) {
+    std::uint64_t first_position, std::uint32_t recurrence_interval, bool complete, int* failure, qw38::cuda::DecodeControl const* pending) {
   auto const& gdn = plan.gdn_;
   auto const& p = plan.projections_;
   auto const* stream = gdn.front.stream;
-  if (!stream || stream->empty() || engine.stream() != stream ||
-      gdn.session_state == nullptr || gdn.session_state->is_poisoned() ||
-      !p.gdn || p.layer != gdn.front.language_layer ||
-      valid_tokens == 0 || valid_tokens > workspace.token_capacity() ||
-      valid_tokens > engine.token_capacity() ||
-      recurrence_interval == 0 ||
-      recurrence_interval > qw38::cuda::kPrefillMaxTokens ||
-      workspace.device() != stream->device() ||
-      first_position > std::numeric_limits<std::uint64_t>::max() - valid_tokens)
-    return std::unexpected(make_error(ErrorCode::InvalidArgument, "prefill.gdn",
-                                      "plan, stream, interval or chunk mismatch"));
-  if (auto st = gdn.position.validate(first_position); !st)
-    return std::unexpected(st.error());
-  auto cursor = gdn.front.cursor.value();
-  if (!cursor) return std::unexpected(cursor.error());
-
-  std::uint64_t const residual_bytes =
-      static_cast<std::uint64_t>(valid_tokens) * kHidden * 4u;
-  for (void const* ptr : {static_cast<void const*>(residual),
-                          static_cast<void const*>(h_mid),
-                          static_cast<void const*>(next_h)}) {
-    auto st = qw38::cuda::validate_prefill_device_span(
-        ptr, residual_bytes, 4u, stream->device());
-    if (!st) return std::unexpected(from_cuda(st.error()));
-  }
-  auto const r = region(residual, residual_bytes);
-  auto const mid = region(h_mid, residual_bytes);
-  auto const out = region(next_h, residual_bytes);
-  auto const scratch = region(workspace.data(), workspace.bytes());
-  if (overlaps(r, mid) || overlaps(r, out) || overlaps(mid, out) ||
-      overlaps(r, scratch) || overlaps(mid, scratch) || overlaps(out, scratch))
-    return std::unexpected(make_error(ErrorCode::InvalidArgument,
-                                      "prefill.gdn.alias", "activation buffers overlap"));
-  std::array<Region, 2> writable{mid, out};
   auto const& f = gdn.front;
-  std::array<std::pair<void const*, std::uint64_t>, 9> persistent{{
-      {f.history.pointer, kConvTaps * kConvChannels * 2u},
-      {gdn.s.pointer, kGdnSBytes},
-      {f.gamma.pointer, kHidden * 2u},
-      {f.taps.pointer, kConvKernel * kConvChannels * 2u},
-      {f.a_log.pointer, kGdnValueHeads * 2u},
-      {f.dt_bias.pointer, kGdnValueHeads * 2u},
-      {gdn.gated_gamma.pointer, kGdnValueDim * 2u},
-      {p.mlp_gamma, kHidden * 2u},
-      {workspace.data(), workspace.bytes()}}};
-  for (Region target : writable)
-    for (auto const& [ptr, bytes] : persistent)
-      if (auto st = reject_overlap(target, ptr, bytes); !st) return st;
-  for (auto const& [ptr, bytes] : persistent)
-    if (auto st = reject_overlap(r, ptr, bytes); !st) return st;
-  for (auto const& weight : {p.first, p.second, p.third, p.fourth,
-                             p.mixer_out, p.mlp_gate, p.mlp_up, p.mlp_down})
-    for (Region target : writable) {
-      if (auto st = reject_overlap(target, weight.codes, weight.codes_bytes); !st)
-        return st;
-      if (auto st = reject_overlap(target, weight.scales, weight.scales_bytes); !st)
-        return st;
-    }
+  auto cursor = pending ? std::expected<std::uint32_t, Error>(pending->cursor[f.gdn_layer])
+                        : f.cursor.value();
+  if (!cursor) return std::unexpected(cursor.error());
+  if (complete) {
+    if (!stream || stream->empty() || engine.stream() != stream ||
+        gdn.session_state == nullptr || gdn.session_state->is_poisoned() ||
+        !p.gdn || p.layer != gdn.front.language_layer ||
+        valid_tokens == 0 || valid_tokens > workspace.token_capacity() ||
+        valid_tokens > engine.token_capacity() ||
+        recurrence_interval == 0 ||
+        recurrence_interval > qw38::cuda::kPrefillMaxTokens ||
+        workspace.device() != stream->device() ||
+        first_position > std::numeric_limits<std::uint64_t>::max() - valid_tokens)
+      return std::unexpected(make_error(ErrorCode::InvalidArgument, "prefill.gdn",
+                                        "plan, stream, interval or chunk mismatch"));
+    if (auto st = gdn.position.validate(first_position); !st)
+      return std::unexpected(st.error());
 
+    std::uint64_t const residual_bytes =
+        static_cast<std::uint64_t>(valid_tokens) * kHidden * 4u;
+    for (void const* ptr : {static_cast<void const*>(residual),
+                            static_cast<void const*>(h_mid),
+                            static_cast<void const*>(next_h)}) {
+      auto st = qw38::cuda::validate_prefill_device_span(
+          ptr, residual_bytes, 4u, stream->device());
+      if (!st) return std::unexpected(from_cuda(st.error()));
+    }
+    auto const r = region(residual, residual_bytes);
+    auto const mid = region(h_mid, residual_bytes);
+    auto const out = region(next_h, residual_bytes);
+    auto const scratch = region(workspace.data(), workspace.bytes());
+    if (overlaps(r, mid) || overlaps(r, out) || overlaps(mid, out) ||
+        overlaps(r, scratch) || overlaps(mid, scratch) || overlaps(out, scratch))
+      return std::unexpected(make_error(ErrorCode::InvalidArgument,
+                                        "prefill.gdn.alias", "activation buffers overlap"));
+    std::array<Region, 2> writable{mid, out};
+    std::array<std::pair<void const*, std::uint64_t>, 9> persistent{{
+        {f.history.pointer, kConvTaps * kConvChannels * 2u},
+        {gdn.s.pointer, kGdnSBytes},
+        {f.gamma.pointer, kHidden * 2u},
+        {f.taps.pointer, kConvKernel * kConvChannels * 2u},
+        {f.a_log.pointer, kGdnValueHeads * 2u},
+        {f.dt_bias.pointer, kGdnValueHeads * 2u},
+        {gdn.gated_gamma.pointer, kGdnValueDim * 2u},
+        {p.mlp_gamma, kHidden * 2u},
+        {workspace.data(), workspace.bytes()}}};
+    for (Region target : writable)
+      for (auto const& [ptr, bytes] : persistent)
+        if (auto st = reject_overlap(target, ptr, bytes); !st) return st;
+    for (auto const& [ptr, bytes] : persistent)
+      if (auto st = reject_overlap(r, ptr, bytes); !st) return st;
+    for (auto const& weight : {p.first, p.second, p.third, p.fourth,
+                               p.mixer_out, p.mlp_gate, p.mlp_up, p.mlp_down})
+      for (Region target : writable) {
+        if (auto st = reject_overlap(target, weight.codes, weight.codes_bytes); !st)
+          return st;
+        if (auto st = reject_overlap(target, weight.scales, weight.scales_bytes); !st)
+          return st;
+      }
+
+  }
   auto s = workspace.slices();
   auto fail = [&](Error error) -> std::expected<void, Error> {
     gdn.session_state->poison();
@@ -224,15 +230,28 @@ std::expected<void, Error> execute_prefill_gdn_layer(
           const_cast<std::uint8_t*>(packed.codes.data()),const_cast<float*>(packed.scales.data()))); !st) return st;
   if (auto st = project(p.mixer_out, s.u, h_mid,
                         PrefillEpilogue::ResidualAddFp32, residual); !st) return st;
-  if (auto st = execute_prefill_mlp(p, engine, h_mid, next_h,
-                                     valid_tokens, first_position, f.eps); !st)
+  if (auto st = detail::Submission::prefill_mlp(p, engine, h_mid, next_h,
+                                     valid_tokens, first_position, f.eps, failure); !st)
     return fail(st.error());
+  if (!complete) return {};
   if (auto st = stream->sync(); !st) return fail(from_cuda(st.error()));
   if (auto st = f.cursor.commit_chunk(*cursor, valid_tokens); !st)
     return fail(st.error());
   if (auto st = gdn.position.commit_chunk(first_position, valid_tokens); !st)
     return fail(st.error());
   return {};
+}
+
+std::expected<void, Error> execute_prefill_gdn_layer(
+    PrefillGdnLayerPlan const& plan, PrefillGdnWorkspace& workspace,
+    qw38::cuda::PrefillEngine& engine, float const* residual,
+    float* h_mid, float* next_h, std::uint32_t valid_tokens,
+    std::uint64_t first_position, std::uint32_t recurrence_interval) {
+  if (plan.gdn_.front.stream) {
+    if (auto st = qw38::cuda::require_uncaptured(*plan.gdn_.front.stream); !st)
+      return std::unexpected(from_cuda(st.error()));
+  }
+  return detail::Submission::prefill_gdn(plan, workspace, engine, residual, h_mid, next_h, valid_tokens, first_position, recurrence_interval, true);
 }
 
 }  // namespace qw38::runtime

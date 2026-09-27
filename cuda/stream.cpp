@@ -6,6 +6,7 @@ namespace qw38::cuda {
 namespace {
 
 std::atomic<bool> g_fail_next_stream_sync{false};
+std::atomic<std::uint64_t> g_stream_sync_count{0};
 
 }  // namespace
 
@@ -81,6 +82,7 @@ std::expected<void, Error> Stream::sync() const {
   if (!guard) {
     return std::unexpected(guard.error());
   }
+  g_stream_sync_count.fetch_add(1, std::memory_order_relaxed);
   if (auto st = check(cudaStreamSynchronize(stream_), "cudaStreamSynchronize");
       !st) {
     return st;
@@ -91,6 +93,10 @@ std::expected<void, Error> Stream::sync() const {
         "injected deferred stream failure"));
   }
   return {};
+}
+
+std::uint64_t testing::stream_sync_count() noexcept {
+  return g_stream_sync_count.load(std::memory_order_relaxed);
 }
 
 void testing::fail_next_stream_sync() noexcept {

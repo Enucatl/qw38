@@ -109,7 +109,8 @@ __device__ __forceinline__ float silu_fp32(float z) {
 }
 
 __global__ void embed_gather_kernel(std::uint16_t const* table,
-                                    std::uint32_t token_id, float* residual) {
+                                    std::uint32_t token_id, float* residual, DecodeControl const* control) {
+  if (control) token_id = control->token;
   std::uint32_t const row = token_id * kHidden;
   for (std::uint32_t i = threadIdx.x; i < kHidden; i += blockDim.x) {
     residual[i] = bf16_to_fp32(table[row + i]);
@@ -429,7 +430,7 @@ std::expected<void, Error> launch_embed_gather(std::uint16_t const* table,
                                                std::uint32_t vocab,
                                                std::uint32_t token_id,
                                                float* residual,
-                                               Stream const& stream) {
+                                               Stream const& stream, DecodeControl const* control) {
   auto st = require_stream(stream, "embed_gather");
   if (!st) {
     return st;
@@ -445,7 +446,7 @@ std::expected<void, Error> launch_embed_gather(std::uint16_t const* table,
   auto guard = stream.activate();
   if (!guard) return std::unexpected(guard.error());
   embed_gather_kernel<<<1, kHiddenRmsThreads, 0, stream.native()>>>(
-      table, token_id, residual);
+      table, token_id, residual, control);
   return check(cudaGetLastError(), "embed_gather_kernel");
 }
 

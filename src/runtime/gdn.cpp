@@ -1,3 +1,5 @@
+#include "runtime/submission.hpp"
+
 #include "runtime/gdn.hpp"
 
 #include "cuda/activation.hpp"
@@ -472,8 +474,10 @@ std::expected<void, Error> region_ab(GdnFrontPlan const& plan) {
   return {};
 }
 
-std::expected<std::uint32_t, Error> region_conv(GdnFrontPlan const& plan) {
-  auto current = plan.cursor.value();
+std::expected<std::uint32_t, Error> region_conv(GdnFrontPlan const& plan,
+    qw38::cuda::DecodeControl const* pending = nullptr,
+    qw38::cuda::DecodeControl const* control = nullptr) {
+  auto current = pending ? std::expected<std::uint32_t, Error>(pending->cursor[plan.gdn_layer]) : plan.cursor.value();
   if (!current) {
     return std::unexpected(current.error());
   }
@@ -483,7 +487,7 @@ std::expected<std::uint32_t, Error> region_conv(GdnFrontPlan const& plan) {
   auto* taps = static_cast<std::uint16_t const*>(plan.taps.pointer);
   std::uint32_t const cursor = *current;
   if (auto st = qw38::cuda::launch_gdn_conv_silu(qkv, taps, history, cursor,
-                                                 convolved, *plan.stream);
+                                                 convolved, *plan.stream, control, plan.gdn_layer);
       !st) {
     return std::unexpected(from_cuda(st.error()));
   }
@@ -1335,28 +1339,32 @@ std::expected<void, Error> region_out_residual(GdnPlan const& plan) {
 }
 
 std::expected<TensorView, Error> execute_decode_gdn_impl(
-    GdnPlan const& plan, std::uint64_t position, GdnRegionTimings* timings) {
-  if (plan.session_state != nullptr && plan.session_state->is_poisoned()) {
-    return std::unexpected(arg_error("session", "session is poisoned"));
-  }
-  if (plan.front.stream == nullptr || plan.front.stream->empty()) {
-    return std::unexpected(arg_error("stream", "empty stream"));
-  }
-  if (auto st = plan.position.validate(position); !st) {
-    return std::unexpected(st.error());
-  }
-  cudaStreamCaptureStatus capture_status = cudaStreamCaptureStatusNone;
-  if (auto st = qw38::cuda::check(
-          cudaStreamIsCapturing(plan.front.stream->native(), &capture_status),
-          "cudaStreamIsCapturing");
-      !st) {
-    return std::unexpected(from_cuda(st.error()));
-  }
-  if (capture_status == cudaStreamCaptureStatusActive) {
-    return std::unexpected(arg_error(
-        "stream.capture", "GDN decode does not support stream capture"));
-  }
+    GdnPlan const& plan, std::uint64_t position, GdnRegionTimings* timings,
+    qw38::cuda::DecodeControl const* pending = nullptr,
+    qw38::cuda::DecodeControl const* control = nullptr) {
+  if (!pending) {
+    if (plan.session_state != nullptr && plan.session_state->is_poisoned()) {
+      return std::unexpected(arg_error("session", "session is poisoned"));
+    }
+    if (plan.front.stream == nullptr || plan.front.stream->empty()) {
+      return std::unexpected(arg_error("stream", "empty stream"));
+    }
+    if (auto st = plan.position.validate(position); !st) {
+      return std::unexpected(st.error());
+    }
+    cudaStreamCaptureStatus capture_status = cudaStreamCaptureStatusNone;
+    if (auto st = qw38::cuda::check(
+            cudaStreamIsCapturing(plan.front.stream->native(), &capture_status),
+            "cudaStreamIsCapturing");
+        !st) {
+      return std::unexpected(from_cuda(st.error()));
+    }
+    if (capture_status == cudaStreamCaptureStatusActive) {
+      return std::unexpected(arg_error(
+          "stream.capture", "GDN decode does not support stream capture"));
+    }
 
+  }
   using qw38::cuda::Event;
   using qw38::cuda::elapsed_ms;
   Event marks[kGdnMixerRegions + 1];
@@ -1401,7 +1409,7 @@ std::expected<TensorView, Error> execute_decode_gdn_impl(
   if (auto st = mark(3); !st) {
     return std::unexpected(st.error());
   }
-  auto cursor = region_conv(plan.front);
+  auto cursor = region_conv(plan.front, pending, control);
   if (!cursor) {
     return std::unexpected(cursor.error());
   }
@@ -1433,6 +1441,7 @@ std::expected<TensorView, Error> execute_decode_gdn_impl(
     return std::unexpected(st.error());
   }
 
+  if (pending) return plan.residual_out;
   if (timings != nullptr) {
     if (auto st = marks[kGdnMixerRegions].sync(); !st) {
       return std::unexpected(from_cuda(st.error()));
@@ -1455,6 +1464,12 @@ std::expected<TensorView, Error> execute_decode_gdn_impl(
     return std::unexpected(st.error());
   }
   return plan.residual_out;
+}
+
+std::expected<TensorView, Error> detail::Submission::gdn(
+    GdnPlan const& plan, qw38::cuda::DecodeControl const& pending,
+    qw38::cuda::DecodeControl const* control) {
+  return execute_decode_gdn_impl(plan, pending.position, nullptr, &pending, control);
 }
 
 std::expected<TensorView, Error> execute_decode_gdn(GdnPlan const& plan,

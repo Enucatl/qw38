@@ -1,3 +1,6 @@
+#include "runtime/submission.hpp"
+#include "cuda/graph.hpp"
+
 #include "runtime/attention.hpp"
 
 #include "cuda/activation.hpp"
@@ -923,30 +926,33 @@ std::expected<AttentionPrepPlan, Error> bind_attention_prep_plan(
   return plan;
 }
 
-std::expected<void, Error> execute_decode_attention_prep(
-    AttentionPrepPlan const& plan, std::uint64_t position) {
-  if (plan.session_state != nullptr && plan.session_state->is_poisoned()) {
-    return std::unexpected(arg_error("session", "session is poisoned"));
-  }
-  if (plan.stream == nullptr || plan.stream->empty()) {
-    return std::unexpected(arg_error("stream", "empty stream"));
-  }
-  if (position >= plan.kv_capacity) {
-    return std::unexpected(make_error(ErrorCode::InvalidCapacity, "position",
-                                      "position exceeds KV capacity"));
-  }
-  auto populated = plan.populated.value();
-  if (!populated) {
-    return std::unexpected(populated.error());
-  }
-  if (position != *populated) {
-    return std::unexpected(make_error(ErrorCode::InvalidPopulatedLength, "position",
-                                      "position must equal the append/populated contract"));
-  }
-  if (position > static_cast<std::uint64_t>(std::numeric_limits<std::int32_t>::max())) {
-    return std::unexpected(arg_error("position", "position exceeds int32 RoPE range"));
-  }
+std::expected<void, Error> detail::Submission::attention_prep(
+    AttentionPrepPlan const& plan, std::uint64_t position, bool complete,
+    qw38::cuda::DecodeControl const* control) {
+  if (complete) {
+    if (plan.session_state != nullptr && plan.session_state->is_poisoned()) {
+      return std::unexpected(arg_error("session", "session is poisoned"));
+    }
+    if (plan.stream == nullptr || plan.stream->empty()) {
+      return std::unexpected(arg_error("stream", "empty stream"));
+    }
+    if (position >= plan.kv_capacity) {
+      return std::unexpected(make_error(ErrorCode::InvalidCapacity, "position",
+                                        "position exceeds KV capacity"));
+    }
+    auto populated = plan.populated.value();
+    if (!populated) {
+      return std::unexpected(populated.error());
+    }
+    if (position != *populated) {
+      return std::unexpected(make_error(ErrorCode::InvalidPopulatedLength, "position",
+                                        "position must equal the append/populated contract"));
+    }
+    if (position > static_cast<std::uint64_t>(std::numeric_limits<std::int32_t>::max())) {
+      return std::unexpected(arg_error("position", "position exceeds int32 RoPE range"));
+    }
 
+  }
   auto* residual = static_cast<float*>(plan.residual.pointer);
   auto* gamma = static_cast<std::uint16_t const*>(plan.gamma.pointer);
   auto* normalized = static_cast<std::uint16_t*>(plan.normalized.pointer);
@@ -1006,12 +1012,13 @@ std::expected<void, Error> execute_decode_attention_prep(
   auto const pos = static_cast<std::int32_t>(position);
   if (auto st = qw38::cuda::launch_attention_prepare(
           qg, k, v, gamma_q, gamma_k, inv_freq, plan.eps, pos, q, g, kv,
-          plan.attn_layer, plan.kv_capacity, position, *plan.stream);
+          plan.attn_layer, plan.kv_capacity, position, *plan.stream, control);
       !st) {
     if (plan.session_state != nullptr) plan.session_state->poison();
     return std::unexpected(from_cuda(st.error()));
   }
 
+  if (!complete) return {};
   if (auto st = plan.stream->sync(); !st) {
     if (plan.session_state != nullptr) plan.session_state->poison();
     return std::unexpected(from_cuda(st.error()));
@@ -1023,23 +1030,11 @@ std::expected<void, Error> execute_decode_attention_prep(
   return committed;
 }
 
-std::expected<TensorView, Error> execute_attention_core(
-    AttentionCorePlan const& plan) {
-  if (plan.session_state != nullptr && plan.session_state->is_poisoned()) {
-    return std::unexpected(arg_error("session", "session is poisoned"));
-  }
-  if (plan.stream == nullptr || plan.stream->empty()) {
-    if (plan.session_state != nullptr) plan.session_state->poison();
-    return std::unexpected(arg_error("stream", "empty stream"));
-  }
-  auto current = plan.populated.value();
-  if (!current) {
-    if (plan.session_state != nullptr) plan.session_state->poison();
-    return std::unexpected(current.error());
-  }
-  std::uint64_t const populated = *current;
+std::expected<TensorView, Error> detail::Submission::attention_core(
+    AttentionCorePlan const& plan, std::uint64_t populated,
+    qw38::cuda::DecodeControl const* control, std::uint64_t bucket) {
   std::uint64_t const nseg64 = std::min<std::uint64_t>(
-      attn_segment_count(populated), plan.partition_limit);
+      attn_segment_count(control ? bucket : populated), plan.partition_limit);
   if (nseg64 > std::numeric_limits<std::uint32_t>::max()) {
     if (plan.session_state != nullptr) plan.session_state->poison();
     return std::unexpected(arg_error("populated", "segment count exceeds CUDA launch range"));
@@ -1059,13 +1054,13 @@ std::expected<TensorView, Error> execute_attention_core(
   }
   if (auto st = qw38::cuda::launch_attention_scan(
           q, kv, plan.attn_layer, plan.kv_capacity, populated, partials, nseg,
-          *plan.stream);
+          *plan.stream, control, plan.partition_limit);
       !st) {
     if (plan.session_state != nullptr) plan.session_state->poison();
     return std::unexpected(from_cuda(st.error()));
   }
   if (auto st = qw38::cuda::launch_attention_merge(partials, g, nseg, y,
-                                                    *plan.stream);
+                                                    *plan.stream, control, plan.partition_limit);
       !st) {
     if (plan.session_state != nullptr) plan.session_state->poison();
     return std::unexpected(from_cuda(st.error()));
@@ -1089,6 +1084,33 @@ std::expected<TensorView, Error> execute_attention_core(
   }
   return plan.residual_out;
 }
+
+std::expected<void, Error> execute_decode_attention_prep(
+    AttentionPrepPlan const& plan, std::uint64_t position) {
+  if (plan.stream) {
+    if (auto st = qw38::cuda::require_uncaptured(*plan.stream); !st)
+      return std::unexpected(from_cuda(st.error()));
+  }
+  return detail::Submission::attention_prep(plan, position, true);
+}
+
+std::expected<TensorView, Error> execute_attention_core(
+    AttentionCorePlan const& plan) {
+  if (plan.session_state != nullptr && plan.session_state->is_poisoned()) {
+    return std::unexpected(arg_error("session", "session is poisoned"));
+  }
+  if (plan.stream == nullptr || plan.stream->empty()) {
+    if (plan.session_state != nullptr) plan.session_state->poison();
+    return std::unexpected(arg_error("stream", "empty stream"));
+  }
+  auto current = plan.populated.value();
+  if (!current) {
+    if (plan.session_state != nullptr) plan.session_state->poison();
+    return std::unexpected(current.error());
+  }
+  return detail::Submission::attention_core(plan, *current);
+}
+
 
 std::expected<TensorView, Error> execute_decode_attention(
     AttentionMixerPlan const& plan, std::uint64_t position) {

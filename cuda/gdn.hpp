@@ -1,6 +1,7 @@
 #pragma once
 
 #include "cuda/error.hpp"
+#include "cuda/decode_control.hpp"
 #include "cuda/stream.hpp"
 
 #include <cstddef>
@@ -32,7 +33,9 @@ inline constexpr std::uint32_t kGdnSElemsPerLayer =
 // taps is tap-major [4, 10240]. cursor is the oldest slot in {0,1,2}.
 [[nodiscard]] std::expected<void, Error> launch_gdn_conv_silu(
     std::uint16_t const* qkv, std::uint16_t const* taps, std::uint16_t* history,
-    std::uint32_t cursor, std::uint16_t* convolved, Stream const& stream);
+    std::uint32_t cursor, std::uint16_t* convolved, Stream const& stream,
+    DecodeControl const* control = nullptr,
+    std::uint32_t cursor_index = 0);
 
 // Token-parallel FIR reads the incoming circular history without modifying it.
 // Commit is a separate channel-owned launch after every FIR reader completes.

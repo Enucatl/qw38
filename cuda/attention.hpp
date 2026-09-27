@@ -1,6 +1,7 @@
 #pragma once
 
 #include "cuda/error.hpp"
+#include "cuda/decode_control.hpp"
 #include "cuda/stream.hpp"
 
 #include <cstddef>
@@ -54,7 +55,7 @@ inline constexpr int kAttnPrepBlocks = kAttnPrepQueryBlocks + kAttnPrepKvBlocks;
     std::uint16_t const* gamma_k, float const* inv_freq, float eps,
     std::int32_t position, std::uint16_t* q_out, std::uint16_t* g_out,
     std::uint16_t* kv, std::uint32_t attn_layer, std::uint64_t capacity,
-    std::uint64_t token, Stream const& stream);
+    std::uint64_t token, Stream const& stream, DecodeControl const* control = nullptr);
 
 // Token-major chunk preparation. Only valid rows are written to cache.
 [[nodiscard]] std::expected<void, Error> launch_attention_prepare_chunk(
@@ -102,12 +103,14 @@ attention_prefill_resources(std::uint32_t query_tile = kAttnPrefillQueryTile);
 [[nodiscard]] std::expected<void, Error> launch_attention_scan(
     std::uint16_t const* q, std::uint16_t const* kv, std::uint32_t attn_layer,
     std::uint64_t capacity, std::uint64_t populated, float* partials,
-    std::uint32_t n_segments, Stream const& stream);
+    std::uint32_t n_segments, Stream const& stream, DecodeControl const* control = nullptr,
+    std::uint32_t partition_limit = 0);
 
 // One block per query head. Merges segment statistics in increasing index,
 // normalizes, applies FP32 sigmoid(g), stores BF16 gated y. No score vector.
 [[nodiscard]] std::expected<void, Error> launch_attention_merge(
     float const* partials, std::uint16_t const* g, std::uint32_t n_segments,
-    std::uint16_t* y_out, Stream const& stream);
+    std::uint16_t* y_out, Stream const& stream, DecodeControl const* control = nullptr,
+    std::uint32_t partition_limit = 0);
 
 }  // namespace qw38::cuda

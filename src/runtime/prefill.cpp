@@ -1,4 +1,6 @@
 #include "runtime/prefill.hpp"
+#include "runtime/submission.hpp"
+#include "cuda/graph.hpp"
 
 #include "runtime/attention.hpp"
 #include "runtime/gdn.hpp"
@@ -230,10 +232,10 @@ std::expected<qw38::cuda::PrefillWeight, Error> bind_prefill_head(
       .codes_bytes = codes_bytes, .scales_bytes = scales_bytes};
 }
 
-std::expected<void, Error> execute_prefill_mlp(
+std::expected<void, Error> detail::Submission::prefill_mlp(
     PrefillLayerProjectionPlan const& plan, qw38::cuda::PrefillEngine& engine,
     float const* h_mid, float* next_h, std::uint32_t valid_tokens,
-    std::uint64_t first_position, float eps) {
+    std::uint64_t first_position, float eps, int* failure) {
   if (!plan.q8_workspace_.empty()) {
     if (engine.stream() != plan.q8_stream_ || !plan.q8_state_ || plan.q8_state_->is_poisoned() ||
         valid_tokens > engine.token_capacity() ||
@@ -241,7 +243,7 @@ std::expected<void, Error> execute_prefill_mlp(
       return std::unexpected(make_error(ErrorCode::InvalidArgument,"q8.prefill","invalid engine or token range"));
     bool submitted = false;
     auto st = qw38::cuda::q4k_q8_mlp(plan.mlp_gate,plan.mlp_up,plan.mlp_down,
-        h_mid,plan.mlp_gamma,eps,next_h,valid_tokens,plan.q8_workspace_,*engine.stream(),submitted);
+        h_mid,plan.mlp_gamma,eps,next_h,valid_tokens,plan.q8_workspace_,*engine.stream(),submitted,failure);
     if (!st) {
       if (submitted) plan.q8_state_->poison();
       return std::unexpected(from_cuda(st.error()));
@@ -253,6 +255,18 @@ std::expected<void, Error> execute_prefill_mlp(
                        valid_tokens, first_position);
   if (!st) return std::unexpected(from_cuda(st.error()));
   return {};
+}
+
+std::expected<void, Error> execute_prefill_mlp(
+    PrefillLayerProjectionPlan const& plan, qw38::cuda::PrefillEngine& engine,
+    float const* h_mid, float* next_h, std::uint32_t valid_tokens,
+    std::uint64_t first_position, float eps) {
+  if (engine.stream()) {
+    if (auto st = qw38::cuda::require_uncaptured(*engine.stream()); !st)
+      return std::unexpected(from_cuda(st.error()));
+  }
+  return detail::Submission::prefill_mlp(plan, engine, h_mid, next_h,
+                                        valid_tokens, first_position, eps, nullptr);
 }
 
 }  // namespace qw38::runtime

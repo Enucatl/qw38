@@ -6,6 +6,7 @@ find_package(CUDAToolkit REQUIRED)
   buffer.cpp
   stream.cpp
   event.cpp
+  graph.cpp
   upload.cpp
   copy.cu
   activation.cu

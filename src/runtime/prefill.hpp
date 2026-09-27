@@ -10,6 +10,7 @@
 #include <expected>
 
 namespace qw38::runtime {
+namespace detail { struct Submission; }
 
 // Weight-only projection binding. Model and its uploaded buffers must outlive
 // this plan. Mixer cores and state commits belong to TASK-024/025.
@@ -26,6 +27,7 @@ struct PrefillLayerProjectionPlan {
   qw38::cuda::PrefillWeight mlp_down{};
   std::uint16_t const* mlp_gamma{};
  private:
+  friend struct detail::Submission;
   friend std::expected<PrefillLayerProjectionPlan, Error> bind_prefill_layer_projections(
       Model const&, std::uint32_t, qw38::cuda::Stream const&, Session*);
   friend std::expected<void, Error> execute_prefill_mlp(
@@ -60,6 +62,7 @@ class PrefillGdnLayerPlan {
   PrefillGdnLayerPlan& operator=(PrefillGdnLayerPlan const&) = default;
 
  private:
+  friend struct detail::Submission;
   friend std::expected<PrefillGdnLayerPlan, Error> bind_prefill_gdn_layer(
       Model const&, Session&, std::uint32_t, qw38::cuda::Stream const&);
   friend std::expected<void, Error> execute_prefill_gdn_layer(
@@ -123,6 +126,7 @@ class PrefillAttentionLayerPlan {
   PrefillAttentionLayerPlan& operator=(PrefillAttentionLayerPlan const&) = default;
 
  private:
+  friend struct detail::Submission;
   friend std::expected<PrefillAttentionLayerPlan, Error>
   bind_prefill_attention_layer(Model const&, Session&, std::uint32_t,
                                qw38::cuda::Stream const&);

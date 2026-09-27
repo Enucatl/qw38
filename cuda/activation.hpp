@@ -1,6 +1,7 @@
 #pragma once
 
 #include "cuda/error.hpp"
+#include "cuda/decode_control.hpp"
 #include "cuda/stream.hpp"
 
 #include <cstdint>
@@ -34,7 +35,7 @@ inline constexpr int kHeadNormThreads = 128;   // T-03: one block/head
 // Gather one BF16 embedding row into an FP32 residual [5120].
 [[nodiscard]] std::expected<void, Error> launch_embed_gather(
     std::uint16_t const* table, std::uint32_t vocab, std::uint32_t token_id,
-    float* residual, Stream const& stream);
+    float* residual, Stream const& stream, DecodeControl const* control = nullptr);
 
 // Gather valid token rows from device IDs into token-major FP32 residuals.
 [[nodiscard]] std::expected<void, Error> launch_embed_gather_chunk(

@@ -8,6 +8,7 @@
 #include <expected>
 
 namespace qw38::runtime {
+namespace detail { struct Submission; }
 
 enum class LanguageMixerKind : std::uint8_t { Gdn, Attention };
 
@@ -24,6 +25,7 @@ class LanguageLayerPlan {
   [[nodiscard]] LanguageMixerKind mixer_kind() const noexcept { return kind_; }
 
  private:
+  friend struct detail::Submission;
   friend std::expected<TensorView, Error> execute_decode_language_layer(
       LanguageLayerPlan const&, std::uint64_t);
   friend struct LanguageLayerPlanTestAccess;

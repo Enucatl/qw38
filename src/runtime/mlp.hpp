@@ -13,6 +13,7 @@
 #include <string>
 
 namespace qw38::runtime {
+namespace detail { struct Submission; }
 
 inline constexpr std::uint32_t kMlpLayers = 64;
 inline constexpr float kMlpRmsEps = 1.0e-6f;
@@ -46,6 +47,7 @@ struct MlpPlan {
   SessionExecutionState* session_state{};
   float eps{kMlpRmsEps};
  private:
+  friend struct detail::Submission;
   friend std::expected<MlpPlan, Error> bind_mlp_plan(
       Model const&, Session&, std::uint32_t, qw38::cuda::Stream const&, float);
   friend std::expected<void, Error> execute_decode_mlp(MlpPlan const&);

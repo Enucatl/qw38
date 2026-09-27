@@ -359,6 +359,10 @@ std::expected<Session, Error> Session::create(
 }
 
 std::expected<void, Error> Session::shutdown() {
+  if (execution_state_ && execution_state_->busy_)
+    return std::unexpected(make_error(ErrorCode::InvalidArgument, "session.busy",
+                                      "token or chunk completion is pending"));
+
   std::expected<void, qw38::cuda::Error> synchronized;
   if (stream_) {
     synchronized = stream_->sync();
@@ -410,6 +414,10 @@ std::expected<void, Error> Session::zero_persistent() {
 }
 
 std::expected<void, Error> Session::reset() {
+  if (execution_state_ && execution_state_->busy_)
+    return std::unexpected(make_error(ErrorCode::InvalidArgument, "session.busy",
+                                      "token or chunk completion is pending"));
+
   if (!stream_ || !execution_state_) {
     return std::unexpected(make_error(ErrorCode::InvalidArgument,
                                       "session.reset", "session is closed"));
@@ -453,6 +461,10 @@ std::expected<void, Error> Session::validate_metadata() const {
 }
 
 std::expected<SessionSnapshot, Error> Session::save() const {
+  if (execution_state_ && execution_state_->busy_)
+    return std::unexpected(make_error(ErrorCode::InvalidArgument, "session.busy",
+                                      "token or chunk completion is pending"));
+
   try {
   if (!stream_) {
     return std::unexpected(
@@ -505,6 +517,10 @@ std::expected<SessionSnapshot, Error> Session::save() const {
 }
 
 std::expected<void, Error> Session::restore(SessionSnapshot const& snap) {
+  if (execution_state_ && execution_state_->busy_)
+    return std::unexpected(make_error(ErrorCode::InvalidArgument, "session.busy",
+                                      "token or chunk completion is pending"));
+
   if (!stream_ || !execution_state_) {
     return std::unexpected(
         make_error(ErrorCode::Internal, "session.restore", "missing stream"));
@@ -699,6 +715,10 @@ std::expected<WorkspaceView, Error> Session::scratch(
 
 std::expected<void, Error> Session::set_populated_length(
     std::uint32_t attention_layer, std::uint64_t populated) {
+  if (execution_state_ && execution_state_->busy_)
+    return std::unexpected(make_error(ErrorCode::InvalidArgument, "session.busy",
+                                      "token or chunk completion is pending"));
+
   if (!execution_state_ || execution_state_->is_poisoned()) {
     return std::unexpected(make_error(ErrorCode::InvalidArgument, "session",
                                       "session is poisoned or closed"));
@@ -766,6 +786,10 @@ std::expected<GdnPositionSlot, Error> Session::gdn_position_slot(
 
 std::expected<void, Error> Session::set_conv_cursor(
     std::array<std::uint32_t, kConvLayers> cursor) {
+  if (execution_state_ && execution_state_->busy_)
+    return std::unexpected(make_error(ErrorCode::InvalidArgument, "session.busy",
+                                      "token or chunk completion is pending"));
+
   if (!execution_state_ || execution_state_->is_poisoned()) {
     return std::unexpected(make_error(ErrorCode::InvalidArgument, "session",
                                       "session is poisoned or closed"));

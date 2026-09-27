@@ -1,4 +1,6 @@
 #include "runtime/mlp.hpp"
+#include "runtime/submission.hpp"
+#include "cuda/graph.hpp"
 
 #include "cuda/activation.hpp"
 #include "cuda/decode_mmv.hpp"
@@ -592,7 +594,7 @@ std::expected<MlpPlan, Error> bind_mlp_plan(Model const& model,
   return plan;
 }
 
-std::expected<void, Error> execute_decode_mlp(MlpPlan const& plan) {
+std::expected<void, Error> detail::Submission::mlp(MlpPlan const& plan, int* failure) {
   if (plan.session_state != nullptr && plan.session_state->is_poisoned()) {
     return std::unexpected(arg_error("session", "session is poisoned"));
   }
@@ -615,7 +617,7 @@ std::expected<void, Error> execute_decode_mlp(MlpPlan const& plan) {
     };
     bool submitted = false;
     auto st = qw38::cuda::q4k_q8_mlp(weight(plan.gate),weight(plan.up),weight(plan.down),
-        h_mid,gamma,plan.eps,next_h,1,plan.q8_workspace_,*plan.stream,submitted);
+        h_mid,gamma,plan.eps,next_h,1,plan.q8_workspace_,*plan.stream,submitted,failure);
     if (!st) {
       if (submitted && plan.session_state) plan.session_state->poison();
       return std::unexpected(from_cuda(st.error()));
@@ -664,6 +666,14 @@ std::expected<void, Error> execute_decode_mlp(MlpPlan const& plan) {
     return std::unexpected(from_cuda(st.error()));
   }
   return {};
+}
+
+std::expected<void, Error> execute_decode_mlp(MlpPlan const& plan) {
+  if (plan.stream) {
+    if (auto st = qw38::cuda::require_uncaptured(*plan.stream); !st)
+      return std::unexpected(from_cuda(st.error()));
+  }
+  return detail::Submission::mlp(plan, nullptr);
 }
 
 }  // namespace qw38::runtime

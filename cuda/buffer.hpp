@@ -7,8 +7,34 @@
 #include <cstdint>
 #include <expected>
 #include <span>
+#include <utility>
 
 namespace qw38::cuda {
+
+class HostBuffer {
+ public:
+  HostBuffer() = default;
+  HostBuffer(HostBuffer&& other) noexcept : ptr_(std::exchange(other.ptr_, nullptr)) {}
+  HostBuffer& operator=(HostBuffer&& other) noexcept {
+    if (this != &other) {
+      if (ptr_) (void)cudaFreeHost(ptr_);
+      ptr_ = std::exchange(other.ptr_, nullptr);
+    }
+    return *this;
+  }
+  ~HostBuffer() { if (ptr_) (void)cudaFreeHost(ptr_); }
+  HostBuffer(HostBuffer const&) = delete;
+  HostBuffer& operator=(HostBuffer const&) = delete;
+  static std::expected<HostBuffer, Error> allocate(std::size_t bytes) {
+    HostBuffer result;
+    if (auto st = check(cudaMallocHost(&result.ptr_, bytes), "cudaMallocHost"); !st)
+      return std::unexpected(st.error());
+    return result;
+  }
+  void* data() noexcept { return ptr_; }
+ private:
+  void* ptr_{};
+};
 
 class DeviceBuffer {
  public:
