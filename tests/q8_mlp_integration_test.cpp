@@ -55,8 +55,8 @@ int main(){
   auto session=take(rt.create_session(model,3));auto const& stream=rt.stream();
   auto decode=take(runtime::bind_mlp_plan(model,session,0,stream));
   auto prefill=take(runtime::bind_prefill_layer_projections(model,0,stream,&session));
-  auto engine=take(cuda::PrefillEngine::create(stream,256));
-  std::vector<float> h(256*5120);for(unsigned r=0;r<256;++r)for(unsigned c=0;c<5120;++c)h[r*5120+c]=(int((c*17)%97)-48)*.03125f;
+  auto engine=take(cuda::PrefillEngine::create(stream,512));
+  std::vector<float> h(512*5120);for(unsigned r=0;r<512;++r)for(unsigned c=0;c<5120;++c)h[r*5120+c]=(int((c*17)%97)-48)*.03125f;
   auto gamma=take(artifact.payload(runtime::mlp_norm_name(0)));
   double square=0;for(unsigned c=0;c<5120;++c)square+=double(h[c])*h[c];
   float inv=1.f/std::sqrt(float(square/5120)+1e-6f);
@@ -73,7 +73,7 @@ int main(){
   check(cuda::copy_h2d(input,std::as_bytes(std::span(h)),stream));check(stream.sync());
   auto allocations=cuda::malloc_count();
   check(runtime::execute_decode_mlp(decode));close(download(output,5120,stream),ref);
-  for(unsigned m:{3u,127u,128u,129u,256u,1u}){
+  for(unsigned m:{3u,127u,128u,129u,255u,256u,257u,511u,512u,1u}){
     check(runtime::execute_prefill_mlp(prefill,engine,static_cast<float const*>(input),static_cast<float*>(output),m,0));
     auto values=download(output,m*5120,stream);
     for(unsigned r=0;r<m;++r)close(std::span(values).subspan(r*5120,5120),ref);
@@ -93,6 +93,7 @@ int main(){
   auto run_prefill=[&](float* target,unsigned m,float eps=1e-6f){return runtime::execute_prefill_mlp(
       prefill,engine,static_cast<float const*>(input),target,m,0,eps);};
   rejected(run_prefill(static_cast<float*>(output),0));
+  rejected(run_prefill(static_cast<float*>(output),513));
   rejected(run_prefill(nullptr,1));
   rejected(run_prefill(static_cast<float*>(input),1));
   rejected(run_prefill(static_cast<float*>(output),1,0));
@@ -109,9 +110,9 @@ int main(){
   require(runtime::detail::SessionPlanAccess::execution_state(session)->is_poisoned(),"failure poisons session");
   require(!runtime::execute_decode_mlp(decode),"poison prevents continuation");
   check(session.reset());check(cuda::copy_h2d(input,std::as_bytes(std::span(h)),stream));
-  require(!run_prefill(static_cast<float*>(output),256),"J128 nonfinite RMS typed failure");
+  require(!run_prefill(static_cast<float*>(output),512),"J128 nonfinite RMS typed failure");
   require(runtime::detail::SessionPlanAccess::execution_state(session)->is_poisoned(),"J128 failure poisons session");
-  require(!run_prefill(static_cast<float*>(output),256),"J128 poison prevents continuation");
+  require(!run_prefill(static_cast<float*>(output),512),"J128 poison prevents continuation");
   check(session.reset());h[0]=-1;check(cuda::copy_h2d(input,std::as_bytes(std::span(h)),stream));
   check(runtime::execute_decode_mlp(decode));
   cuda::testing::fail_next_stream_sync();
@@ -119,6 +120,6 @@ int main(){
   require(runtime::detail::SessionPlanAccess::execution_state(session)->is_poisoned(),"submitted failure still poisons");
   check(session.reset());check(cuda::copy_h2d(input,std::as_bytes(std::span(h)),stream));check(runtime::execute_decode_mlp(decode));
   auto moved=std::move(session);check(runtime::execute_decode_mlp(decode));
-  require(moved.q8_mlp_workspace().size()==cuda::q8_mlp_workspace_bytes(256),"bounded scratch follows Session move");
-  std::cout<<"real Session M=1/3/127/128/129/256 complete RMS/Q8/SwiGLU/down/residual reference, reuse, poison/reset/move PASS\n";
+  require(moved.q8_mlp_workspace().size()==cuda::q8_mlp_workspace_bytes(512),"bounded scratch follows Session move");
+  std::cout<<"real Session M=1/3/127/128/129/255/256/257/511/512 complete RMS/Q8/SwiGLU/down/residual reference, reuse, poison/reset/move PASS\n";
 }

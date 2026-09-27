@@ -83,6 +83,8 @@ int run(char const* artifact) {
   if (!plan || !decode || !mlp || !engine || !workspace) {
     std::cerr << "attention prefill bind failed\n"; return 1;
   }
+  if (PrefillAttentionWorkspace::create(0, stream.device()) ||
+      PrefillAttentionWorkspace::create(kArenaTokenCapacity + 1u, stream.device())) return 1;
   auto embedding = model->payload("model.language_model.embed_tokens.weight");
   if (!embedding) return 1;
   constexpr std::uint32_t count = 5;
@@ -205,7 +207,7 @@ int run(char const* artifact) {
     return 0;
   }
   if (!session->reset() || PrefillAttentionWorkspace::create(0, stream.device()) ||
-      PrefillAttentionWorkspace::create(qw38::cuda::kPrefillMaxTokens + 1u,
+      PrefillAttentionWorkspace::create(kArenaTokenCapacity + 1u,
                                          stream.device()) ||
       execute_prefill_attention_layer(*plan, *workspace, *engine,
                                       in, mid, out, 1, 1) ||

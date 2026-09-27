@@ -26,6 +26,7 @@ class Graph {
   bool empty() const noexcept { return exec_ == nullptr; }
 
  private:
+  friend struct GraphTestAccess;
   void swap(Graph& other) noexcept {
     std::swap(stream_, other.stream_);
     std::swap(device_, other.device_);

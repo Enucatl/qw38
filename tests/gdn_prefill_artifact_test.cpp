@@ -131,7 +131,7 @@ int run(char const* artifact) {
       session->conv_cursor()[gdn_index] != 1u) return 1;
   if (!session->reset()) return 1;
   if (PrefillGdnWorkspace::create(0, stream.device()) ||
-      PrefillGdnWorkspace::create(qw38::cuda::kPrefillMaxTokens + 1u,
+      PrefillGdnWorkspace::create(kArenaTokenCapacity + 1u,
                                   stream.device())) return 1;
   if (execute_prefill_gdn_layer(*plan, *workspace, *engine,
         in, mid, out, 9, 0, 1) || session->conv_cursor()[gdn_index] != 0u) {

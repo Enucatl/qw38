@@ -2,6 +2,7 @@
 #include "cuda/nvfp4_device.cuh"
 #include "cuda/fp8_device.cuh"
 #include "cuda/q8_device.cuh"
+#include "cuda/q4k_q8.hpp"
 
 #include "cuda/copy.hpp"
 
@@ -524,7 +525,7 @@ std::expected<void, Error> launch_hidden_rms_q8(float const* residual,
     std::uint16_t const* gamma, float eps, unsigned m, std::int8_t* codes,
     float* scales, std::int32_t* sums, int* failure, Stream const& stream) {
   if (!residual || !gamma || !codes || !scales || !sums || !failure ||
-      !m || m > 256 || !finite_pos(eps) || stream.empty())
+      !m || m > kQ8MlpMaxTokens || !finite_pos(eps) || stream.empty())
     return std::unexpected(make_error(ErrorCode::InvalidArgument, "q8.rms", "invalid operands"));
   auto guard = stream.activate(); if (!guard) return std::unexpected(guard.error());
   hidden_rms_kernel<3><<<m,kHiddenRmsThreads,0,stream.native()>>>(residual,gamma,eps,

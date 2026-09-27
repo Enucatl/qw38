@@ -79,7 +79,8 @@ struct AttentionPrefillResources {
   int occupancy_blocks_per_sm{};
 };
 
-// One block per query head and 32 query rows. Register-resident BF16 Q,
+// M512 uses eight warps for two sibling heads x Q32, sharing K64/V64.
+// Other sizes use four warps per head x Q32. Register-resident BF16 Q,
 // FP32 softmax/PV, two BF16 P components and separately pipelined BF16 K/V.
 // Explicit query tiles 1 and 4 select the scalar diagnostic controls.
 [[nodiscard]] std::expected<void, Error> launch_attention_prefill_scan(
@@ -92,7 +93,8 @@ struct AttentionPrefillResources {
     std::uint8_t* fp8_codes = nullptr, float* fp8_scales = nullptr);
 
 [[nodiscard]] std::expected<AttentionPrefillResources, Error>
-attention_prefill_resources(std::uint32_t query_tile = kAttnPrefillQueryTile);
+attention_prefill_resources(std::uint32_t query_tile = kAttnPrefillQueryTile,
+                           std::uint32_t valid_tokens = 1);
 
 [[nodiscard]] std::expected<AttentionPrefillResources, Error> attention_decode_resources();
 

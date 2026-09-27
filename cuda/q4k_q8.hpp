@@ -22,7 +22,7 @@ struct Q8Input {
 
 inline constexpr int kQ4KQ8DotBound = 32 * 15 * 127;
 inline constexpr int kQ8SumBound = 32 * 127;
-inline constexpr unsigned kQ8MlpMaxTokens = 256;
+inline constexpr unsigned kQ8MlpMaxTokens = 512;
 // One reusable pack (max K=17408), two full-width FP32 gate/up slabs,
 // and one producer failure flag. No allocation occurs during execution.
 [[nodiscard]] constexpr std::uint64_t q8_mlp_workspace_bytes(unsigned m) {

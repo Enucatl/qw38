@@ -12,8 +12,21 @@
 #include <fstream>
 #include <iostream>
 #include <stdexcept>
+#include <string_view>
 #include <utility>
 #include <vector>
+
+namespace qw38::cuda {
+struct GraphTestAccess {
+  static std::expected<void, Error> upload(Graph const& graph, Stream const& stream) {
+    auto guard = stream.activate();
+    if (!guard) return std::unexpected(guard.error());
+    if (auto st = check(cudaGraphUpload(graph.exec_, stream.native()), "cudaGraphUpload"); !st)
+      return st;
+    return stream.sync();
+  }
+};
+}  // namespace qw38::cuda
 
 namespace qw38::runtime {
 struct LanguageLayerPlanTestAccess {
@@ -25,6 +38,23 @@ struct LanguageLayerPlanTestAccess {
   }
 };
 struct LanguageModelPlanTestAccess {
+  static auto upload_capacity(LanguageModelPlan& plan) {
+    auto p = plan.pending(1, plan.state_->token_position(), 1);
+    if (!p) return std::expected<void, Error>(std::unexpected(p.error()));
+    p->position = plan.kv_capacity_ - 1;
+    p->populated = plan.kv_capacity_;
+    if (auto st = plan.prepare_graph(*p); !st) return st;
+    // Provision device backing for the maximum graph without running synthetic
+    // populated-32K inference. The fixture executes valid first decode separately.
+    auto uploaded = qw38::cuda::GraphTestAccess::upload(plan.graph_, *plan.stream_);
+    if (!uploaded) return std::expected<void, Error>(std::unexpected(from_cuda(uploaded.error())));
+    return std::expected<void, Error>{};
+  }
+  static std::uint64_t prefill_bytes(LanguageModelPlan const& plan) {
+    auto const& p = *plan.prefill_;
+    return p.engine.workspace_bytes() + p.gdn_workspace.bytes() +
+        p.attention_workspace.bytes() + p.token_ids.bytes() + p.next_h.bytes();
+  }
   static auto capture(LanguageModelPlan& plan, unsigned token, std::uint64_t position) {
     auto pending = plan.pending(token, position, 1);
     if (!pending) return std::expected<void, Error>(std::unexpected(pending.error()));
@@ -81,7 +111,9 @@ bool write_logits(std::uint32_t position, std::span<float const> logits) {
 
 }  // namespace
 
-int main() {
+int main(int argc, char** argv) {
+  bool const capacity_only = argc == 2 && std::string_view(argv[1]) == "--capacity-only";
+  if (argc != 1 && !capacity_only) return 2;
   qw38::runtime::profiling::enabled = std::getenv("QW38_PROFILE") != nullptr;
   auto const* artifact = std::getenv("QW38_AUTHORITY_ARTIFACT");
   if (artifact == nullptr) {
@@ -100,6 +132,34 @@ int main() {
     std::cerr << error_message(model.error()) << '\n';
     return fail("load authority");
   }
+  // Provision the real maximum-request capacity and exercise first library use.
+  // This is workspace accounting, not TASK-043's populated 32K acceptance run.
+  {
+    auto capacity_session = runtime->create_session(*model, 32768 + 128);
+    if (!capacity_session) return fail("512-workspace maximum-capacity allocation");
+    auto capacity_plan = LanguageModelPlan::bind(*model, *capacity_session, runtime->stream());
+    std::vector<std::uint32_t> chunk(512, 1);
+    if (!capacity_plan || !capacity_plan->prefill_tokens(chunk) ||
+        !capacity_plan->decode_token(1, 512) || capacity_plan->graph_fallback() ||
+        !LanguageModelPlanTestAccess::upload_capacity(*capacity_plan) ||
+        !LanguageModelPlanTestAccess::uncommitted(*capacity_plan, 513))
+      return fail("512 workspace first decode and completed maximum graph upload");
+    std::size_t free = 0, total = 0;
+    if (cudaMemGetInfo(&free, &total) != cudaSuccess || free < 2ull * 1024 * 1024 * 1024)
+      return fail("512 workspace preserves 2 GiB reserve including library/graph");
+    auto const prefill_bytes = LanguageModelPlanTestAccess::prefill_bytes(*capacity_plan);
+    if (prefill_bytes != 254248960ull || capacity_session->arena_plan().total_bytes != 513802240ull ||
+        capacity_session->q8_mlp_workspace().size() != 82444292ull)
+      return fail("observed workspace equals pre-allocation calculation");
+    std::cout << "capacity=32896 chunk=512 prefill_bytes=" << prefill_bytes
+              << " arena_bytes=" << capacity_session->arena_plan().total_bytes
+              << " residual_bytes=" << 2 * kArenaTokenCapacity * kResidualBytesPerToken
+              << " q8_bytes=" << capacity_session->q8_mlp_workspace().size()
+              << " persistent_bytes=" << capacity_session->persistent_bytes()
+              << " model_bytes=" << model->device_bytes() << " free_bytes=" << free
+              << " first_decode_completed=true maximum_graph_upload_completed=true\n";
+  }
+  if (capacity_only) return 0;
   auto session = runtime->create_session(*model, 3);
   if (!session) return fail("create session");
   auto plan = LanguageModelPlan::bind(*model, *session, runtime->stream());
@@ -218,18 +278,18 @@ int main() {
   if (!plan->prefill_tokens(tail) || !plan->decode_token(3, 2))
     return fail("nonempty-session prefill to decode handoff");
 
-  auto boundary_session = runtime->create_session(*model, 259);
+  auto boundary_session = runtime->create_session(*model, 515);
   if (!boundary_session) return fail("create boundary session");
   auto boundary_plan = LanguageModelPlan::bind(*model, *boundary_session,
                                                runtime->stream());
   if (!boundary_plan) return fail("bind boundary plan");
-  std::vector<std::uint32_t> sequence(258);
+  std::vector<std::uint32_t> sequence(514);
   for (std::size_t i = 0; i < sequence.size(); ++i)
     sequence[i] = static_cast<std::uint32_t>(1 + i % 3);
   auto before = boundary_session->save();
   if (!before) return fail("save boundary start");
   std::array<std::uint64_t, 2> const duplicate_rows{0, 0};
-  std::array<std::uint64_t, 1> const outside_rows{258};
+  std::array<std::uint64_t, 1> const outside_rows{514};
   auto sink = [](std::uint64_t, std::span<float const>)
       -> std::expected<void, Error> { return {}; };
   auto duplicate = boundary_plan->prefill_tokens(sequence, duplicate_rows, sink);
@@ -239,8 +299,8 @@ int main() {
   if (duplicate || outside || no_sink || !after_invalid ||
       !equal_state(*before, *after_invalid))
     return fail("invalid requested rows must not mutate session");
-  std::array<std::uint64_t, 4> const checkpoints{0, 255, 256, 257};
-  std::array<std::vector<float>, 4> selected;
+  std::array<std::uint64_t, 8> const checkpoints{0, 254, 255, 256, 510, 511, 512, 513};
+  std::array<std::vector<float>, 8> selected;
   std::size_t next_row = 0;
   auto selected_run = boundary_plan->prefill_tokens(sequence, checkpoints,
       [&](std::uint64_t position, std::span<float const> logits)
@@ -258,7 +318,7 @@ int main() {
   if (std::equal(selected[1].begin(), selected[1].end(), selected[2].begin()) ||
       std::equal(selected[2].begin(), selected[2].end(), selected[3].begin()))
     return fail("requested rows on opposite sides of chunk boundary differ");
-  for (std::size_t i : {1u, 3u}) {
+  for (std::size_t i : {5u, 7u}) {
     if (!boundary_session->reset()) return fail("reset selected-row reference");
     auto prefix = std::span<std::uint32_t const>(sequence.data(), checkpoints[i] + 1);
     auto reference = boundary_plan->prefill_tokens(prefix);
@@ -266,14 +326,40 @@ int main() {
                                   selected[i].begin()))
       return fail("selected row differs from same-schedule final row");
   }
+  for (unsigned count : {255u, 256u, 257u, 511u, 512u, 513u}) {
+    if (!boundary_session->reset()) return fail("capacity edge reset");
+    auto input = std::span<std::uint32_t const>(sequence).first(count);
+    auto first = boundary_plan->prefill_tokens(input);
+    if (!first) return fail("capacity edge prefill");
+    std::vector<float> logits(first->logits.begin(), first->logits.end());
+    auto state = boundary_session->save();
+    if (!state || state->token_position != count || !boundary_session->reset())
+      return fail("capacity edge state");
+    auto replay = boundary_plan->prefill_tokens(input);
+    auto replay_state = boundary_session->save();
+    if (!replay || !replay_state || !equal_state(*state, *replay_state) ||
+        !std::equal(logits.begin(), logits.end(), replay->logits.begin()))
+      return fail("same-schedule capacity edge replay");
+    auto continued = boundary_plan->decode_token(7, count);
+    if (!continued || boundary_plan->graph_fallback()) return fail("capacity edge graph handoff");
+    std::vector<float> next(continued->logits.begin(), continued->logits.end());
+    auto after = boundary_session->save();
+    if (!after || !boundary_session->restore(*state)) return fail("capacity edge restore");
+    auto restored = boundary_plan->decode_token(7, count);
+    auto restored_state = boundary_session->save();
+    if (!restored || !restored_state || !equal_state(*after, *restored_state) ||
+        !std::equal(next.begin(), next.end(), restored->logits.begin()))
+      return fail("capacity edge restore/decode replay");
+    std::cout << "prefill edge=" << count << " replay/restore/graph handoff PASS\n";
+  }
   if (!boundary_session->reset() ||
       !boundary_plan->decode_token(sequence[0], 0))
     return fail("nonempty selected-row setup");
-  std::array<std::uint64_t, 2> const nonzero_rows{256, 257};
+  std::array<std::uint64_t, 2> const nonzero_rows{512, 513};
   std::array<std::vector<float>, 2> nonzero_selected;
   std::size_t nonzero_index = 0;
   auto nonzero_run = boundary_plan->prefill_tokens(
-      std::span<std::uint32_t const>(sequence.data() + 1, 257), nonzero_rows,
+      std::span<std::uint32_t const>(sequence.data() + 1, 513), nonzero_rows,
       [&](std::uint64_t position, std::span<float const> logits)
           -> std::expected<void, Error> {
         if (nonzero_index >= nonzero_rows.size() ||
@@ -302,9 +388,9 @@ int main() {
   if (!boundary_session->reset()) return fail("reset before sink failures");
   auto clean = boundary_session->save();
   if (!clean) return fail("save before sink failures");
-  auto two = std::span<std::uint32_t const>(sequence.data(), 2);
+  auto failure_chunk = std::span<std::uint32_t const>(sequence.data(), 512);
   std::array<std::uint64_t, 1> const first_row{0};
-  auto returned_failure = boundary_plan->prefill_tokens(two, first_row,
+  auto returned_failure = boundary_plan->prefill_tokens(failure_chunk, first_row,
       [&](std::uint64_t, std::span<float const>) -> std::expected<void, Error> {
         if (boundary_session->save() || boundary_session->reset())
           return std::unexpected(make_error(ErrorCode::Internal, "prefill.busy",
@@ -315,17 +401,17 @@ int main() {
   if (!LanguageModelPlanTestAccess::uncommitted(*boundary_plan, 0) ||
       returned_failure || returned_failure.error().field != "prefill.test" ||
       boundary_session->save() ||
-      boundary_plan->prefill_tokens(two))
+      boundary_plan->prefill_tokens(failure_chunk))
     return fail("returned sink failure must poison session");
   if (!boundary_session->restore(*clean)) return fail("restore after sink error");
-  auto thrown_failure = boundary_plan->prefill_tokens(two, first_row,
+  auto thrown_failure = boundary_plan->prefill_tokens(failure_chunk, first_row,
       [](std::uint64_t, std::span<float const>) -> std::expected<void, Error> {
         throw std::runtime_error("injected sink exception");
       });
   if (thrown_failure || boundary_session->save() ||
-      boundary_plan->prefill_tokens(two))
+      boundary_plan->prefill_tokens(failure_chunk))
     return fail("thrown sink failure must poison session");
-  if (!boundary_session->restore(*clean) || !boundary_plan->prefill_tokens(two))
+  if (!boundary_session->restore(*clean) || !boundary_plan->prefill_tokens(failure_chunk))
     return fail("restore after sink exception");
 
   auto control_session = runtime->create_session(*model, 3);
@@ -356,13 +442,13 @@ int main() {
       !equal_state(*control_state, *moved_again_state))
     return fail("prefill after session move with initialized workspace");
   if (!boundary_session->reset()) return fail("second chunk failure reset");
-  std::array<std::uint64_t,1> second_chunk_row{256};
+  std::array<std::uint64_t,1> second_chunk_row{512};
   auto second_chunk_failure = boundary_plan->prefill_tokens(sequence, second_chunk_row,
       [](std::uint64_t, std::span<float const>) -> std::expected<void, Error> {
         return std::unexpected(make_error(ErrorCode::Internal, "sink.chunk", "injected second chunk failure"));
       });
   if (second_chunk_failure || second_chunk_failure.error().field != "sink.chunk" ||
-      !LanguageModelPlanTestAccess::uncommitted(*boundary_plan, 256) || boundary_session->save())
+      !LanguageModelPlanTestAccess::uncommitted(*boundary_plan, 512) || boundary_session->save())
     return fail("failed second chunk preserves only the completed first chunk");
   if (!boundary_session->reset()) return fail("recover second chunk failure");
   auto graph_session = runtime->create_session(*model, 514);

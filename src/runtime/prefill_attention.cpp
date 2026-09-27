@@ -51,7 +51,7 @@ std::expected<PrefillAttentionLayerPlan, Error> bind_prefill_attention_layer(
 
 std::expected<PrefillAttentionWorkspace, Error>
 PrefillAttentionWorkspace::create(std::uint32_t token_capacity, int device) {
-  if (token_capacity == 0 || token_capacity > qw38::cuda::kPrefillMaxTokens)
+  if (token_capacity == 0 || token_capacity > kArenaTokenCapacity)
     return std::unexpected(make_error(ErrorCode::InvalidArgument,
                                       "prefill.attention.capacity", "invalid token capacity"));
   auto allocation = qw38::cuda::DeviceBuffer::allocate(

@@ -77,6 +77,22 @@ determine the fast-engine goal; completed retention is not goal completion.
 Manifest-only artifact identity, pinned tooling and `wake-run` remain binding.
 No engine workload was run for this amendment.
 
+### User-directed TASK-042 acceptance decision — 2026-09-27
+
+The user approves the implemented TASK-042 candidate despite the measured
+regressions described in its [report](tasks/TASK-042.md). This supersedes that
+candidate's no-observed-matched-decode-regression criterion (R042-1). The
+original +4.1786% matched decode result, first-token delay, isolated attention
+regressions and cold-load variability remain recorded with unresolved causes.
+At the time of this decision, R042-2 still required completed graph-first-use
+capacity verification before final review and delivery. That check later passed;
+see the task's completion report. The preserved candidate resumed in place.
+
+The user's direction for distinct paths below/above 4096 tokens, using `../ds4`
+as a reference, is FOLLOW_UP_REQUIRED scheduling work. It does not add a new
+prompt-length dispatcher to this accepted candidate or weaken TASK-043's final
+quality/capacity/performance gates. Current M512/smaller-chunk dispatch remains.
+
 ## Fast-engine amendment — FAST-02 (2026-09-27)
 
 The user requested an implementable next batch after reviewing
@@ -479,7 +495,7 @@ Correctness and quality criteria remain unchanged; execute applicable checks onc
   existing ablations; new ablations need a specific diagnostic question.
 - Keep benchmarks separate from correctness tests. Preserve exact commands, results, artifact/binary identities, and hardware context in each completion report.
 - Executable status values are `TODO`, `IN_PROGRESS`, `BLOCKED`, and `DONE`.
-  TASK-001–030 and TASK-033–041 are `DONE`; TASK-042–043 are `TODO`.
+  TASK-001–030 and TASK-033–042 are `DONE`; TASK-043 is `TODO`.
   `SUPERSEDED` denotes
   retired TASK-031/032 cross-references, never implementation completion.
 - A rejected candidate is a useful experiment result. Record the reason and
@@ -689,7 +705,7 @@ an achieved performance target.
 | TASK-039 | Token-boundary submission and decode graph replay | M18 | TASK-038 | Internal enqueue with safe completion commits, reduced waits and bounded graph/eager dispatch | DONE |
 | TASK-040 | Quantized engine validation and delivery decision | M19 | TASK-039 | Frozen core-54/replay/capacity/PERF-01 evidence and promotion/retention with explicit speed gaps | DONE |
 | TASK-041 | Reuse-rich Q4_K×Q8 prefill MMQ | M20 | TASK-040 | J128 full-chunk consumer, cooperative FP32 metadata and fragment reuse, preserved MMVQ and shared packs; complete M256 MLP and integrated prefill improve, matched decode does not regress; isolated M1 first-use regression recorded as FOLLOW_UP_REQUIRED | DONE |
-| TASK-042 | Shared-KV attention with bounded 512-token prefill | M21 | TASK-041 | Two-head prefill KV reuse, consistent larger capacity, selected short/tail path and verified handoff | TODO |
+| TASK-042 | Shared-KV attention with bounded 512-token prefill | M21 | TASK-041 | User accepted candidate with measured regressions retained as unresolved; graph-first-use capacity evidence complete; below/above-4096 path selection recorded as FOLLOW_UP_REQUIRED | DONE |
 | TASK-043 | Prefill engine validation and delivery decision | M22 | TASK-042 | Frozen quality/replay/capacity/PERF-01 gate, explicit promotion/retention and remaining costs | TODO |
 
 TASK-037's original M=1 gate was superseded by the user-directed retention
@@ -1062,6 +1078,7 @@ TASK-001 → 002 → 003 → 004 → 005 → 006
 
 | Task | Blocker | Evidence | Required follow-up |
 | ---- | ------- | -------- | ------------------ |
+| TASK-042 | Resolved for TASK-042 delivery: R042-1 accepted explicitly by the user with regression retained as unresolved; R042-2 capacity fixture repaired and verified. | Astra pass 1 BLOCKED; pass 2 PASS. See [completion report](tasks/TASK-042.md#completion-report--2026-09-27) and historical [blocked implementation report](tasks/TASK-042.md#historical-blocked-implementation-report--2026-09-27). Full commands, logs, reviewed candidate and identities remain under `.cache/evaluation/qw38-language-v2/task042-support/`. | DONE under explicit user acceptance. Original performance results and uncertain causes remain recorded. Distinct paths below/above 4096 tokens using `../ds4` as a reference are `FOLLOW_UP_REQUIRED`; no new dispatcher or downstream specification change. TASK-043 remains TODO with final quality, populated-32K capacity and performance gates unchanged. |
 | TASK-038 | Resolved by explicit user acceptance on 2026-09-27: matched integrated prefill regressed 9.55% despite lower complete attention costs in both phases. | Independent Astra review pass 2: PASS; pass 1's sole finding was the now-waived matched-prefill criterion. Candidate, exact commands and logs preserved under `.cache/evaluation/qw38-language-v2/task038-support/`; see [completion report](tasks/TASK-038.md#completion-report). | DONE under the user-directed acceptance amendment. Regression and unresolved cause remain recorded; final TASK-040 gates remain unchanged. TASK-039 completed next; see its [completion report](tasks/TASK-039.md#completion-report). |
 | TASK-017 | Resolved: stale compiler executable reported a graph-binding failure. | Current compiler source already assigns retained MTP layer bindings index 0; rebuilding produced both production and BF16 identity artifacts. | Completed primary-language decode and independent BF16/source validation; see [`TASK-017`](tasks/TASK-017.md). |
 | TASK-018 | Resolved: authority and sampler reproducibility findings were corrected and independently reviewed. | Fresh Sol high review of commit `bc3e33823b2a638004a00d30e15260990861a76` returned PASS with no findings or evidence requests. | TASK-020 materializes calibration/development token manifests before fitting; TASK-022/026 rebind preserved evaluation inputs to the reconciled policy identity before acceptance. |

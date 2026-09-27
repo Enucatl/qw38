@@ -266,7 +266,7 @@ std::expected<void,Error> distinct(std::span<Region const> regions, Stream const
   return {};
 }
 bool valid_input(Q8Input x) {
-  return x.m && x.m<=256 && x.k && x.k<=17408 && x.padded_k==decode_pad_k(x.k) &&
+  return x.m && x.m<=kQ8MlpMaxTokens && x.k && x.k<=17408 && x.padded_k==decode_pad_k(x.k) &&
       x.codes.size()==std::uint64_t(x.m)*x.padded_k &&
       x.scales.size()==x.codes.size()/32 && x.sums.size()==x.scales.size();
 }
@@ -324,7 +324,7 @@ std::expected<void,Error> q4k_q8_mlp(PrefillWeight const& gate,PrefillWeight con
   if (!pending_failure) {
     if (auto st = require_uncaptured(stream); !st) return st;
   }
-  if (!m || m>256 || workspace.size()<q8_mlp_workspace_bytes(m) ||
+  if (!m || m>kQ8MlpMaxTokens || workspace.size()<q8_mlp_workspace_bytes(m) ||
       !std::isfinite(eps) || eps<=0 || gate.n!=17408 || gate.k!=5120 ||
       up.n!=gate.n || up.k!=gate.k || down.n!=5120 || down.k!=17408)
     return std::unexpected(make_error(ErrorCode::InvalidArgument,"q8.mlp","invalid geometry"));

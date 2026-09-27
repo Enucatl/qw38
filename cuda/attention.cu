@@ -418,9 +418,10 @@ __device__ __forceinline__ void attention_mma(float (&c)[4],
       a0, a1, a2, a3, b0, b1, c[0], c[1], c[2], c[3]);
 }
 
+template <int Threads = kPrefillThreads>
 __device__ void stage_attention_kv(std::uint16_t const* source,
     std::uint16_t* tile, std::uint64_t base, std::uint64_t end) {
-  for (int i = threadIdx.x; i < 64 * 32; i += kPrefillThreads) {
+  for (int i = threadIdx.x; i < 64 * 32; i += Threads) {
     auto const token = base + i / 32;
     bool const valid = token < end;
     // Even a zero-fill copy uses an in-bounds source address.
@@ -437,7 +438,7 @@ __device__ void stage_attention_kv(std::uint16_t const* source,
 // The eight-column register layout, separate K/V pipeline and grouped heads
 // follow pinned llama.cpp fattn-mma-f16.cuh (see third_party attribution).
 // Both probability components and all statistics/accumulators remain FP32/BF16.
-template <bool Decode>
+template <bool Decode, bool Paired = false>
 __global__ void attention_mma_kernel(
     std::uint16_t const* q, std::uint16_t const* g,
     std::uint16_t const* kv, std::uint32_t attn_layer,
@@ -454,17 +455,23 @@ __global__ void attention_mma_kernel(
     }
   }
   constexpr int D = 256, K = 64, Q = 32;
+  constexpr int Heads = Paired ? 2 : 1, Threads = Heads * kPrefillThreads;
+  static_assert(!Decode || !Paired);
   constexpr int ValueTiles = Decode ? 4 : 16;
   extern __shared__ __align__(16) unsigned char storage[];
   auto* ks = reinterpret_cast<std::uint16_t*>(storage);
   auto* vs = ks + K * kKvTileStride;
-  int const warp = threadIdx.x / 32, lane = threadIdx.x % 32;
-  unsigned const h = blockIdx.x, row0 = Decode ? 0 : blockIdx.y * Q;
+  int const head = Paired ? threadIdx.x / kPrefillThreads : 0;
+  int const warp = Paired ? (threadIdx.x / 32) % 4 : threadIdx.x / 32;
+  int const lane = threadIdx.x % 32;
+  unsigned const h = blockIdx.x * Heads + head, row0 = Decode ? 0 : blockIdx.y * Q;
   unsigned const pm = (valid_tokens + 127) / 128 * 128;
   if constexpr (!Decode) {
     if (fp8_codes && row0 >= valid_tokens) {
-      for (unsigned r = 0; r < Q; ++r)
-        fp8_pack_row(nullptr, row0 + r, pm, D, fp8_codes, fp8_scales, h * 2, 6144);
+      for (unsigned a = 0; a < Heads; ++a)
+        for (unsigned r = 0; r < Q; ++r)
+          fp8_pack_row(nullptr, row0 + r, pm, D, fp8_codes, fp8_scales,
+                       (blockIdx.x * Heads + a) * 2, 6144);
       return;
     }
   }
@@ -498,11 +505,11 @@ __global__ void attention_mma_kernel(
     begin = (tiles * blockIdx.y / partitions) * K;
     end = min(first_position, (tiles * (blockIdx.y + 1) / partitions) * K);
   }
-  stage_attention_kv(kb, ks, begin, end);
+  stage_attention_kv<Threads>(kb, ks, begin, end);
   cute::cp_async_wait<0>();
   __syncthreads();
   for (std::uint64_t base = begin; base < end; base += K) {
-    stage_attention_kv(vb, vs, base, end); // Overlap V with QK.
+    stage_attention_kv<Threads>(vb, vs, base, end); // Overlap V with QK.
     float score[4][4]{};
 #pragma unroll
     for (int d = 0; d < 16; ++d) {
@@ -518,7 +525,7 @@ __global__ void attention_mma_kernel(
       }
     }
     __syncthreads(); // All K readers finish before the next K tile arrives.
-    stage_attention_kv(kb, ks, base + K, end); // Overlap next K with softmax/PV.
+    stage_attention_kv<Threads>(kb, ks, base + K, end); // Overlap next K with softmax/PV.
     float best[2] = {maximum[0], maximum[1]};
 #pragma unroll
     for (int t = 0; t < 4; ++t) {
@@ -613,22 +620,26 @@ __global__ void attention_mma_kernel(
           rounded = fp32_to_bf16_rne(pv[d][i] / denominator[i % 2] * sigmoid_fp32(bf16_to_fp32(g[off])));
           if (!fp8_codes) y[off] = rounded;
         }
-        if (fp8_codes) ks[(col - row0) * D + coord] = rounded;
+        if (fp8_codes) ks[(head * Q + col - row0) * D + coord] = rounded;
       }
     }
   }
   if constexpr (!Decode) {
     if (fp8_codes) {
       __syncthreads();
-      for (unsigned r = 0; r < Q; ++r)
-        fp8_pack_row(ks + r * D, row0 + r, pm, D, fp8_codes, fp8_scales, h * 2, 6144);
+      // Reuse the dead K tile for distinct [head,Q32,D256] outputs. Both
+      // heads fit in its 64 padded rows; the CTA cooperatively packs each.
+      for (unsigned a = 0; a < Heads; ++a)
+        for (unsigned r = 0; r < Q; ++r)
+          fp8_pack_row(ks + (a * Q + r) * D, row0 + r, pm, D,
+                       fp8_codes, fp8_scales, (blockIdx.x * Heads + a) * 2, 6144);
     }
   }
 }
 
-template <bool Decode = false>
+template <bool Decode = false, bool Paired = false>
 std::expected<void, Error> configure_prefill_mma() {
-  return check(cudaFuncSetAttribute(attention_mma_kernel<Decode>,
+  return check(cudaFuncSetAttribute(attention_mma_kernel<Decode, Paired>,
       cudaFuncAttributeMaxDynamicSharedMemorySize, kPrefillSharedBytes),
       "cudaFuncSetAttribute(attention_mma_kernel)");
 }
@@ -799,7 +810,13 @@ std::expected<void, Error> launch_attention_prefill_scan(
       return std::unexpected(make_error(ErrorCode::InvalidArgument,"fp8.attention","pack aliases live operand"));
   }
   dim3 const grid(kAttnQueryHeads,(rows + query_tile - 1u) / query_tile);
-  if (query_tile == kAttnPrefillQueryTile) {
+  if (query_tile == kAttnPrefillQueryTile && valid_tokens == 512) {
+    if (auto st = configure_prefill_mma<false, true>(); !st) return st;
+    attention_mma_kernel<false, true>
+        <<<dim3(kAttnQueryHeads / 2, rows / query_tile), 2 * kPrefillThreads,
+           kPrefillSharedBytes, stream.native()>>>(
+            q, g, kv, attn_layer, capacity, first_position, valid_tokens, y, fp8_codes, fp8_scales);
+  } else if (query_tile == kAttnPrefillQueryTile) {
     if (auto st = configure_prefill_mma(); !st) return st;
     attention_mma_kernel<false>
         <<<grid, kPrefillThreads, kPrefillSharedBytes, stream.native()>>>(
@@ -816,20 +833,23 @@ std::expected<void, Error> launch_attention_prefill_scan(
 }
 
 std::expected<AttentionPrefillResources, Error> attention_prefill_resources(
-    std::uint32_t query_tile) {
+    std::uint32_t query_tile, std::uint32_t valid_tokens) {
   if (query_tile != kAttnPrefillQueryTile &&
       query_tile != kAttnPrefillQueryTileScalar &&
       query_tile != kAttnPrefillQueryTileControl)
     return std::unexpected(make_error(ErrorCode::InvalidArgument,
                                       "attention_prefill_resources", "invalid query tile"));
+  bool const paired = query_tile == kAttnPrefillQueryTile && valid_tokens == 512;
   void const* kernel = query_tile == kAttnPrefillQueryTile
-      ? reinterpret_cast<void const*>(attention_mma_kernel<false>)
+      ? (paired ? reinterpret_cast<void const*>(attention_mma_kernel<false, true>)
+                : reinterpret_cast<void const*>(attention_mma_kernel<false>))
       : query_tile == kAttnPrefillQueryTileScalar
           ? reinterpret_cast<void const*>(attention_prefill_scan_kernel<kAttnPrefillQueryTileScalar>)
           : reinterpret_cast<void const*>(attention_prefill_scan_kernel<kAttnPrefillQueryTileControl>);
   bool const mma = query_tile == kAttnPrefillQueryTile;
   if (mma) {
-    if (auto st = configure_prefill_mma(); !st) return std::unexpected(st.error());
+    auto st = paired ? configure_prefill_mma<false, true>() : configure_prefill_mma();
+    if (!st) return std::unexpected(st.error());
   }
   std::size_t const dynamic_bytes = mma ? kPrefillSharedBytes : 0;
   cudaFuncAttributes attr{};
@@ -838,7 +858,7 @@ std::expected<AttentionPrefillResources, Error> attention_prefill_resources(
   if (!st) return std::unexpected(st.error());
   int occupancy = 0;
   st = check(cudaOccupancyMaxActiveBlocksPerMultiprocessor(
-      &occupancy, kernel, mma ? kPrefillThreads : kAttnScanThreads, dynamic_bytes),
+      &occupancy, kernel, mma ? kPrefillThreads * (paired ? 2 : 1) : kAttnScanThreads, dynamic_bytes),
       "cudaOccupancyMaxActiveBlocksPerMultiprocessor(attention_prefill_scan_kernel)");
   if (!st) return std::unexpected(st.error());
   return AttentionPrefillResources{attr.numRegs,

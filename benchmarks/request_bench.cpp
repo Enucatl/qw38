@@ -245,7 +245,7 @@ struct Engine {
         << ",\"q8_mlp_workspace_bytes\":" << session.q8_mlp_workspace().size()
         << ",\"persistent_bytes\":" << session.persistent_bytes()
         << ",\"scratch_bytes\":" << session.arena_plan().total_bytes
-        << ",\"chunk\":256,\"kv_type\":\"BF16\",\"state_type\":\"FP32\""
+        << ",\"chunk\":" << kArenaTokenCapacity << ",\"kv_type\":\"BF16\",\"state_type\":\"FP32\""
         << ",\"activation_type\":\"" << (q8_mlp ? "BF16;E4M3 mixer prefill;Q8 K32 MLP" : fp8 ? "BF16;E4M3 mixer prefill" :
             nvfp4 ? "BF16;NVFP4 gate/up prefill" : "BF16")
         << "\",\"graph_mode\":\"" << (graph ? "graph" : "eager") << "\"";
@@ -280,7 +280,8 @@ int main(int argc, char** argv) {
   std::string const mode(argv[3]);
   auto const depth = number(argv[4]);
   check(mode == "prefill" || mode == "decode" || mode == "request" || mode == "development", "invalid workload");
-  check(mode != "development" || depth == 256, "development check requires frozen 256-token prompt");
+  check(mode != "development" || depth == 256 || depth == 4096,
+        "development check requires frozen 256- or 4096-token prompt");
   check(depth > 0 && depth <= 32768, "invalid depth");
   auto tokens = read_ids(argv[2], depth + 128);
   auto prompt = std::span<std::uint32_t const>{tokens}.first(depth);
@@ -333,6 +334,16 @@ int main(int argc, char** argv) {
   auto const total_ms = std::chrono::duration<double, std::milli>(end - start).count();
   auto const tail_ms = steps.empty() ? 0 : std::chrono::duration<double, std::milli>(end - tail_start).count();
   measured_range.close();
+  if (mode == "development") {
+    std::ofstream logits(std::string(argv[5]) + ".logits.f32", std::ios::binary);
+    logits.write(reinterpret_cast<char const*>(engine.logits.data()), engine.logits.size_bytes());
+    check(bool(logits), "cannot save development logits");
+    double const maximum = *std::max_element(engine.logits.begin(), engine.logits.end());
+    double sum = 0;
+    for (float x : engine.logits) sum += std::exp(double(x) - maximum);
+    out << "{\"kind\":\"diagnostic\",\"next_fixed_token\":" << tokens[depth + 8]
+        << ",\"target_nll\":" << maximum + std::log(sum) - engine.logits[tokens[depth + 8]] << "}\n";
+  }
   check(engine.position == depth + steps.size(), "incorrect final population");
   check(std::all_of(engine.logits.begin(), engine.logits.end(), [](float x) { return std::isfinite(x); }),
         "nonfinite final logits");

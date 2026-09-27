@@ -63,7 +63,7 @@ int main() {
   cuda::PrefillWeight w{wc.data(),ws.data(),cuda::kDecodeLayoutQ4KCandidateV2,cuda::kDecodeQuantizerQ4KCandidateV2,
       n,k,unsigned(packed.padded_n),pk,wc.bytes(),ws.bytes()};
   std::vector<float> small_tile;
-  for(unsigned m:{1u,3u,33u,127u,128u,129u,256u}) {
+  for(unsigned m:{1u,3u,33u,127u,128u,129u,256u,257u,511u,512u}) {
     std::vector<std::uint16_t> x(m*k);
     for(unsigned r=0;r<m;++r)for(unsigned c=0;c<k;++c){
       float value=(int((r*23+c*19)%67)-44)*.125f*(1+r%5);

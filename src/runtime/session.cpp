@@ -263,6 +263,7 @@ std::expected<Session, Error> Session::create(
     return std::unexpected(persist.error());
   }
   auto res_n = residual_bytes(kArenaTokenCapacity);
+  static_assert(kArenaTokenCapacity == qw38::cuda::kQ8MlpMaxTokens);
   if (!res_n) {
     return std::unexpected(res_n.error());
   }

@@ -51,7 +51,7 @@ inline constexpr std::uint64_t kFixedPersistentBytes = 153944064;
 inline constexpr std::uint64_t kKvBytesPerToken = 65536;
 
 // T-02 tuning: scratch/residual arena provision, not an architecture contract.
-inline constexpr std::uint64_t kArenaTokenCapacity = 256;
+inline constexpr std::uint64_t kArenaTokenCapacity = 512;
 // V0 model context horizon from max_position_embeddings.
 inline constexpr std::uint64_t kMaxKvCapacity = 262144;
 

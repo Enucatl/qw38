@@ -1,150 +1,132 @@
 #include "runtime/prefill.hpp"
 #include "runtime/runtime.hpp"
-
 #include "cuda/alloc.hpp"
 #include "cuda/attention.hpp"
 #include "cuda/copy.hpp"
 #include "cuda/event.hpp"
-#include "cuda/upload.hpp"
 #include "format/floatcvt.hpp"
 
 #include <cuda_runtime.h>
-
-#include <algorithm>
-#include <cstddef>
-#include <cstdint>
+#include <charconv>
+#include <chrono>
+#include <cmath>
 #include <cstdlib>
+#include <fstream>
+#include <iomanip>
 #include <iostream>
 #include <span>
 #include <vector>
 
 namespace {
-template <typename T>
-std::span<std::byte const> bytes(std::vector<T> const& v) {
-  return {reinterpret_cast<std::byte const*>(v.data()), v.size() * sizeof(T)};
+using namespace qw38;
+template<class T, class E> T take(std::expected<T, E>&& value) {
+  if (!value) { std::cerr << error_message(value.error()) << '\n'; std::exit(1); }
+  return std::move(*value);
+}
+template<class E> void check(std::expected<void, E> value) {
+  if (!value) { std::cerr << error_message(value.error()) << '\n'; std::exit(1); }
+}
+unsigned number(char const* arg) {
+  std::string_view text(arg); unsigned n = 0;
+  auto [end, ec] = std::from_chars(text.data(), text.data() + text.size(), n);
+  if (ec != std::errc{} || end != text.end()) std::exit(2);
+  return n;
+}
 }
 
-int run(char const* artifact) {
-  using namespace qw38::runtime;
-  auto runtime = Runtime::create();
-  if (!runtime) { std::cerr << error_message(runtime.error()) << '\n'; return 1; }
-  auto model = runtime->load(artifact);
-  if (!model) { std::cerr << error_message(model.error()) << '\n'; return 1; }
-  constexpr std::uint32_t capacity = 32768u + 32u, m = 32u;
-  auto session = runtime->create_session(*model, capacity);
-  if (!session) { std::cerr << error_message(session.error()) << '\n'; return 1; }
-  auto const& stream = runtime->stream();
-  auto plan = bind_prefill_attention_layer(*model, *session, 3, stream);
-  auto engine = qw38::cuda::PrefillEngine::create(stream, m);
-  auto workspace = PrefillAttentionWorkspace::create(m, stream.device());
-  auto resources = qw38::cuda::attention_prefill_resources();
-  auto control_resources = qw38::cuda::attention_prefill_resources(4);
-  if (!plan || !engine || !workspace || !resources || !control_resources) return 1;
-  cudaDeviceProp gpu{};
-  if (!qw38::cuda::check(cudaGetDeviceProperties(&gpu, stream.device()),
-                         "cudaGetDeviceProperties")) return 1;
-  std::size_t free_bytes = 0, total_bytes = 0;
-  if (!qw38::cuda::check(cudaMemGetInfo(&free_bytes, &total_bytes),
-                         "cudaMemGetInfo")) return 1;
-  auto embedding = model->payload("model.language_model.embed_tokens.weight");
-  if (!embedding) return 1;
-  std::vector<std::uint16_t> embedding_rows(m * kHidden);
-  auto const* table = static_cast<std::uint16_t const*>(embedding->pointer);
-  for (std::uint32_t t = 0; t < m; ++t)
-    if (!qw38::cuda::copy_d2h(embedding_rows.data() + t * kHidden,
-        table + static_cast<std::uint64_t>(3000u + t * 17u) * kHidden,
-        kHidden * 2u, stream)) return 1;
-  if (!stream.sync()) return 1;
-  std::vector<float> input(m * kHidden);
-  for (std::size_t i = 0; i < input.size(); ++i)
-    input[i] = qw38::format::bf16_to_fp32(embedding_rows[i]);
-  auto din = qw38::cuda::upload(bytes(input), stream);
-  auto dmid = qw38::cuda::DeviceBuffer::allocate(input.size() * 4u, stream.device());
-  auto dout = qw38::cuda::DeviceBuffer::allocate(input.size() * 4u, stream.device());
-  auto start = qw38::cuda::Event::create_timing();
-  auto end = qw38::cuda::Event::create_timing();
-  if (!din || !dmid || !dout || !start || !end) return 1;
-  auto s = workspace->slices();
-  auto const allocation_mark = qw38::cuda::malloc_count();
-  std::uint64_t const kv_bytes =
-      16ull * 2ull * kKvHeads * capacity * kHeadDim * 2ull;
-  std::cout << "context,gpu," << gpu.name << ",sm," << gpu.major << gpu.minor
-            << ",artifact_device_bytes," << model->device_bytes()
-            << ",workspace_bytes," << workspace->bytes() + engine->workspace_bytes()
-            << ",kv_bytes," << kv_bytes << ",free_bytes," << free_bytes
-            << ",total_bytes," << total_bytes
-            << ",query_tile," << qw38::cuda::kAttnPrefillQueryTile
-            << ",key_tile," << qw38::cuda::kAttnPrefillKeyTile
-            << ",registers," << resources->registers
-            << ",shared_bytes," << resources->shared_bytes
-            << ",local_bytes," << resources->local_bytes
-            << ",occupancy_blocks_per_sm," << resources->occupancy_blocks_per_sm
-            << '\n';
-  std::cout << "control,query_tile,4,key_tile," << qw38::cuda::kAttnPrefillKeyTileControl
-            << ",registers," << control_resources->registers
-            << ",shared_bytes," << control_resources->shared_bytes
-            << ",local_bytes," << control_resources->local_bytes
-            << ",occupancy_blocks_per_sm," << control_resources->occupancy_blocks_per_sm
-            << '\n';
-  std::cout << "sample,kind,prefix,m,query_tile,rep,gpu_ms,kv_unique_read_bytes,kv_read_estimate_bytes\n";
-  for (std::uint32_t prefix : {512u, 4096u, 32768u}) {
-    if (!session->reset() || !session->set_populated_length(0, prefix)) return 1;
-    auto warmup = execute_prefill_attention_layer(*plan, *workspace, *engine,
-        static_cast<float const*>(din->data()), static_cast<float*>(dmid->data()),
-        static_cast<float*>(dout->data()), m, prefix);
-    if (!warmup) { std::cerr << error_message(warmup.error()) << '\n'; return 1; }
-    for (std::uint32_t rep = 0; rep < 3u; ++rep) {
-      if (!session->reset() || !session->set_populated_length(0, prefix)) return 1;
-      if (prefix != 32768u) {
-        if (!start->record(stream)) return 1;
-        auto st = execute_prefill_attention_layer(*plan, *workspace, *engine,
-            static_cast<float const*>(din->data()), static_cast<float*>(dmid->data()),
-            static_cast<float*>(dout->data()), m, prefix);
-        if (!st) { std::cerr << error_message(st.error()) << '\n'; return 1; }
-        if (!end->record(stream) || !end->sync()) return 1;
-        auto ms = qw38::cuda::elapsed_ms(*start, *end);
-        if (!ms) return 1;
-        std::uint64_t const traffic = 2ull * kKvHeads * (prefix + m) * kHeadDim * 2u;
-        std::uint64_t estimated = 0;
-        for (std::uint32_t q = 0; q < m; q += qw38::cuda::kAttnPrefillQueryTile)
-          estimated += 2ull * kQueryHeads *
-                       (prefix + std::min(m, q + qw38::cuda::kAttnPrefillQueryTile)) *
-                       kHeadDim * 2u;
-        std::cout << "sample,complete_layer," << prefix << ',' << m << ','
-                  << qw38::cuda::kAttnPrefillQueryTile << ',' << rep
-                  << ',' << *ms << ',' << traffic << ',' << estimated << '\n';
-      } else {
-        // A real projection/preparation pass supplies Q/g and valid appended KV.
-        auto st = execute_prefill_attention_layer(*plan, *workspace, *engine,
-            static_cast<float const*>(din->data()), static_cast<float*>(dmid->data()),
-            static_cast<float*>(dout->data()), m, prefix);
-        if (!st) { std::cerr << error_message(st.error()) << '\n'; return 1; }
-      }
-      for (std::uint32_t tile : {1u, 4u}) {
-        if (!start->record(stream) ||
-            !qw38::cuda::launch_attention_prefill_scan(
-                s.q, s.g, static_cast<std::uint16_t const*>(session->kv().pointer),
-                0, capacity, prefix, m, s.y, stream, tile) ||
-            !end->record(stream) || !end->sync()) return 1;
-        auto ms = qw38::cuda::elapsed_ms(*start, *end);
-        if (!ms || qw38::cuda::malloc_count() != allocation_mark) return 1;
-        std::uint64_t const traffic = 2ull * kKvHeads * (prefix + m) * kHeadDim * 2u;
-        std::uint64_t estimated = 0;
-        for (std::uint32_t q = 0; q < m; q += tile)
-          estimated += 2ull * kQueryHeads * (prefix + std::min(m, q + tile)) *
-                       kHeadDim * 2u;
-        std::cout << "sample,attention_only," << prefix << ',' << m << ',' << tile
-                  << ',' << rep << ',' << *ms << ',' << traffic << ',' << estimated
-                  << '\n';
-      }
-    }
+// FAST-03: identical prepared inputs and initial KV for two M256 calls versus
+// one M512 call. Includes prepare/append, scan/gate/direct FP8 packing, real
+// output projection, residual add and completion, including first use.
+int main(int argc, char** argv) {
+  if (argc != 6) {
+    std::cerr << "usage: attention_prefill_bench ARTIFACT CHUNK PREFIX ROWS OUTPUT_F32\n";
+    return 2;
   }
-  return 0;
-}
-}  // namespace
-
-int main() {
-  auto const* artifact = std::getenv("QW38_AUTHORITY_ARTIFACT");
-  if (!artifact) { std::cerr << "QW38_AUTHORITY_ARTIFACT is required\n"; return 1; }
-  return run(artifact);
+  unsigned const chunk = number(argv[2]), prefix = number(argv[3]), rows = number(argv[4]);
+  if ((chunk != 32 && chunk != 256 && chunk != 512) ||
+      (rows != 32 && rows != 512) || chunk > rows || prefix > 32256) return 2;
+  auto setup_start = std::chrono::steady_clock::now();
+  auto rt = take(runtime::Runtime::create());
+  auto artifact = take(format::Artifact::open(argv[1]));
+  auto model = take(rt.upload_diagnostic(artifact, runtime::DiagnosticWeights::Layer, 3));
+  auto session = take(rt.create_session(model, prefix + rows));
+  auto const& stream = rt.stream();
+  auto plan = take(runtime::bind_prefill_layer_projections(model, 3, stream, &session));
+  auto engine = take(cuda::PrefillEngine::create(stream, chunk,
+      cuda::kPrefillDefaultWeightRows, cuda::PrefillDispatch::BoundedUnpackBf16Cublas, true));
+  auto workspace = take(runtime::PrefillAttentionWorkspace::create(chunk, stream.device()));
+  auto s = workspace.slices();
+  auto upload = [&](std::vector<std::uint16_t> const& host) {
+    auto device = take(cuda::DeviceBuffer::allocate(host.size() * 2));
+    check(cuda::copy_h2d(device.data(), std::as_bytes(std::span(host)), stream));
+    check(stream.sync());
+    return device;
+  };
+  auto data = [](std::size_t count, unsigned seed) {
+    std::vector<std::uint16_t> values(count);
+    for (std::size_t i = 0; i < count; ++i)
+      values[i] = format::fp32_to_bf16_rne(.01f * (int((i * seed + i / 256) % 101) - 50));
+    return values;
+  };
+  auto qg = upload(data(rows * 12288ull, 7));
+  auto k = upload(data(rows * 1024ull, 11));
+  auto v = upload(data(rows * 1024ull, 13));
+  auto gamma = upload(std::vector<std::uint16_t>(512, format::fp32_to_bf16_rne(1.f)));
+  auto frequencies = take(cuda::DeviceBuffer::allocate(32 * 4));
+  check(cuda::zero(frequencies, stream));
+  auto kv = static_cast<std::uint16_t*>(session.kv().pointer);
+  auto initial_kv = data(2ull * 4 * (prefix + rows) * 256, 17);
+  check(cuda::copy_h2d(kv, std::as_bytes(std::span(initial_kv)), stream));
+  auto residual = take(cuda::DeviceBuffer::allocate(rows * 5120ull * 4));
+  auto output = take(cuda::DeviceBuffer::allocate(rows * 5120ull * 4));
+  check(cuda::zero(residual, stream));
+  auto begin = take(cuda::Event::create_timing()), end = take(cuda::Event::create_timing());
+  check(stream.sync());
+  double const setup_ms = std::chrono::duration<double, std::milli>(
+      std::chrono::steady_clock::now() - setup_start).count();
+  auto const allocations = cuda::malloc_count();
+  check(begin.record(stream));
+  auto start = std::chrono::steady_clock::now();
+  for (unsigned offset = 0; offset < rows; offset += chunk) {
+    check(cuda::launch_attention_prepare_chunk(
+        static_cast<std::uint16_t const*>(qg.data()) + offset * 12288ull,
+        static_cast<std::uint16_t const*>(k.data()) + offset * 1024ull,
+        static_cast<std::uint16_t const*>(v.data()) + offset * 1024ull,
+        static_cast<std::uint16_t const*>(gamma.data()) + 256,
+        static_cast<std::uint16_t const*>(gamma.data()),
+        static_cast<float const*>(frequencies.data()), 1e-6f, prefix + offset,
+        chunk, s.q, s.g, kv, 0, prefix + rows, stream));
+    auto packed = engine.fp8_operand(chunk, 6144);
+    check(cuda::launch_attention_prefill_scan(s.q, s.g, kv, 0, prefix + rows,
+        prefix + offset, chunk, s.y, stream, cuda::kAttnPrefillQueryTile,
+        const_cast<std::uint8_t*>(packed.codes.data()), const_cast<float*>(packed.scales.data())));
+    check(engine.project({.weight = plan.mixer_out, .input = s.y,
+        .output = static_cast<float*>(output.data()) + offset * 5120ull,
+        .residual = static_cast<float const*>(residual.data()) + offset * 5120ull,
+        .valid_tokens = chunk, .first_position = prefix + offset,
+        .epilogue = cuda::PrefillEpilogue::ResidualAddFp32, .packed = packed}));
+    check(stream.sync());
+  }
+  check(end.record(stream)); check(end.sync());
+  double const host_ms = std::chrono::duration<double, std::milli>(
+      std::chrono::steady_clock::now() - start).count();
+  auto const hot_allocations = cuda::malloc_count() - allocations;
+  auto resources = take(cuda::attention_prefill_resources(cuda::kAttnPrefillQueryTile, chunk));
+  std::vector<float> result(rows * 5120ull);
+  check(cuda::copy_d2h(result.data(), output.data(), result.size() * 4, stream));
+  check(stream.sync());
+  for (float x : result) if (!std::isfinite(x)) return 1;
+  std::ofstream saved(argv[5], std::ios::binary);
+  saved.write(reinterpret_cast<char const*>(result.data()), result.size() * 4);
+  if (!saved) return 1;
+  std::cout << std::setprecision(12) << "chunk=" << chunk << " prefix=" << prefix
+      << " rows=" << rows << " setup_ms=" << setup_ms << " host_ms=" << host_ms
+      << " gpu_ms=" << take(cuda::elapsed_ms(begin, end))
+      << " workspace_bytes=" << workspace.bytes() + engine.workspace_bytes()
+      << " blocks=" << (chunk == 512 ? 12 : 24) * ((chunk + 127) / 128 * 4)
+      << " threads=" << (chunk == 512 ? 256 : 128)
+      << " registers=" << resources.registers << " shared_bytes=" << resources.shared_bytes
+      << " local_bytes=" << resources.local_bytes << " blocks_per_sm=" << resources.occupancy_blocks_per_sm
+      << " hot_allocations=" << hot_allocations << " runs=1 warmups=0 finite=true\n";
+  return hot_allocations ? 1 : 0;
 }

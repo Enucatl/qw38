@@ -60,7 +60,7 @@ std::expected<PrefillGdnLayerPlan, Error> bind_prefill_gdn_layer(
 
 std::expected<PrefillGdnWorkspace, Error> PrefillGdnWorkspace::create(
     std::uint32_t token_capacity, int device) {
-  if (token_capacity == 0 || token_capacity > qw38::cuda::kPrefillMaxTokens)
+  if (token_capacity == 0 || token_capacity > kArenaTokenCapacity)
     return std::unexpected(make_error(ErrorCode::InvalidArgument,
                                       "prefill.gdn.capacity", "invalid token capacity"));
   auto allocation = qw38::cuda::DeviceBuffer::allocate(
