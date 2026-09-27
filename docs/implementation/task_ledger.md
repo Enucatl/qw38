@@ -93,6 +93,39 @@ as a reference, is FOLLOW_UP_REQUIRED scheduling work. It does not add a new
 prompt-length dispatcher to this accepted candidate or weaken TASK-043's final
 quality/capacity/performance gates. Current M512/smaller-chunk dispatch remains.
 
+### Small/large cutoff and startup tradeoff — 2026-09-27
+
+Use **4096 tokens** as the agreed scheduling cutoff: **small is <=4096;
+large is >4096**. For prefill, classify the full prompt rather than each
+512-token execution chunk; for decode, use the populated context length.
+Exactly 4096 belongs to the small regime. Distinct execution paths remain
+FOLLOW_UP_REQUIRED; this decision records their boundary without implementing
+a dispatcher or changing TASK-042's delivered schedule.
+
+The prompt boundary follows `ds4_prefill_cap_for_prompt` in
+[`../ds4/ds4.c`](../../../ds4/ds4.c), which selects its default long-prompt cap
+when `prompt_len > 4096`. DS4 is a design reference, not a requirement to copy
+its chunk sizes or its separate MMQ matrix-dimension guards.
+
+Modestly higher one-time startup/model-loading costs are acceptable when they
+enable faster prefill and decode. Favor reusable preparation over repeated
+work in those phases. Report startup/loading separately alongside prefill,
+decode and complete-request latency so the tradeoff remains visible. This
+does not establish that TASK-042's unexplained first-token regression was a
+one-time loading cost. Preserve PERF-01's actual first-use timing boundaries,
+single-run/no-warmup policy and quality/capacity gates; do not reclassify
+measured inference work as loading or reinterpret historical results.
+
+### First-decode visibility follow-up — 2026-09-27
+
+The user requested a specific task for any instrumentation or measurements
+needed to understand TASK-042's unexplained first-decode regression.
+[TASK-044](tasks/TASK-044.md) owns this bounded diagnosis after TASK-043,
+reusing saved evidence first and adding only missing timing visibility.
+It separates startup, graph first use and recurring decode costs, retaining
+an explicit unresolved outcome if the evidence cannot establish causality.
+TASK-043's validation scope and TASK-042's accepted status remain unchanged.
+
 ## Fast-engine amendment — FAST-02 (2026-09-27)
 
 The user requested an implementable next batch after reviewing
@@ -452,6 +485,7 @@ historical and is not relabeled as a 54-case result.
 ## Normative authority
 
 - FAST-03 and its detailed task files for TASK-041–043;
+  the user-directed first-decode visibility follow-up for TASK-044;
   FAST-02 for completed TASK-037–040;
   FAST-01 for completed TASK-033–036; DELIVERY-01 for completed TASK-028–030;
   OVERALL-01 for completed TASK-018–027 contracts
@@ -491,11 +525,11 @@ Correctness and quality criteria remain unchanged; execute applicable checks onc
   TASK-037–038 implement quantized MLP and attention improvements, TASK-039
   implements submission improvements, and TASK-040 decided retention;
   TASK-041/042 improve prefill MMQ and grouped attention/chunk scheduling,
-  and TASK-043 decides the next delivery. Reuse
+  TASK-043 decides the next delivery, and TASK-044 diagnoses first-decode costs. Reuse
   existing ablations; new ablations need a specific diagnostic question.
 - Keep benchmarks separate from correctness tests. Preserve exact commands, results, artifact/binary identities, and hardware context in each completion report.
 - Executable status values are `TODO`, `IN_PROGRESS`, `BLOCKED`, and `DONE`.
-  TASK-001–030 and TASK-033–042 are `DONE`; TASK-043 is `TODO`.
+  TASK-001–030 and TASK-033–042 are `DONE`; TASK-043–044 are `TODO`.
   `SUPERSEDED` denotes
   retired TASK-031/032 cross-references, never implementation completion.
 - A rejected candidate is a useful experiment result. Record the reason and
@@ -707,6 +741,7 @@ an achieved performance target.
 | TASK-041 | Reuse-rich Q4_K×Q8 prefill MMQ | M20 | TASK-040 | J128 full-chunk consumer, cooperative FP32 metadata and fragment reuse, preserved MMVQ and shared packs; complete M256 MLP and integrated prefill improve, matched decode does not regress; isolated M1 first-use regression recorded as FOLLOW_UP_REQUIRED | DONE |
 | TASK-042 | Shared-KV attention with bounded 512-token prefill | M21 | TASK-041 | User accepted candidate with measured regressions retained as unresolved; graph-first-use capacity evidence complete; below/above-4096 path selection recorded as FOLLOW_UP_REQUIRED | DONE |
 | TASK-043 | Prefill engine validation and delivery decision | M22 | TASK-042 | Frozen quality/replay/capacity/PERF-01 gate, explicit promotion/retention and remaining costs | TODO |
+| TASK-044 | Attribute first-decode latency and startup costs | M23 | TASK-043 | Saved-trace attribution, minimal missing instrumentation and bounded 4096+8 comparison; explicit cause or unresolved evidence gap | TODO |
 
 TASK-037's original M=1 gate was superseded by the user-directed retention
 decision above. Its M=1 regression and review history remain recorded. TASK-038
@@ -1044,6 +1079,7 @@ prefill development to TASK-041/042 and final validation to TASK-043.
 | Remaining J32 MMQ metadata/weight reuse gap | TASK-041; existing Q4_K/Q8 policy and one resident view retained |
 | Prefill sibling-head KV reuse and fixed-256 scheduling | TASK-042; grouped prefill plus bounded 512 capacity, existing smaller-chunk path |
 | New FAST-03 candidate's quality/replay/capacity/matched performance | TASK-043; retains every applicable obligation and TASK-040 quality limitations until resolved |
+| TASK-042 unexplained first-decode regression and startup-cost attribution | TASK-044; reuse final captures before adding bounded diagnostic measurements |
 
 ## Critical path
 
@@ -1066,7 +1102,7 @@ TASK-001 → 002 → 003 → 004 → 005 → 006
 
                                       036 → 037 (integer MLP) → 038 (attention reuse) → 039 (submission/graphs) → 040 (validate/deliver)
 
-                                      040 → 041 (MMQ reuse) → 042 (grouped attention / 512 prefill) → 043 (validate/deliver)
+                                      040 → 041 (MMQ reuse) → 042 (grouped attention / 512 prefill) → 043 (validate/deliver) → 044 (first-decode diagnosis)
 ```
 
 ## Architecture blocker log

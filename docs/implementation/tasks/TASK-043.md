@@ -20,6 +20,11 @@ capacity, unchanged decode graph selection and pinned toolchain. Retain
 manifest-only artifact identity; do not hash model payloads/scales. Preserve
 old captures and reuse the existing evaluation/replay/request/profile tools.
 
+Apply the [cutoff and startup tradeoff decision](../task_ledger.md#smalllarge-cutoff-and-startup-tradeoff--2026-09-27):
+small <=4096 tokens, large >4096. Report modest one-time startup/loading
+increases alongside any prefill/decode gains, preserving the timing boundaries
+below. The distinct-path dispatcher remains follow-up work.
+
 P100's confirmed candidate-only error and C92 uncertainty are unresolved
 starting conditions, not targets to tune against. No speed improvement waives
 them. New outputs need their own scores; authenticated identical text can
