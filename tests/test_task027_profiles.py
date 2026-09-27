@@ -33,3 +33,4 @@ def test_transient_peak_and_invalid_lifetime() -> None:
     assert category("attention_prefill_scan_kernel", 5, "qw38", False) == "attention"
     assert category("gemv_kernel", 256, "qw38", False) == "projections"
     assert category("mmq", 256, "qw38", False) == "projections"
+    assert category("mmq_j128", 40, "qw38", False) == "projections"

@@ -529,7 +529,7 @@ Correctness and quality criteria remain unchanged; execute applicable checks onc
   existing ablations; new ablations need a specific diagnostic question.
 - Keep benchmarks separate from correctness tests. Preserve exact commands, results, artifact/binary identities, and hardware context in each completion report.
 - Executable status values are `TODO`, `IN_PROGRESS`, `BLOCKED`, and `DONE`.
-  TASK-001–030 and TASK-033–042 are `DONE`; TASK-043–044 are `TODO`.
+  TASK-001–030 and TASK-033–043 are `DONE`; TASK-044 is `TODO`.
   `SUPERSEDED` denotes
   retired TASK-031/032 cross-references, never implementation completion.
 - A rejected candidate is a useful experiment result. Record the reason and
@@ -740,7 +740,7 @@ an achieved performance target.
 | TASK-040 | Quantized engine validation and delivery decision | M19 | TASK-039 | Frozen core-54/replay/capacity/PERF-01 evidence and promotion/retention with explicit speed gaps | DONE |
 | TASK-041 | Reuse-rich Q4_K×Q8 prefill MMQ | M20 | TASK-040 | J128 full-chunk consumer, cooperative FP32 metadata and fragment reuse, preserved MMVQ and shared packs; complete M256 MLP and integrated prefill improve, matched decode does not regress; isolated M1 first-use regression recorded as FOLLOW_UP_REQUIRED | DONE |
 | TASK-042 | Shared-KV attention with bounded 512-token prefill | M21 | TASK-041 | User accepted candidate with measured regressions retained as unresolved; graph-first-use capacity evidence complete; below/above-4096 path selection recorded as FOLLOW_UP_REQUIRED | DONE |
-| TASK-043 | Prefill engine validation and delivery decision | M22 | TASK-042 | Frozen quality/replay/capacity/PERF-01 gate, explicit promotion/retention and remaining costs | TODO |
+| TASK-043 | Prefill engine validation and delivery decision | M22 | TASK-042 | Frozen quality/replay/capacity/PERF-01 gate, explicit promotion/retention and remaining costs | DONE |
 | TASK-044 | Attribute first-decode latency and startup costs | M23 | TASK-043 | Saved-trace attribution, minimal missing instrumentation and bounded 4096+8 comparison; explicit cause or unresolved evidence gap | TODO |
 
 TASK-037's original M=1 gate was superseded by the user-directed retention

@@ -50,7 +50,7 @@ bool options(int argc, char** argv, Options& out) {
         std::uint32_t count{};
         auto [end, ec] = std::from_chars(part.data(), part.data() + part.size(), count);
         if (ec != std::errc{} || end != part.data() + part.size() ||
-            count == 0 || count > 256) return false;
+            count == 0 || count > qw38::runtime::kArenaTokenCapacity) return false;
         out.partitions.push_back(count);
         if (comma == std::string::npos) break;
         text.erase(0, comma + 1);
@@ -59,7 +59,8 @@ bool options(int argc, char** argv, Options& out) {
     }
     else return false;
   }
-  if (out.prefill && out.partitions.empty()) out.partitions.push_back(256);
+  if (out.prefill && out.partitions.empty())
+    out.partitions.push_back(qw38::runtime::kArenaTokenCapacity);
   if (!out.prefill && !out.partitions.empty()) return false;
   return !out.artifact.empty() && !out.prompt.empty() &&
          !out.interleave.empty() && !out.output.empty();
@@ -167,8 +168,10 @@ int main(int argc, char** argv) {
     std::cerr << "invalid token input\n";
     return 1;
   }
-  constexpr std::array<std::uint64_t, 9> checkpoints{1, 3, 4, 63, 64, 65, 255, 256, 257};
-  auto const stream = cycle(source, 265);
+  std::vector<std::uint64_t> checkpoints{1, 3, 4, 63, 64, 65, 255, 256, 257};
+  if (opt.prefill) checkpoints.insert(checkpoints.end(), {511, 512, 513});
+  auto const capacity = checkpoints.back() + 8;
+  auto const stream = cycle(source, capacity);
   auto runtime = Runtime::create();
   if (!runtime) return fail(runtime.error());
   auto model = runtime->load(opt.artifact);
@@ -205,7 +208,8 @@ int main(int argc, char** argv) {
            << (opt.prefill ? "prefill" : "decode")
            << "\",\"decode_submission\":\"graph\",\"graph_fallback\":null"
               ",\"graph_buckets\":\"powers_of_two_from_256_capped_by_capacity\""
-              ",\"attention_schedule\":\"task038_grouped_mma_two_bf16_p_fixed_order_merge\""
+              ",\"attention_schedule\":\"decode_six_heads_two_bf16_p_fixed_order_merge\""
+              ",\"prefill_attention_schedule\":\"M512_two_heads_Q32_K64_else_per_head_Q32_K64\""
               ",\"attention_partitions\":\"min(ceil(populated/256),ceil(2*SMs/4),128)\""
               ",\"partitions\":[";
     for (std::size_t i = 0; i < opt.partitions.size(); ++i) {
@@ -229,7 +233,7 @@ int main(int argc, char** argv) {
     auto const length = checkpoints[ci];
     auto const prefix = std::span<std::uint32_t const>(stream.data(), length);
     auto const tail = std::span<std::uint32_t const>(stream.data() + length, 8);
-    auto baseline = runtime->create_session(*model, 265);
+    auto baseline = runtime->create_session(*model, capacity);
     if (!baseline) return fail(baseline.error());
     auto baseline_plan = LanguageModelPlan::bind(*model, *baseline, runtime->stream());
     if (!baseline_plan) return fail(baseline_plan.error());
@@ -241,7 +245,7 @@ int main(int argc, char** argv) {
     std::string cross_json = "null";
     bool cross_ok = true;
     if (opt.prefill) {
-      auto decoded = runtime->create_session(*model, 265);
+      auto decoded = runtime->create_session(*model, capacity);
       if (!decoded) return fail(decoded.error());
       auto decoded_plan = LanguageModelPlan::bind(*model, *decoded, runtime->stream());
       if (!decoded_plan) return fail(decoded_plan.error());
@@ -295,7 +299,7 @@ int main(int argc, char** argv) {
       expected.states.push_back(std::move(*state));
     }
 
-    auto replay = runtime->create_session(*model, 265);
+    auto replay = runtime->create_session(*model, capacity);
     if (!replay) return fail(replay.error());
     auto replay_plan = LanguageModelPlan::bind(*model, *replay, runtime->stream());
     if (!replay_plan) return fail(replay_plan.error());
@@ -315,7 +319,7 @@ int main(int argc, char** argv) {
       reset_ok = reset_ok && result->argmax == expected.argmax[i] && logits_equal(result->logits, expected.logits[i]) && same(*state, expected.states[i]);
     }
 
-    auto restored = runtime->create_session(*model, 265);
+    auto restored = runtime->create_session(*model, capacity);
     if (!restored) return fail(restored.error());
     if (auto result = restored->restore(*baseline_state); !result) return fail(result.error());
     auto restored_plan = LanguageModelPlan::bind(*model, *restored, runtime->stream());
@@ -328,9 +332,21 @@ int main(int argc, char** argv) {
       snapshot_ok = snapshot_ok && result->argmax == expected.argmax[i] && logits_equal(result->logits, expected.logits[i]) && same(*state, expected.states[i]);
     }
     std::ostringstream row;
+    row << "{\"prefill_chunks\":[";
+    if (opt.prefill) {
+      for (std::uint64_t offset = 0, chunk = 0; offset < length; ++chunk) {
+        auto count = std::min<std::uint64_t>(length - offset,
+                                            opt.partitions[chunk % opt.partitions.size()]);
+        if (chunk) row << ',';
+        row << "{\"tokens\":" << count << ",\"heads_per_cta\":"
+            << (count == 512 ? 2 : 1) << '}';
+        offset += count;
+      }
+    }
+    row << "],";
     for (auto const* plan : {&*baseline_plan, &*replay_plan, &*restored_plan})
       if (plan->graph_fallback()) return fail(*plan->graph_fallback());
-    row << "{\"length\":" << length << ",\"suffix_tokens\":8,\"reset_replay\":" << (reset_ok ? "true" : "false")
+    row << "\"length\":" << length << ",\"suffix_tokens\":8,\"reset_replay\":" << (reset_ok ? "true" : "false")
         << ",\"snapshot_restore\":" << (snapshot_ok ? "true" : "false")
         << ",\"cross_schedule\":" << cross_json << '}';
     checkpoint_rows.push_back(row.str());

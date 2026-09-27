@@ -57,7 +57,7 @@ def category(name: str, grid_x: int, engine: str, head: bool) -> str:
         return "gdn"
     if (
         name == "device_kernel"  # CUTLASS NVFP4/FP8; confirmed by full kernel name.
-        or name == "mmq"  # Q4_K x Q8 integer prefill contraction.
+        or name in {"mmq", "mmq_j128"}  # Q4_K x Q8 integer prefill contractions.
         or "mmv" in name
         or "gemv" in name
         or "mma" in name

@@ -2,7 +2,7 @@
 
 ## Status
 
-TODO
+DONE
 
 ## Milestone and dependency
 
@@ -92,3 +92,45 @@ If residual FP8 epilogues/tails, GDN or exposed submission gaps justify another
 batch, report the concrete evidence and proposed smallest next step. Do not
 automatically launch it, expand quality coverage or convert this final gate
 into an open-ended optimization task.
+
+## Completion Report — 2026-09-27
+
+**Decision: RETAIN_CONTROL.** Production remains TASK-026/027 at `d2f02e2`;
+P100 `case_077` fails, so promotion is blocked and the fast-engine goal is
+unmet (all nine latency ratios are below 1). The candidate and complete
+requirement-to-evidence mapping are recorded in
+[`../task043-delivery.md`](../task043-delivery.md). It covers the frozen
+policy-1030 implementation and rollback, core-54 and extended quality, replay
+boundaries and failure recovery, six single-run profiles/nine latency and
+memory rows, resource/capacity measurements, and remaining costs. The agreed
+4096 scheduling split still has no distinct dispatcher; first-decode attribution
+remains unresolved. TASK-044 owns that diagnosis; no new task was launched.
+
+Acceptance commands and results (all exit 0):
+
+- `bash .cache/evaluation/qw38-language-v2/task043-support/run.sh` — final
+  Release targets, profile test (1 passed), full-model integration (1/1),
+  core-54, fixed R-32768, replay suite and six PERF captures.
+- `bash .cache/evaluation/qw38-language-v2/task043-support/score.sh` — saved
+  quality scoring and source/binary authentication.
+- `uv run python .cache/evaluation/qw38-language-v2/task043-support/prepare-reviews.py`
+  — all 15 prompts and both output texts authenticated; 30 attributed reviews
+  reused, with the `case_077` failure preserved.
+- `bash .cache/evaluation/qw38-language-v2/task043-support/finalize.sh` —
+  frozen final evidence: P100 FAIL; C92 8/15 in both arms; NLL delta
+  +0.00310205934703436 over 701 targets; other quality, replay and capacity
+  gates pass. All nine performance ratios remain below 1.
+
+The full-model integration took 16.82 s; 32K prefill was 15.818 s versus
+TASK-040's 29.422 s and llama.cpp's 12.373 s. The final 32K request retained
+8,319,336,448 free device bytes. Exact logs, profiles, artifacts and identities
+remain under `.cache/evaluation/qw38-language-v2/task043-support/`; wake-run
+logs `3a46463648e1.log`, `1d67273d9eeb.log` and `4376ca713288.log` all exited
+0. Independent Astra review: PASS, pass 1, at
+`.cache/evaluation/qw38-language-v2/task043-support/astra-review-1.md`.
+Main-thread identity check confirmed six reviewed candidate files and 341
+evidence identities unchanged before delivery. Implementation model:
+GPT-6 Codex (specific variant unavailable). Follow-ups remain the TASK-044
+first-decode diagnosis and the agreed distinct paths at the 4096 boundary.
+Luna completed documentation delivery; the DONE-task cache scan found zero
+matching task-specific directories.
