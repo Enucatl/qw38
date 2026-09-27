@@ -610,7 +610,7 @@ an achieved performance target.
 | TASK-037 | Integer Q4_K MLP consumers for prefill and decode | M16 | TASK-036 | Retained policy-1030 candidate; complete M=256 MLP and matched integrated prefill/decode improve; M=1 regression deferred by user-directed amendment | DONE |
 | TASK-038 | Pipelined attention with shared KV reuse | M17 | TASK-037 | Retained by explicit user acceptance; attention costs and numerical/quality checks pass; matched prefill regression 247.119085 → 270.714379 ms remains recorded | DONE |
 | TASK-039 | Token-boundary submission and decode graph replay | M18 | TASK-038 | Internal enqueue with safe completion commits, reduced waits and bounded graph/eager dispatch | DONE |
-| TASK-040 | Quantized engine validation and delivery decision | M19 | TASK-039 | Frozen core-54/replay/capacity/PERF-01 evidence and promotion/retention with explicit speed gaps | TODO |
+| TASK-040 | Quantized engine validation and delivery decision | M19 | TASK-039 | Frozen core-54/replay/capacity/PERF-01 evidence and promotion/retention with explicit speed gaps | DONE |
 
 TASK-037's original M=1 gate was superseded by the user-directed retention
 decision above. Its M=1 regression and review history remain recorded. TASK-038

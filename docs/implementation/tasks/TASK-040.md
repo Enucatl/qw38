@@ -2,7 +2,7 @@
 
 ## Status
 
-TODO
+DONE
 
 ## Milestone and dependency
 
@@ -98,3 +98,59 @@ reviews or provenance leaves it incomplete. A failing quality result is a
 valid final decision outcome, not permission to omit the remaining required
 evidence. Rank measured residual costs and name the smallest justified next
 change if needed; do not automatically create or launch another batch.
+
+## Completion Report
+
+**Decision: RETAIN_CONTROL.** Policy 1030 is not promoted; production remains
+TASK-026/027 at `d2f02e2`. The candidate is the unchanged TASK-039 inference
+runtime, with manifest metadata digest
+`6ebcc402487aa92d4a6bb7d64ccfff00c20d74a738ac7e3fa2166522f4b35ff5`.
+The full reproduction, frozen precision/lifetime contracts, performance and
+memory tables, limitations, rollback, and follow-up are in
+[`task040-delivery.md`](../task040-delivery.md).
+
+The final core-54 scored FAIL: P100 FAIL with the unchanged confirmed
+`case_077` error; C92 is INCONCLUSIVE at 7/15 versus 8/15 with loss interval
+[0, 0.20]. NLL delta is +0.0025621463600068992 over 701 targets and every
+slice passes its NLL gate. L12 is 12/12, R-512 and R-4096 are 6/6 each, and
+the sole required `R-32768-s0-d0.1` is 1/1 in both arms. All fifteen P100
+outputs have output-bound reviews. These quality outcomes prevent promotion
+and are the permitted fully evidenced RETAIN_CONTROL result. All nine
+llama.cpp/candidate latency ratios are below 1; capacity retains 8,740,864,000
+free bytes after the final request, above the 2 GiB reserve.
+
+Acceptance commands and results (all main-thread long commands were launched
+through `wake-run`):
+
+- `bash .cache/evaluation/qw38-language-v2/task040-support/run.sh` exited 125
+  before build or inference because its historical local image ID was
+  unavailable. The failure and authenticated preflight are preserved.
+- `bash .cache/evaluation/qw38-language-v2/task040-support/resume.sh` passed:
+  pinned Release build, full-model integration 1/1, core-54 54/54, default
+  replay plus seven partition replays, fixed long retrieval, six once-only
+  performance captures and capacity analysis.
+- `bash .cache/evaluation/qw38-language-v2/task040-support/score.sh` produced
+  fixed-long PASS and the final core scoring inputs; its focused profile check
+  passed (`1 passed`). The script's final source checksum check exited 1
+  because the profile test had intentionally changed. Saved inference was not
+  rerun; original and final source identities are recorded in evidence notes.
+- `uv run python .cache/evaluation/qw38-language-v2/task040-support/prepare-reviews.py`
+  bound nine fresh adjudications and authenticated reuse of six candidate and
+  fifteen comparator reviews. The unchanged `case_077` failure was retained.
+- `bash .cache/evaluation/qw38-language-v2/task040-support/finalize.sh` passed:
+  final reviewed score is FAIL as expected for RETAIN_CONTROL; compiler and
+  decode delivery targets build, and frozen binary, inference-source and
+  comparator identities match.
+
+Independent GPT-6 Astra high review passed on pass 1 with no findings, gaps or
+requests. All eight reviewed candidate identities and 208 evidence identities
+were confirmed unchanged after review; candidate manifest SHA-256 is
+`9fb138d3ee0a182a0ef9f43105f91148e8b95b3e9b8b38c05996a05a80c8fe2e`.
+Evidence logs and detailed command mappings are retained under
+`.cache/evaluation/qw38-language-v2/task040-support/`. Implementation and
+acceptance evidence were produced by GPT-6 Codex in the main thread; completion
+documentation and delivery bookkeeping were handled by GPT-6 Luna. Before
+delivery, the main thread confirmed the reviewed code and guide and all 208
+evidence identities were unchanged. The DONE-task cache scan found no matching
+directories (`task040-support/cache-cleanup.json`). The largest measured
+residual is Q4_K×Q8 prefill MMQ at 20.171 s; no follow-up task was created.

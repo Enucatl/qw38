@@ -70,12 +70,15 @@ remains the control. Intermediate development checks do not confer acceptance.
 
 # Implementation baseline
 
-The [TASK-036 delivery record](../implementation/task036-delivery.md) describes
-the current FP8 mixer development candidate, measured context limits and
-retained TASK-026/027 production control. It is not promoted: C92 is
-inconclusive and P100 fails. TASK-037–040 start from that development runtime
-without declaring quality acceptance. The V0 choices below remain historical
-controls except where the amendments explicitly retain their semantics.
+The [TASK-040 delivery record](../implementation/task040-delivery.md) describes
+the current policy-1030 development candidate: integer Q4_K×Q8 MLP consumers,
+FP8 mixers, pipelined/grouped attention with two-component BF16 probabilities,
+and default bounded decode graphs with token/chunk completion commits.
+It retains TASK-026/027 at `d2f02e2` as production control: C92 is inconclusive,
+P100 fails, and all nine speed-parity targets remain unmet. Validated capacity
+is 32,768 prompt tokens plus 128 continuation slots. TASK-030/036 reports stay
+historical. The V0 choices below remain historical controls except where the
+amendments explicitly retain their semantics.
 
 V0's reference backend is NVIDIA CUDA. Its reference GPU is the NVIDIA GeForce RTX 5090, a Blackwell device with compute capability 12.0, and the native reference target is `sm_120`. V0 may optimize specifically for that GPU and architecture. The reference deployment is a Linux container environment using Docker and the NVIDIA Container Toolkit. Implementation uses C++23 for host code and CUDA C++23 for device code.
 

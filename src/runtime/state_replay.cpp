@@ -202,7 +202,12 @@ int main(int argc, char** argv) {
     if (!report) return false;
     report << "{\"status\":\"" << status << "\",\"artifact_manifest_digest\":\""
            << digest.str() << "\",\"mode\":\""
-           << (opt.prefill ? "prefill" : "decode") << "\",\"partitions\":[";
+           << (opt.prefill ? "prefill" : "decode")
+           << "\",\"decode_submission\":\"graph\",\"graph_fallback\":null"
+              ",\"graph_buckets\":\"powers_of_two_from_256_capped_by_capacity\""
+              ",\"attention_schedule\":\"task038_grouped_mma_two_bf16_p_fixed_order_merge\""
+              ",\"attention_partitions\":\"min(ceil(populated/256),ceil(2*SMs/4),128)\""
+              ",\"partitions\":[";
     for (std::size_t i = 0; i < opt.partitions.size(); ++i) {
       if (i) report << ',';
       report << opt.partitions[i];
@@ -242,6 +247,7 @@ int main(int argc, char** argv) {
       if (!decoded_plan) return fail(decoded_plan.error());
       auto decoded_boundary = decoded_plan->setup_prompt_slow(prefix);
       if (!decoded_boundary) return fail(decoded_boundary.error());
+      if (decoded_plan->graph_fallback()) return fail(*decoded_plan->graph_fallback());
       auto decoded_state = decoded->save();
       if (!decoded_state) return fail(decoded_state.error());
       bool const metadata = baseline_state->token_position == decoded_state->token_position &&
@@ -322,6 +328,8 @@ int main(int argc, char** argv) {
       snapshot_ok = snapshot_ok && result->argmax == expected.argmax[i] && logits_equal(result->logits, expected.logits[i]) && same(*state, expected.states[i]);
     }
     std::ostringstream row;
+    for (auto const* plan : {&*baseline_plan, &*replay_plan, &*restored_plan})
+      if (plan->graph_fallback()) return fail(*plan->graph_fallback());
     row << "{\"length\":" << length << ",\"suffix_tokens\":8,\"reset_replay\":" << (reset_ok ? "true" : "false")
         << ",\"snapshot_restore\":" << (snapshot_ok ? "true" : "false")
         << ",\"cross_schedule\":" << cross_json << '}';
@@ -348,6 +356,7 @@ int main(int argc, char** argv) {
   if (!second_a) return fail(second_a.error());
   auto second_a_state = interleave->save();
   if (!second_a_state) return fail(second_a_state.error());
+  if (interleave_plan->graph_fallback()) return fail(*interleave_plan->graph_fallback());
   bool const interleave_ok = logits_equal(first_a_logits, second_a->logits) && same(*first_a_state, *second_a_state);
   std::ostringstream interleave_json;
   interleave_json << "{\"schedule\":\"A,reset,B,reset,A\",\"identical\":"
