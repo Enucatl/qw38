@@ -9,6 +9,115 @@ the existing V0 implementation. From TASK-018 onward, select quantization,
 physical weight layout, and execution kernels together, using measured SM120
 capabilities before committing to the production representation.
 
+## Optimization amendment — FAST-04 (2026-09-27)
+
+The user requested fewer than five implementable tasks for another bounded
+optimization round after reviewing TASK-043 performance and TASK-044's
+diagnosis. This amendment defines **TASK-045–048**, initially `TODO`;
+no kernel implementation or new engine measurement was performed for planning.
+The task files include implementation guides and objective completion rules.
+
+| Task | Name | Delivered milestone |
+| --- | --- | --- |
+| [045](tasks/TASK-045.md) | Efficient FP8 and Q4 decode projections | Improved M=1 consumers using existing weights/precision and measured complete-operation wins |
+| [046](tasks/TASK-046.md) | Reduce vocabulary-head and normalization overhead | Measured head/direct-input and robust RMS decisions, with at least one retained improvement |
+| [047](tasks/TASK-047.md) | Context-aware scheduling and prefill kernel efficiency | Full-prompt/visible-context selection, bounded MMQ/attention improvements and verified graph/replay boundaries |
+| [048](tasks/TASK-048.md) | Optimization-round validation and delivery decision | One combined quality/replay/capacity/performance gate against TASK-043 and pinned llama.cpp |
+
+### Evidence and priority
+
+The [TASK-043 report](task043-delivery.md) and immutable profiles under
+`.cache/evaluation/qw38-language-v2/task043-support/` show 4K decode at
+2520.961 ms for 128 tokens: Q4 MMVQ 914.006 ms, FP8 GEMV 905.600 ms,
+hidden RMS variants including fused packing 229.650 ms, vocabulary head
+178.652 ms and attention 48.619 ms. Q4/FP8 consumers together consume 72.2%
+of elapsed decode. 32K prefill is 15.818 s versus llama.cpp's 12.373 s;
+projections take 9.667 s and attention 3.764 s. These observations prioritize
+work; they do not establish attainable speedups or permit adding overlapping
+comparator kernel categories into an elapsed-time explanation.
+
+Current source confirms scalar FP8 decode, small-load Q4 MMVQ, repeated head
+input staging and multi-pass robust RMS. Prefill still selects chunks by the
+512-token capacity and paired attention by full-chunk size, not full prompt
+regime. J128 MMQ/paired attention use 220/179 registers per thread respectively;
+targeted counters may distinguish resource/stall causes before editing them.
+Existing gate/up pack reuse, compact weights, asynchronous attention KV staging
+and CUDA graphs are already implemented, not new work for this round.
+
+TASK-044's original first-decode outlier remains **UNRESOLVED**. Its measured
+recurring GPU work supports prioritizing consumer kernels over another broad
+startup investigation. Keep the exact missing-observable follow-up in its
+[report](task044-decode-attribution.md); this batch need not force a cause.
+
+### Authority and retained boundaries
+
+Start from approved TASK-043 policy 1030 at
+`c301efa70f494a01bc7f6585d2f741623eb6fed4`, plus TASK-044's instrumentation.
+That production baseline and its output-bound P100 exception stay in effect
+until TASK-048 records a promotion. Intermediate development acceptance is
+not promotion. Keep TASK-026/027 at `d2f02e2` as the older rollback option.
+
+T-01–03 authorize concrete load/warp/fragment/tile and partition tuning under
+the existing model equations. Preserve policy 1030, artifact layout, one
+resident weight view, FP8-weight/BF16-input decode, Q4_K×Q8 K32 affine MLP,
+Q8 head's BF16 weight reconstruction, FP32 normalization/accumulation/
+residuals/recurrence, BF16 KV/history and two-component BF16 attention P.
+Keep overflow/nonfinite behavior, typed errors, safe commits and bounded
+session scratch. Changing numerical operand policies, quantizers, persistent
+state, GDN algorithms, or adding full weight/KV copies is outside this batch.
+
+TASK-047 owns the agreed <=4096/>4096 scheduling follow-up. Prefill uses the
+full logical incoming prompt length, preserved across partitions; prefix
+position is separate. Decode uses visible populated length including the
+submitted token. Exactly 4096 is small. Keep maximum chunk/arena capacity
+512. Distinct regime selection need not force a slower different kernel where
+measurement supports a shared choice; concrete prefill improvement is still
+required. Graph reuse must remain valid for the selected schedule.
+
+### Development and completion protocol
+
+Implement one evidence-backed first candidate per scoped family. Reuse saved
+timelines, existing drivers and pinned attributed llama.cpp/CUTLASS patterns.
+Only collect targeted kernel counters for a stated unresolved question;
+profiler replay/serialization is diagnostic and never acceptance timing.
+No parameter sweep, new benchmark framework or statistical speed claim.
+
+TASK-045/046 use one matched development request per parent/candidate:
+authenticated TASK-027 `tokens-4096.u32le`, followed by the first eight fixed
+inputs of its frozen 128-token continuation. Report prefill, first decode,
+remaining seven and the whole eight-step phase, including synchronized final
+logits/readout and actual first use. Compare identical inputs, capacity,
+artifact, timing boundaries and pinned toolchain, not different greedy
+continuations. A saved parent result is reusable only with matching identities.
+TASK-047 adds the specified 256 and 32768 development prompts, each with
+eight fixed inputs; TASK-048 alone owns the six final 128-token PERF-01 runs.
+
+Run complete-operation comparisons specified by each task once per arm with
+zero warmups; benchmark defaults with repetitions must be overridden or
+minimally extended. Keep correctness tests separate. Repeat only after an
+affected code change, failed check or concrete unresolved concern. Record
+setup/loading separately and first use at its actual boundary; do not move
+inference work outside a timer to claim a speedup. Modest preparation costs
+remain acceptable when reported alongside complete cold-request latency.
+
+Run affected numerical/state/production-caller checks and, when arithmetic
+changes outputs or reduction order, the frozen TASK-035 eight-window NLL
+screen with aggregate delta <= +0.03. Recover missing fixtures from recorded
+source selection; never substitute acceptance answers. Reuse authenticated
+unchanged checks. Intermediate tasks require the wins and no-regression
+observations stated in their contracts; isolated wins cannot waive integrated
+regressions. TASK-046/047 explicitly permit documented component rejection
+while requiring a real retained improvement. Failure of a mandatory gate is
+BLOCKED pending a concrete repair/replan, not automatic acceptance.
+
+TASK-048 consolidates core-54 including output-bound P100 review, the sole
+fixed 32K retrieval case, replay/regime transitions, 32768+128 capacity with
+2 GiB free reserve, and nine latency rows from six executions. Historical
+exceptions are not general waivers. Its contract distinguishes PROMOTE,
+RETAIN_TASK043 and the separate all-nine-rows llama.cpp parity goal.
+Manifest-only artifact identity, pinned container/toolchain, proportional
+checks and main-thread `wake-run` rules remain binding throughout.
+
 ## TASK-043 user-approved promotion — 2026-09-27
 
 The repository owner approved the sole recorded P100 failure, `case_077`, after
@@ -506,13 +615,14 @@ historical and is not relabeled as a 54-case result.
 
 ## Normative authority
 
-- FAST-03 and its detailed task files for TASK-041–043;
+- FAST-04 and its detailed task files for TASK-045–048;
+  FAST-03 for completed TASK-041–043;
   the user-directed first-decode visibility follow-up for TASK-044;
   FAST-02 for completed TASK-037–040;
   FAST-01 for completed TASK-033–036; DELIVERY-01 for completed TASK-028–030;
   OVERALL-01 for completed TASK-018–027 contracts
 - `docs/architecture/architecture-v0.md` for retained semantics and controls;
-  reopened decisions are governed by OVERALL-01/DELIVERY-01/FAST-01/FAST-02/FAST-03
+  reopened decisions are governed by OVERALL-01/DELIVERY-01/FAST-01/FAST-02/FAST-03/FAST-04
 - `docs/architecture/evaluation-policy-v0.md` — EVAL-01 / PERF-01
 - `docs/architecture/evaluation-policy-core-54.md` — routine coverage and
   manual-only full-suite execution
@@ -536,7 +646,7 @@ Correctness and quality criteria remain unchanged; execute applicable checks onc
   TASK-001–030 completion records are historical and unchanged. Development
   prerequisites are not production promotion requirements; a checked fallback
   satisfies its task only as specified in that contract.
-- A conflict outside OVERALL-01/DELIVERY-01/FAST-01/FAST-02/FAST-03's authorized decisions stops the sequence with
+- A conflict outside OVERALL-01/DELIVERY-01/FAST-01/FAST-02/FAST-03/FAST-04's authorized decisions stops the sequence with
   `ARCHITECTURE_BLOCKER`; the obsolete Q4-only restrictions do not block the
   investigations explicitly authorized here.
 - Every blocker report contains: `Decision ID`, `Attempted implementation`, `Observed problem`, `Evidence`, `Why this is architectural rather than tuning`, `Smallest plausible alternative`, and `Affected downstream tasks`.
@@ -547,11 +657,16 @@ Correctness and quality criteria remain unchanged; execute applicable checks onc
   TASK-037–038 implement quantized MLP and attention improvements, TASK-039
   implements submission improvements, and TASK-040 decided retention;
   TASK-041/042 improve prefill MMQ and grouped attention/chunk scheduling,
-  TASK-043 decides the next delivery, and TASK-044 diagnoses first-decode costs. Reuse
+  TASK-043 delivered under user approval, and TASK-044 completed first-decode
+  diagnosis with the original event unresolved;
+  TASK-045/046 improve decode consumers and bounded head/RMS costs,
+  TASK-047 implements context scheduling and prefill improvements, and
+  TASK-048 decides the next delivery. Reuse
   existing ablations; new ablations need a specific diagnostic question.
 - Keep benchmarks separate from correctness tests. Preserve exact commands, results, artifact/binary identities, and hardware context in each completion report.
 - Executable status values are `TODO`, `IN_PROGRESS`, `BLOCKED`, and `DONE`.
   TASK-001–030 and TASK-033–044 are `DONE`.
+  TASK-045–048 are `TODO` in sequential dependency order.
   `SUPERSEDED` denotes
   retired TASK-031/032 cross-references, never implementation completion.
 - A rejected candidate is a useful experiment result. Record the reason and
@@ -715,6 +830,16 @@ an achieved performance target.
   prefill heads with consistent 512-token capacity and smaller-chunk dispatch.
 - **M22 — Prefill delivery decision:** consolidated new candidate quality,
   replay, capacity and per-row performance decision.
+- **M23 — First-decode attribution:** bounded diagnosis, startup/recurring
+  cost separation and explicit unresolved observables.
+- **M24 — Efficient decode projections:** measured FP8/Q4 M=1 consumers with
+  unchanged artifact and numerical policy.
+- **M25 — Secondary decode overhead:** measured vocabulary-head and robust
+  normalization decisions with a retained complete-operation improvement.
+- **M26 — Context-aware prefill:** explicit prompt/context regimes, bounded
+  MMQ/attention improvements and correct graph/replay transitions.
+- **M27 — Optimization-round delivery:** combined quality, capacity, replay
+  and nine-row performance decision against production and llama.cpp.
 
 ## Task ledger
 
@@ -764,6 +889,10 @@ an achieved performance target.
 | TASK-042 | Shared-KV attention with bounded 512-token prefill | M21 | TASK-041 | User accepted candidate with measured regressions retained as unresolved; graph-first-use capacity evidence complete; below/above-4096 path selection recorded as FOLLOW_UP_REQUIRED | DONE |
 | TASK-043 | Prefill engine validation and delivery decision | M22 | TASK-042 | User-approved promotion with the sole P100 error accepted; raw quality FAIL preserved, other gates pass, all nine speed gaps remain | DONE |
 | TASK-044 | Attribute first-decode latency and startup costs | M23 | TASK-043 | Saved-trace attribution, minimal missing instrumentation and bounded 4096+8 comparison; explicit cause or unresolved evidence gap | DONE |
+| TASK-045 | Efficient FP8 and Q4 decode projections | M24 | TASK-044 | Improved existing M=1 consumers, complete-operation wins and faster matched decode | TODO |
+| TASK-046 | Reduce vocabulary-head and normalization overhead | M25 | TASK-045 | Measured direct-input head and robust RMS decisions with at least one retained improvement | TODO |
+| TASK-047 | Context-aware scheduling and prefill kernel efficiency | M26 | TASK-046 | Explicit <=4096/>4096 regimes, measured MMQ/attention improvements and graph/replay boundary correctness | TODO |
+| TASK-048 | Optimization-round validation and delivery decision | M27 | TASK-047 | Frozen combined quality/replay/capacity/performance gate and promotion or retention decision | TODO |
 
 TASK-037's original M=1 gate was superseded by the user-directed retention
 decision above. Its M=1 regression and review history remain recorded. TASK-038
@@ -1077,6 +1206,8 @@ not block development; correctness/capacity failures require repair or fallback.
 Completed owners below remain historical. FAST-02 assigned development to
 TASK-037–039 and final validation to TASK-040. FAST-03 assigns new-candidate
 prefill development to TASK-041/042 and final validation to TASK-043.
+FAST-04 assigns the next bounded development round to TASK-045–047 and its
+single final decision to TASK-048.
 
 | Former obligation | Revised owner |
 | ----------------- | ------------- |
@@ -1102,6 +1233,10 @@ prefill development to TASK-041/042 and final validation to TASK-043.
 | Prefill sibling-head KV reuse and fixed-256 scheduling | TASK-042; grouped prefill plus bounded 512 capacity, existing smaller-chunk path |
 | New FAST-03 candidate's quality/replay/capacity/matched performance | TASK-043; retains every applicable obligation and TASK-040 quality limitations until resolved |
 | TASK-042 unexplained first-decode regression and startup-cost attribution | TASK-044; reuse final captures before adding bounded diagnostic measurements |
+| Remaining scalar FP8 and small-load Q4 decode consumers | TASK-045; existing artifact and precision retained |
+| Vocabulary readout and hidden-RMS recurring costs | TASK-046; bounded measured implementation decisions |
+| Agreed full-prompt/populated-context 4096 cutoff and remaining prefill inefficiency | TASK-047; stable regime propagation, bounded kernel work and graph/replay checks |
+| Combined FAST-04 quality, capacity, replay and performance | TASK-048; historical exceptions do not automatically transfer |
 
 ## Critical path
 
@@ -1125,6 +1260,8 @@ TASK-001 → 002 → 003 → 004 → 005 → 006
                                       036 → 037 (integer MLP) → 038 (attention reuse) → 039 (submission/graphs) → 040 (validate/deliver)
 
                                       040 → 041 (MMQ reuse) → 042 (grouped attention / 512 prefill) → 043 (validate/deliver) → 044 (first-decode diagnosis)
+
+                                      044 → 045 (decode consumers) → 046 (head/RMS) → 047 (context schedules/prefill) → 048 (validate/deliver)
 ```
 
 ## Architecture blocker log
@@ -1186,6 +1323,7 @@ and gate required fixed-key answers. See
 | DELIVERY-01 | 2026-09-26 | Remaining TASK-028–032 ordering, representation/dataflow and validation cadence | Attention first, integrated NVFP4 gate/up second, consolidated promotion in TASK-030; TASK-031/032 retired without completion. Retains historical evidence, semantics and quality thresholds; removes mandatory format contests and repeated full gates. |
 | FAST-01 | 2026-09-26 | Q-01/Q-02, projection operands in P-02, A-01/L-01, M-01/T-01–03; local attention P precision and future validation ownership | TASK-033–036 extend the completed milestone with attention reuse/PV, compact projection consumers, prepared FP8/shared activations and one final decision. Preserves completed evidence, model/state semantics and quality criteria; see the detailed post-TASK-030 plan. |
 | FAST-02 | 2026-09-27 | Q-01/Q-02, bounded INT32 partials in P-01, MLP/decode-P operands in P-02, A-01/A-02/L-01, G-02/M-01/T-01–03 and final validation ownership | TASK-037–040 integrate Q4_K×Q8 MLP arithmetic, pipelined/grouped attention and token-boundary submission/graphs, then one final gate. Explicitly supersedes per-weight BF16 rounding for the new policy, upstream-kernel exclusion and graph deferral; preserves model/state semantics, historical results and quality standards. |
+| FAST-04 | 2026-09-27 | T-01–03 scheduling and final validation ownership, within retained policy 1030 and G-02/M-01 | TASK-045–048 target decode consumers, head/RMS, explicit context regimes and bounded prefill improvements, followed by one combined gate. Preserve artifact/precision/state, 512 capacity, accepted history and quality thresholds. |
 | TASK-037 retention decision | 2026-09-27 | TASK-037 completion criterion | User accepts the M=1 component regression as deferred decode optimization because M=256 complete MLP and matched integrated prefill/decode improve; final TASK-040 gates remain unchanged. |
 | TASK-038 acceptance decision | 2026-09-27 | TASK-038 completion criterion | User accepts the implemented attention candidate despite the measured short-prefill regression and directs DONE status; the regression remains recorded and final TASK-040 gates remain unchanged. |
 

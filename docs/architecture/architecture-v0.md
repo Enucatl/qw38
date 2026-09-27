@@ -1,5 +1,21 @@
 # Architecture thesis
 
+**FAST-04 (2026-09-27), post-TASK-044 authority:** the
+[ledger amendment](../implementation/task_ledger.md#optimization-amendment--fast-04-2026-09-27)
+and TASK-045–048 govern the next optimization round. Retain the approved
+TASK-043 policy-1030 artifact, one resident weight view, all operand/rounding
+contracts and the persistent state ABI. T-01–03 permit measured M=1 load/warp
+choices, head/RMS implementation changes within existing numerical bounds,
+prefill fragment/tile tuning and explicit <=4096/>4096 schedule selection.
+Prefill classifies the logical full prompt; decode classifies visible populated
+length, including the submitted token. The maximum execution chunk remains
+512, as authorized by FAST-03; graph validity includes changed scheduling
+parameters. Two-component BF16 attention P, FP32 statistics/PV/residuals/
+recurrence, BF16 KV/history and safe token/chunk commits remain binding.
+No quantizer, artifact layout, activation-precision or GDN algorithm change is
+authorized. TASK-048 owns the new final quality/capacity/performance decision;
+the historical P100 exception is not a general waiver for new candidates.
+
 **FAST-02 (2026-09-27), post-TASK-036 authority:** the
 [ledger amendment](../implementation/task_ledger.md#fast-engine-amendment--fast-02-2026-09-27)
 and TASK-037–040 contracts govern the next batch. TASK-037 selects existing
