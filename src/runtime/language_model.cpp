@@ -11,6 +11,7 @@
 #include <array>
 #include <bit>
 #include <cmath>
+#include <cstdio>
 #include <limits>
 #include <new>
 #include <stdexcept>
@@ -351,6 +352,18 @@ std::expected<DecodeResult, Error> LanguageModelPlan::decode_token(
   profiling::ScopedRange token_range("decode_token");
   auto p = pending(token_id, position, 1);
   if (!p) return std::unexpected(p.error());
+  char detail[96] = "decode_token_detail";
+  if (profiling::enabled) {
+    auto const bucket = std::min(kv_capacity_,
+        std::bit_ceil(std::max<std::uint64_t>(256, p->populated)));
+    auto const graph = submission_ != DecodeSubmission::Graph || graph_failure_
+        ? "eager"
+        : graph_.empty() || graph_bucket_ != bucket ? "build" : "replay";
+    std::snprintf(detail, sizeof(detail), "decode_token position=%llu bucket=%llu graph=%s",
+        static_cast<unsigned long long>(position),
+        static_cast<unsigned long long>(bucket), graph);
+  }
+  profiling::ScopedRange detail_range(detail);
   auto fail = [&](Error error) -> std::expected<DecodeResult, Error> {
     state_->poison();
     (void)stream_->sync(); // Drain before any borrowed/owned staging may die.

@@ -214,16 +214,35 @@ struct Engine {
   unsigned position = 0;
   // Bind only after owners have reached their final addresses.
   explicit Engine(char const* path, unsigned capacity, std::ostream& out)
-      : runtime(take(Runtime::create())),
+      : runtime([&] {
+          qw38::runtime::profiling::ScopedRange range("runtime_create");
+          auto const start = Clock::now();
+          auto value = take(Runtime::create());
+          out << "\"runtime_create_ms\":" << elapsed(start) << ',';
+          return value;
+        }()),
         model([&] {
+          qw38::runtime::profiling::ScopedRange range("model_load_upload");
           auto start = Clock::now();
           auto value = take(runtime.load(path));
           synchronize_gpu();
           out << "\"load_upload_ms\":" << elapsed(start) << ',';
           return value;
         }()),
-        session(take(runtime.create_session(model, capacity))),
-        plan(take(LanguageModelPlan::bind(model, session, runtime.stream()))) {
+        session([&] {
+          qw38::runtime::profiling::ScopedRange range("session_create");
+          auto const start = Clock::now();
+          auto value = take(runtime.create_session(model, capacity));
+          out << "\"session_create_ms\":" << elapsed(start) << ',';
+          return value;
+        }()),
+        plan([&] {
+          qw38::runtime::profiling::ScopedRange range("plan_bind");
+          auto const start = Clock::now();
+          auto value = take(LanguageModelPlan::bind(model, session, runtime.stream()));
+          out << "\"plan_bind_ms\":" << elapsed(start) << ',';
+          return value;
+        }()) {
     auto const* mode = std::getenv("QW38_DECODE_SUBMISSION");
     bool const graph = !mode || std::string_view(mode) == "graph";
     check(!mode || graph || std::string_view(mode) == "eager", "invalid decode submission");
@@ -288,8 +307,12 @@ int main(int argc, char** argv) {
   std::ofstream out(argv[5]);
   check(bool(out), "cannot open output");
   out << std::setprecision(17);
+  qw38::runtime::profiling::enabled = std::getenv("QW38_PROFILE") != nullptr;
   auto start = Clock::now();
-  synchronize_gpu();
+  {
+    qw38::runtime::profiling::ScopedRange range("cuda_initialization");
+    synchronize_gpu();
+  }
   auto const cuda_init_ms = elapsed(start);
   auto const initial_free = free_bytes();
   start = Clock::now();
@@ -309,7 +332,6 @@ int main(int argc, char** argv) {
     populated_setup_ms = elapsed(start);
     check(engine.position == depth, "incorrect incoming decode population");
   }
-  qw38::runtime::profiling::enabled = std::getenv("QW38_PROFILE") != nullptr;
   std::vector<unsigned> outputs(mode == "prefill" ? 1u : mode == "development" ? 9u : 128u);
   std::vector<double> steps(mode == "decode" ? 128u : mode == "request" ? 127u : mode == "development" ? 8u : 0u);
   synchronize_gpu();
@@ -317,7 +339,10 @@ int main(int argc, char** argv) {
   start = Clock::now();
   double ttft_ms = 0;
   if (mode != "decode") {
-    outputs[0] = engine.prefill(prompt);
+    {
+      qw38::runtime::profiling::ScopedRange range("initial_prefill");
+      outputs[0] = engine.prefill(prompt);
+    }
     synchronize_gpu();
     ttft_ms = elapsed(start);
   }

@@ -2,7 +2,7 @@
 
 ## Status
 
-TODO
+DONE
 
 ## Milestone and dependency
 
@@ -74,3 +74,49 @@ smallest next discriminating measurement. If explained, propose the smallest
 evidence-backed repair separately; this task does not implement an optimization
 or the <=4096/>4096 dispatcher. Apply the accepted startup tradeoff without
 relabeling historical regressions or weakening quality/capacity gates.
+
+## Completion Report
+
+Published the bounded analysis in
+[`task044-decode-attribution.md`](../task044-decode-attribution.md). The
+original TASK-042 first-decode difference of +8.017558 ms remains
+**UNRESOLVED**. New instrumented captures did not reproduce it: first decode
+was 25.886605 ms (parent) and 25.543292 ms (candidate). The report classifies
+observed setup, prefill, first graph use and recurring token costs, preserves
+the accepted TASK-042 regression and TASK-043 P100 exception, and specifies
+the missing observable and smallest discriminating follow-up. No optimization
+or quality rerun was performed.
+
+The request benchmark adds opt-in CUDA initialization, runtime creation,
+model load/upload, session creation, plan binding and initial-prefill ranges;
+the decode marker records token position, bucket and planned build/replay/eager
+state. The existing profile analyzer reports the first eight steps with
+overlap-safe interval attribution. Exactly one new instrumented 4096+8
+execution per arm was captured. Outputs retained each arm's original IDs,
+position 4104 and byte-identical logits. Evidence, identities, complete tables,
+commands and limitations are in the report and
+`.cache/evaluation/qw38-language-v2/task044-support/`.
+
+Verification results:
+
+- `bash .cache/evaluation/qw38-language-v2/task044-support/run-instrumented.sh`:
+  both builds and the candidate integration check passed; the script then
+  exited 1 before either capture because of an unset container shell variable.
+  The check was `QW38_AUTHORITY_ARTIFACT=/workspace/.cache/candidates/candidate-fp8-mixer-q8-mlp-v1.qw38 ctest --test-dir build/pinned-release --output-on-failure -V -R '^language_model_integration$'` (**1/1 PASS**, 20.07 s).
+- `bash .cache/evaluation/qw38-language-v2/task044-support/capture.sh`:
+  **PASS**, exit 0; one capture per arm. `verify-outputs.py` passed for both
+  arms, including output identity, finite/byte-identical logits, final
+  position, one run and zero warmups.
+- `uv run --with pytest pytest -q tests/test_task027_profiles.py`:
+  **2 passed**. Saved-trace metrics and graph/API correlation checks passed;
+  `verify-source-graph.py` passed source, binary, compiler-command and capture
+  correlation checks. `git diff --check` passed.
+- Astra review: **PASS**, first pass, no findings or evidence gaps; verbatim
+  result: `.cache/evaluation/qw38-language-v2/task044-support/astra-review-1.md`.
+
+The instrumentation and reporting checks do not establish the cause of the
+unreproduced first-decode event. **FOLLOW_UP_REQUIRED:** capture a first decode
+that exhibits the excess latency, with CPU scheduling and host file/page-fault
+visibility correlated to CUDA APIs and GPU activity. If it does not recur,
+the original cause remains unresolved. No repair is supported by the current
+evidence.

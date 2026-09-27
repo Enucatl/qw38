@@ -7,10 +7,181 @@ from __future__ import annotations
 
 import json
 import sqlite3
+import sys
 from collections import defaultdict
 from pathlib import Path
 
 ROOT = Path(".cache/task027/single-run")
+
+
+def interval_union(intervals: list[tuple[int, int]]) -> int:
+    """Return covered nanoseconds without double counting overlapping intervals.
+
+    Args:
+        intervals: Nonnegative trace start/end timestamp pairs.
+
+    Returns:
+        Total duration covered by at least one interval.
+    """
+    total = end = 0
+    for begin, finish in sorted(intervals):
+        total += max(0, finish - max(begin, end))
+        end = max(end, finish)
+    return total
+
+
+def range_costs(db: sqlite3.Connection, start: int, end: int, tid: int) -> dict:
+    """Describe one NVTX window, retaining CPU/GPU overlap and API correlation.
+
+    GPU totals describe activity inside the window, not work causally charged
+    to setup stages. Activities crossing a boundary are clipped for unions.
+    API sums can include nested calls; only the union is subtracted from wall
+    time. Uncovered host time is unclassified, not necessarily CPU execution.
+
+    Args:
+        db: Nsight SQLite connection for one benchmark process.
+        start: Inclusive NVTX start timestamp in nanoseconds.
+        end: Exclusive NVTX end timestamp in nanoseconds.
+        tid: NVTX range's global thread identifier.
+
+    Returns:
+        CPU/API and GPU costs, correlations, transfers and uncovered intervals.
+    """
+    api = defaultdict(lambda: {"calls": 0, "cpu_ms": 0.0})
+    api_intervals = []
+    for begin, finish, name in db.execute(
+        "SELECT r.start,r.end,s.value FROM CUPTI_ACTIVITY_KIND_RUNTIME r "
+        "JOIN StringIds s ON s.id=r.nameId "
+        "WHERE r.start<? AND r.end>? AND r.globalTid=?",
+        (end, start, tid),
+    ):
+        begin, finish = max(begin, start), min(finish, end)
+        api[name]["calls"] += 1
+        api[name]["cpu_ms"] += (finish - begin) / 1e6
+        api_intervals.append((begin, finish))
+    kernels = db.execute(
+        "SELECT start,end,correlationId FROM CUPTI_ACTIVITY_KIND_KERNEL "
+        "WHERE start<? AND end>? ORDER BY start",
+        (end, start),
+    ).fetchall()
+    kernel_intervals = [(max(a, start), min(b, end)) for a, b, _ in kernels]
+    correlations = dict(
+        db.execute(
+            "SELECT r.correlationId,s.value FROM CUPTI_ACTIVITY_KIND_RUNTIME r "
+            "JOIN StringIds s ON s.id=r.nameId WHERE r.globalTid=?",
+            (tid,),
+        )
+    )
+    launches = defaultdict(int)
+    for _, _, correlation in kernels:
+        launches[correlations.get(correlation, "unmatched")] += 1
+    transfers = defaultdict(lambda: {"calls": 0, "bytes": 0, "gpu_ms": 0.0})
+    activity_intervals = list(kernel_intervals)
+    for begin, finish, size, kind, correlation in db.execute(
+        "SELECT start,end,bytes,copyKind,correlationId "
+        "FROM CUPTI_ACTIVITY_KIND_MEMCPY WHERE start<? AND end>?",
+        (end, start),
+    ):
+        begin, finish = max(begin, start), min(finish, end)
+        key = f"{kind}:{correlations.get(correlation, 'unmatched')}"
+        transfers[key]["calls"] += 1
+        transfers[key]["bytes"] += size
+        transfers[key]["gpu_ms"] += (finish - begin) / 1e6
+        activity_intervals.append((begin, finish))
+    memset_intervals = [
+        (max(a, start), min(b, end))
+        for a, b in db.execute(
+            "SELECT start,end FROM CUPTI_ACTIVITY_KIND_MEMSET WHERE start<? AND end>?",
+            (end, start),
+        )
+    ]
+    activity_intervals.extend(memset_intervals)
+    api_union = interval_union(api_intervals)
+    gpu_union = interval_union(activity_intervals)
+    return {
+        "start_ns": start,
+        "end_ns": end,
+        "nvtx_ms": (end - start) / 1e6,
+        "cpu_cuda_api": dict(api),
+        "cpu_cuda_api_union_ms": api_union / 1e6,
+        "host_outside_cuda_api_ms": (end - start - api_union) / 1e6,
+        "kernel_count": len(kernels),
+        "kernel_sum_ms": sum(b - a for a, b in kernel_intervals) / 1e6,
+        "kernel_union_ms": interval_union(kernel_intervals) / 1e6,
+        "kernel_launch_correlation": dict(launches),
+        "gpu_transfers": dict(transfers),
+        "gpu_memset_ms": sum(b - a for a, b in memset_intervals) / 1e6,
+        "gpu_activity_union_ms": gpu_union / 1e6,
+        "window_without_gpu_activity_ms": (end - start - gpu_union) / 1e6,
+        "first_kernel_after_start_ms": (kernel_intervals[0][0] - start) / 1e6
+        if kernels
+        else None,
+        "last_kernel_before_end_ms": (end - max(b for _, b in kernel_intervals)) / 1e6
+        if kernels
+        else None,
+    }
+
+
+def decode_attribution(path: Path) -> dict:
+    """Extract startup ranges and the first eight decode steps of a saved run.
+
+    Args:
+        path: SQLite trace path with a sibling benchmark JSONL file.
+
+    Returns:
+        Host measurements and matching setup/token range diagnostics.
+
+    Raises:
+        ValueError: Startup ranges repeat or eight complete steps are missing.
+    """
+    records = [
+        json.loads(line) for line in path.with_suffix(".jsonl").read_text().splitlines()
+    ]
+    setup = next(row for row in records if row["kind"] == "setup")
+    sample = next(row for row in records if row["kind"] == "sample")
+    db = sqlite3.connect(f"file:{path.resolve()}?mode=ro", uri=True)
+    try:
+        startup = {}
+        for name in (
+            "cuda_initialization",
+            "runtime_create",
+            "model_load_upload",
+            "session_create",
+            "plan_bind",
+            "initial_prefill",
+        ):
+            rows = db.execute(
+                "SELECT start,end,globalTid FROM NVTX_EVENTS WHERE text=?", (name,)
+            ).fetchall()
+            if len(rows) > 1:
+                raise ValueError(f"duplicate startup range: {name}")
+            if rows:
+                startup[name] = range_costs(db, *rows[0])
+        tokens = []
+        for start, end, tid in db.execute(
+            "SELECT start,end,globalTid FROM NVTX_EVENTS WHERE text='decode_token' ORDER BY start LIMIT 8"
+        ).fetchall():
+            row = range_costs(db, start, end, tid)
+            row["detail"] = [
+                r[0]
+                for r in db.execute(
+                    "SELECT text FROM NVTX_EVENTS WHERE start>=? AND end<=? AND globalTid=? AND text LIKE 'decode_token position=%'",
+                    (start, end, tid),
+                )
+            ]
+            tokens.append(row)
+        if len(tokens) != 8 or len(sample["steps_ms"]) < 8:
+            raise ValueError("eight completed decode steps required")
+        return {
+            "path": str(path),
+            "setup": setup,
+            "sample": sample,
+            "startup_ranges": startup,
+            "first_eight_decode": tokens,
+            "accounting": "CPU API sums may nest; GPU sums may overlap. Unions cover the NVTX window. CPU waits overlap GPU execution. Uncovered host time is unclassified. Transfer bytes count intersecting operations in full. Never add these diagnostics to host latency.",
+        }
+    finally:
+        db.close()
 
 
 def allocation_peak(events: list[tuple]) -> dict:
@@ -217,4 +388,11 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    if len(sys.argv) > 2 and sys.argv[1] == "--decode-attribution":
+        print(
+            json.dumps(
+                [decode_attribution(Path(path)) for path in sys.argv[2:]], indent=2
+            )
+        )
+    else:
+        main()

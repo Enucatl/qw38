@@ -26,8 +26,10 @@ candidate and finding only. All nine latency targets remain unmet, and the
 fast-engine goal remains unfinished. The TASK-026/027 runtime at `d2f02e2`
 is retained for rollback. This current decision supersedes the earlier
 production-baseline statements in the historical amendments below.
-TASK-044 remains the next TODO; the 4096-boundary dispatcher remains follow-up
-work. No inference or performance measurement is repeated for this approval.
+At the time of this approval, TASK-044 remained the next TODO. Its diagnosis
+has since completed with the first-decode cause unresolved; the documented
+visibility follow-up and the 4096-boundary dispatcher remain follow-up work.
+No inference or performance measurement was repeated for the TASK-043 approval.
 
 ## Prefill amendment — FAST-03 (2026-09-27)
 
@@ -549,7 +551,7 @@ Correctness and quality criteria remain unchanged; execute applicable checks onc
   existing ablations; new ablations need a specific diagnostic question.
 - Keep benchmarks separate from correctness tests. Preserve exact commands, results, artifact/binary identities, and hardware context in each completion report.
 - Executable status values are `TODO`, `IN_PROGRESS`, `BLOCKED`, and `DONE`.
-  TASK-001–030 and TASK-033–043 are `DONE`; TASK-044 is `TODO`.
+  TASK-001–030 and TASK-033–044 are `DONE`.
   `SUPERSEDED` denotes
   retired TASK-031/032 cross-references, never implementation completion.
 - A rejected candidate is a useful experiment result. Record the reason and
@@ -761,7 +763,7 @@ an achieved performance target.
 | TASK-041 | Reuse-rich Q4_K×Q8 prefill MMQ | M20 | TASK-040 | J128 full-chunk consumer, cooperative FP32 metadata and fragment reuse, preserved MMVQ and shared packs; complete M256 MLP and integrated prefill improve, matched decode does not regress; isolated M1 first-use regression recorded as FOLLOW_UP_REQUIRED | DONE |
 | TASK-042 | Shared-KV attention with bounded 512-token prefill | M21 | TASK-041 | User accepted candidate with measured regressions retained as unresolved; graph-first-use capacity evidence complete; below/above-4096 path selection recorded as FOLLOW_UP_REQUIRED | DONE |
 | TASK-043 | Prefill engine validation and delivery decision | M22 | TASK-042 | User-approved promotion with the sole P100 error accepted; raw quality FAIL preserved, other gates pass, all nine speed gaps remain | DONE |
-| TASK-044 | Attribute first-decode latency and startup costs | M23 | TASK-043 | Saved-trace attribution, minimal missing instrumentation and bounded 4096+8 comparison; explicit cause or unresolved evidence gap | TODO |
+| TASK-044 | Attribute first-decode latency and startup costs | M23 | TASK-043 | Saved-trace attribution, minimal missing instrumentation and bounded 4096+8 comparison; explicit cause or unresolved evidence gap | DONE |
 
 TASK-037's original M=1 gate was superseded by the user-directed retention
 decision above. Its M=1 regression and review history remain recorded. TASK-038
