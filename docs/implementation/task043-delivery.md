@@ -1,9 +1,16 @@
 # TASK-043 prefill-engine validation and delivery decision
 
-**RETAIN_CONTROL.** Policy 1030 remains a development candidate. Production
-stays TASK-026/027 at `d2f02e2`: the unchanged confirmed P100 failure prevents
-promotion. All nine llama.cpp/candidate latency ratios remain below 1, so the
-fast-engine goal is unmet. TASK-030/036/040 decisions remain historical.
+**PROMOTE with an accepted P100 exception and speed gaps.** The repository
+owner approved the sole P100 failure, `case_077`, on 2026-09-27 after reviewing
+its exact error. The approved production baseline is policy 1030 at
+`c301efa70f494a01bc7f6585d2f741623eb6fed4`, with the artifact identity below.
+This supersedes TASK-043's original RETAIN_CONTROL decision. The saved P100
+and overall quality scores remain FAIL; acceptance is specific to this frozen
+candidate and output, as recorded in the
+[approval amendment](tasks/TASK-043.md#user-approved-promotion--2026-09-27).
+All nine llama.cpp/candidate latency ratios remain below 1, so the fast-engine
+goal is unmet. TASK-026/027 at `d2f02e2` remains available for rollback;
+TASK-030/036/040 decisions remain historical.
 
 ## Frozen implementation and numerical contract
 
@@ -78,9 +85,11 @@ All fifteen P100 prompts and both complete output texts exactly match their
 TASK-040 reviewed counterparts. All thirty per-arm reviews retain original
 reviewer attribution after prompt/text authentication. No new adjudications
 were needed. Candidate `case_077` still incorrectly adds mapping metadata
-pages to mapped-file residency; its confirmed failure remains. Thus P100 and
-the final quality gate are FAIL. Capped outputs remain capped; existing
-reviews do not represent code execution or a human review where attributed to AI.
+pages to mapped-file residency; its confirmed failure remains. Thus the saved
+P100 and final quality scores are FAIL. The owner's subsequent acceptance of
+this finding permits promotion without changing those scores. Capped outputs
+remain capped; existing reviews do not represent code execution or a human
+review where attributed to AI.
 
 Release full-model integration passes 1/1 (16.82 s), including same-schedule
 replay, nonempty handoff, selected-row delivery/failure, late-failure recovery,
@@ -204,8 +213,8 @@ the main throughput bottleneck. TASK-044 should first reuse these captures to
 attribute startup/first graph use versus recurring decode. A subsequent
 bounded scheduling proposal can target measured small/large attention or
 projection costs at the agreed 4096 boundary; no dispatcher, tile sweep,
-quantization change or new optimization task is implemented here. P100 remains
-an independent promotion blocker and cannot be waived by speed gains.
+quantization change or new optimization task is implemented here. The P100
+exception follows explicit owner approval; speed gains do not change its score.
 
 ## Reproduction, evidence and rollback
 
@@ -220,15 +229,15 @@ by the preserved checksum list and provenance. Its original image identity is
 retained; matching versions do not mean image-content equality. Comparator
 workload and timing/instrumentation semantics are unchanged. No comparator
 rerun was required. These timings are speed comparisons, not a quality/speed
-Pareto claim for a candidate with failed quality.
+Pareto claim of passing quality for the candidate with an accepted P100 error.
 
 From this checkout, use the pinned build/compile/load commands in the
 [TASK-040 recipe](task040-delivery.md#reproduction-and-rollback), which retains
 the same policy/artifact and compiler CLI. The final Release targets
 `qw38_compile`, `qw38_decode`, `qw38_evaluate`, `qw38_state_replay`,
 `qw38_bench_request` and `qw38_language_model_integration_test` were built.
-The diagnostic decode command takes little-endian uint32 token IDs. Production
-rollback requires the separate `d2f02e2` checkout and policy-1027 artifact from
+The decode command takes little-endian uint32 token IDs. Rollback requires
+the separate `d2f02e2` checkout and policy-1027 artifact from
 [the retained-control recipe](task030-delivery.md#use-the-retained-production-control);
 changing the artifact alone does not restore the older runtime.
 

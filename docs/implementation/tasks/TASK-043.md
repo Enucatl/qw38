@@ -93,7 +93,32 @@ batch, report the concrete evidence and proposed smallest next step. Do not
 automatically launch it, expand quality coverage or convert this final gate
 into an open-ended optimization task.
 
-## Completion Report — 2026-09-27
+## User-approved promotion — 2026-09-27
+
+**Decision: PROMOTE with an accepted P100 exception and speed gaps.** After
+reviewing the sole recorded P100 failure, `case_077`, the repository owner
+directed: "only this? then we can proceed and approve it". This approval
+supersedes this candidate's original RETAIN_CONTROL decision below and the
+requirement that this particular P100 finding block promotion.
+
+The approved baseline is runtime revision
+`c301efa70f494a01bc7f6585d2f741623eb6fed4` with policy 1030 and artifact manifest
+`6ebcc402487aa92d4a6bb7d64ccfff00c20d74a738ac7e3fa2166522f4b35ff5`.
+The accepted output has text SHA-256
+`c14426380d8fd1b5f3650fcb2b43e260a33e6687580b7cf4b6ba317aa83e69e3`.
+Its incorrect addition of metadata pages to mmap residency remains recorded;
+the saved P100 adjudication and quality report remain FAIL. This is an explicit
+acceptance of that finding for this frozen candidate, not a new passing score
+or a blanket exemption for future outputs.
+
+C92, NLL/slices, L12, retrieval, replay and capacity passed the recorded gates.
+All nine latency targets remain unmet; the fast-engine goal is not achieved.
+TASK-026/027 at `d2f02e2` remains the rollback baseline. TASK-044's first-decode
+diagnosis and the agreed 4096-boundary scheduling follow-up remain open.
+This amendment changes documentation only; existing inference, scores and
+independent review evidence are preserved without reruns. TASK-043 stays DONE.
+
+## Original Completion Report — 2026-09-27
 
 **Decision: RETAIN_CONTROL.** Production remains TASK-026/027 at `d2f02e2`;
 P100 `case_077` fails, so promotion is blocked and the fast-engine goal is

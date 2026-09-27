@@ -9,6 +9,26 @@ the existing V0 implementation. From TASK-018 onward, select quantization,
 physical weight layout, and execution kernels together, using measured SM120
 capabilities before committing to the production representation.
 
+## TASK-043 user-approved promotion — 2026-09-27
+
+The repository owner approved the sole recorded P100 failure, `case_077`, after
+reviewing the mmap-residency error: "only this? then we can proceed and approve
+it". TASK-043 remains DONE with **promotion under an accepted P100 exception
+and speed gaps**, superseding its original RETAIN_CONTROL decision.
+The approved production baseline is revision
+`c301efa70f494a01bc7f6585d2f741623eb6fed4`, policy 1030, artifact manifest
+`6ebcc402487aa92d4a6bb7d64ccfff00c20d74a738ac7e3fa2166522f4b35ff5`.
+See the [output-bound approval](tasks/TASK-043.md#user-approved-promotion--2026-09-27).
+
+The saved P100/overall quality scores remain FAIL; every other recorded
+quality, replay and capacity gate passes. This exception applies to that
+candidate and finding only. All nine latency targets remain unmet, and the
+fast-engine goal remains unfinished. The TASK-026/027 runtime at `d2f02e2`
+is retained for rollback. This current decision supersedes the earlier
+production-baseline statements in the historical amendments below.
+TASK-044 remains the next TODO; the 4096-boundary dispatcher remains follow-up
+work. No inference or performance measurement is repeated for this approval.
+
 ## Prefill amendment — FAST-03 (2026-09-27)
 
 The user requested a thorough investigation of the remaining prefill gap,
@@ -740,7 +760,7 @@ an achieved performance target.
 | TASK-040 | Quantized engine validation and delivery decision | M19 | TASK-039 | Frozen core-54/replay/capacity/PERF-01 evidence and promotion/retention with explicit speed gaps | DONE |
 | TASK-041 | Reuse-rich Q4_K×Q8 prefill MMQ | M20 | TASK-040 | J128 full-chunk consumer, cooperative FP32 metadata and fragment reuse, preserved MMVQ and shared packs; complete M256 MLP and integrated prefill improve, matched decode does not regress; isolated M1 first-use regression recorded as FOLLOW_UP_REQUIRED | DONE |
 | TASK-042 | Shared-KV attention with bounded 512-token prefill | M21 | TASK-041 | User accepted candidate with measured regressions retained as unresolved; graph-first-use capacity evidence complete; below/above-4096 path selection recorded as FOLLOW_UP_REQUIRED | DONE |
-| TASK-043 | Prefill engine validation and delivery decision | M22 | TASK-042 | Frozen quality/replay/capacity/PERF-01 gate, explicit promotion/retention and remaining costs | DONE |
+| TASK-043 | Prefill engine validation and delivery decision | M22 | TASK-042 | User-approved promotion with the sole P100 error accepted; raw quality FAIL preserved, other gates pass, all nine speed gaps remain | DONE |
 | TASK-044 | Attribute first-decode latency and startup costs | M23 | TASK-043 | Saved-trace attribution, minimal missing instrumentation and bounded 4096+8 comparison; explicit cause or unresolved evidence gap | TODO |
 
 TASK-037's original M=1 gate was superseded by the user-directed retention
