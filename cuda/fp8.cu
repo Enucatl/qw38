@@ -7,6 +7,7 @@
 #include "cutlass/gemm/kernel/gemm_universal.hpp"
 #include "cutlass/util/packed_stride.hpp"
 #include <cuda_bf16.h>
+#include <cuda_fp8.h>
 #include <math_constants.h>
 #include <algorithm>
 #include <array>
@@ -84,10 +85,24 @@ __global__ void gemv_kernel(std::uint8_t const* codes,float const* scales,
     DecodeEpilogue epilogue = DecodeEpilogue::StoreFp32, float const* residual = nullptr) {
   unsigned row=blockIdx.x*4+threadIdx.y;
   float sum=0;
-  if(row<n) for(unsigned c=threadIdx.x;c<k;c+=32) {
-    E4 w; w.raw()=codes[std::uint64_t(row)*k+c];
-    float weight=float(w)*scales[(c/128)*(n/128)+row/128];
-    sum=fmaf(weight,__uint_as_float(unsigned(x[c])<<16),sum);
+  // Four contiguous elements per lane cover one K128 scale block. Keep
+  // scale multiplication on each weight before its FP32 FMA.
+  if(row<n) for(unsigned base=0;base<k;base+=128) {
+    unsigned c=base+threadIdx.x*4;
+    __nv_fp8x4_e4m3 packed;
+    packed.__x=*reinterpret_cast<unsigned const*>(codes+std::uint64_t(row)*k+c);
+    float4 w=static_cast<float4>(packed);
+    uint2 input;
+    // Public BF16 views require only two-byte alignment.
+    if(reinterpret_cast<std::uintptr_t>(x)%8==0)
+      input=*reinterpret_cast<uint2 const*>(x+c);
+    else input={unsigned(x[c])|(unsigned(x[c+1])<<16),
+                unsigned(x[c+2])|(unsigned(x[c+3])<<16)};
+    float scale=scales[(base/128)*(n/128)+row/128];
+    sum=fmaf(w.x*scale,__uint_as_float(input.x<<16),sum);
+    sum=fmaf(w.y*scale,__uint_as_float(input.x&0xffff0000u),sum);
+    sum=fmaf(w.z*scale,__uint_as_float(input.y<<16),sum);
+    sum=fmaf(w.w*scale,__uint_as_float(input.y&0xffff0000u),sum);
   }
   for(int off=16;off;off/=2) sum+=__shfl_down_sync(0xffffffff,sum,off);
   if(!threadIdx.x && row<n) {

@@ -58,6 +58,7 @@ __global__ void swiglu_pack_kernel(float const* gate, float const* up,
   q8_pack_warp(v,codes,scales,sums,i/32,failure);
 }
 
+template<bool Wide>
 __global__ void mmvq(PrefillWeight w, std::int8_t const* x, float const* a,
     int const* sums, float* out, float const* residual) {
   unsigned lane = threadIdx.x & 31;
@@ -69,12 +70,27 @@ __global__ void mmvq(PrefillWeight w, std::int8_t const* x, float const* a,
   // accumulation crosses a group or includes scale/minimum multipliers.
   for (unsigned group = lane; group < w.padded_k/32; group += 32) {
     auto tr = tile_row(w,row,group/8);
-    auto* q = reinterpret_cast<std::uint16_t const*>(
+    auto* q = reinterpret_cast<unsigned const*>(
         static_cast<std::uint8_t const*>(w.codes)+tr*128+(group%8)*16);
     auto* z = reinterpret_cast<int const*>(x+group*32);
+    unsigned words[4];int input[8];
+    if constexpr(Wide) {
+      auto v=*reinterpret_cast<uint4 const*>(q);
+      words[0]=v.x;words[1]=v.y;words[2]=v.z;words[3]=v.w;
+      auto lo=*reinterpret_cast<int4 const*>(z),hi=*reinterpret_cast<int4 const*>(z+4);
+      input[0]=lo.x;input[1]=lo.y;input[2]=lo.z;input[3]=lo.w;
+      input[4]=hi.x;input[5]=hi.y;input[6]=hi.z;input[7]=hi.w;
+    } else {
+      // Public code and Q8 spans may be only four-byte aligned.
+      #pragma unroll
+      for(unsigned t=0;t<4;++t)words[t]=q[t];
+      #pragma unroll
+      for(unsigned t=0;t<8;++t)input[t]=z[t];
+    }
     int dot = 0;
     #pragma unroll
-    for (unsigned t=0;t<8;++t) dot = __dp4a(int(unpack4(q[t])),z[t],dot);
+    for (unsigned t=0;t<8;++t)
+      dot = __dp4a(int(unpack4(words[t/2]>>(16*(t%2)))),input[t],dot);
     auto dm = affine(w,row,group/8,group%8);
     acc += a[group]*(dm.x*float(dot)-dm.y*float(sums[group]));
   }
@@ -279,7 +295,11 @@ std::expected<void,Error> valid_weight(PrefillWeight w) {
   return {};
 }
 std::expected<void,Error> project(PrefillWeight w,Q8Input x,float* out,float const* residual,Stream const& s) {
-  if (x.m==1) mmvq<<<(w.n+7)/8,256,0,s.native()>>>(w,x.codes.data(),x.scales.data(),x.sums.data(),out,residual);
+  if (x.m==1) {
+    auto kernel=(reinterpret_cast<std::uintptr_t>(w.codes)%16==0 &&
+        reinterpret_cast<std::uintptr_t>(x.codes.data())%16==0)?mmvq<true>:mmvq<false>;
+    kernel<<<(w.n+7)/8,256,0,s.native()>>>(w,x.codes.data(),x.scales.data(),x.sums.data(),out,residual);
+  }
   else if(x.m>=128) {
     auto kernel=(w.n%128==0 && w.k==w.padded_k && x.m%128==0)?mmq_j128<true>:mmq_j128<false>;
     if(auto st=check(cudaFuncSetAttribute(kernel,cudaFuncAttributeMaxDynamicSharedMemorySize,sizeof(MmqShared)),"q4k_q8.shared");!st)return st;

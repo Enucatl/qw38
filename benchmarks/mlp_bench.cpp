@@ -14,6 +14,7 @@
 #include <chrono>
 #include <cmath>
 #include <iomanip>
+#include <fstream>
 #include "runtime/view.hpp"
 
 #include <cuda_runtime.h>
@@ -63,7 +64,7 @@ TensorView make_view(void* ptr, ArithmeticDtype dtype, PhysicalLayoutId layout,
 
 // One complete real-shape operation per process, identical nonzero residuals
 // and unchanged layer-0 Q4_K weights in the 1029/1030 arms. Includes first use.
-int real_mlp(char const* artifact, char const* rows) {
+int real_mlp(char const* artifact, char const* rows, char const* saved_path=nullptr) {
   using namespace qw38;
   unsigned m=0;std::string_view text(rows);
   auto parsed=std::from_chars(text.data(),text.data()+text.size(),m);
@@ -85,28 +86,33 @@ int real_mlp(char const* artifact, char const* rows) {
   auto begin=Event::create_timing(),end=Event::create_timing();if(!begin || !end)return 1;
   double setup_ms=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-setup_started).count();
   auto count=cuda::malloc_count();
+  std::vector<float> out(m*5120);
   if(!begin->record(stream))return 1;
   auto started=std::chrono::steady_clock::now();
   auto result=m==1?execute_decode_mlp(*decode):runtime::execute_prefill_mlp(*prefill,*engine,
       static_cast<float const*>(session->residual_h_mid().pointer),static_cast<float*>(session->residual_h().pointer),m,0);
   if(!result){std::cerr<<runtime::error_message(result.error())<<'\n';return 1;}
-  if(!end->record(stream) || !stream.sync())return 1;
+  if(!cuda::copy_d2h(out.data(),session->residual_h().pointer,out.size()*4,stream) ||
+      !end->record(stream) || !stream.sync())return 1;
   double host_ms=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-started).count();
   auto gpu_ms=elapsed_ms(*begin,*end);if(!gpu_ms)return 1;
   auto allocations=cuda::malloc_count()-count;
-  std::vector<float> out(m*5120);
-  if(!cuda::copy_d2h(out.data(),session->residual_h().pointer,out.size()*4,stream)||!stream.sync())return 1;
   for(float v:out)if(!std::isfinite(v))return 1;
+  if(saved_path) {
+    std::ofstream saved(saved_path,std::ios::binary);
+    saved.write(reinterpret_cast<char const*>(out.data()),out.size()*4);
+    if(!saved)return 1;
+  }
   std::cout<<std::setprecision(12)<<"policy="<<unsigned(model->schema().precision.id)<<" m="<<m
       <<" setup_ms="<<setup_ms
       <<" gpu_ms="<<*gpu_ms<<" host_ms="<<host_ms<<" q8_workspace_bytes="<<session->q8_mlp_workspace().size()
       <<" prefill_workspace_bytes="<<engine->workspace_bytes()<<" hot_allocations="<<allocations
-      <<" runs=1 warmups=0 includes_library_first_use=true finite=true\n";
+      <<" runs=1 warmups=0 includes_library_first_use=true readout_included=true finite=true\n";
   return allocations?1:0;
 }
 
 int main(int argc,char** argv) {
-  if(argc==3)return real_mlp(argv[1],argv[2]);
+  if(argc==3 || argc==4)return real_mlp(argv[1],argv[2],argc==4?argv[3]:nullptr);
   if(argc!=1)return 2;
   cudaDeviceProp prop{};
   if (auto st = qw38::cuda::check(cudaGetDeviceProperties(&prop, 0),

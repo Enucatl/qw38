@@ -93,6 +93,28 @@ int main() {
     require(z[0]==127 && z[1]==0 && z[2]==2 && z[3]==0 && z[4]==-2,"halfway ties and saturation endpoint");
     require(sum[2]<0,"negative activation sum fixture");
     check(cuda::q4k_q8_project(w,q,span<float>(out),stream));auto y=download<float>(out,stream);
+    if(m==1) {
+      // The fast load is 16 bytes, while public spans permit four-byte
+      // alignment. Shift each independently and protect both output ends.
+      std::vector<std::byte> shifted_weight(wc.bytes()+8);
+      std::copy(packed.codes.begin(),packed.codes.end(),shifted_weight.begin()+4);
+      auto unaligned_weight=upload(shifted_weight,stream);
+      std::vector<std::int8_t> shifted_codes(pk+8,99);
+      std::copy(z.begin(),z.end(),shifted_codes.begin()+4);
+      auto unaligned_codes=upload(shifted_codes,stream);
+      std::vector<float> guards(n+2,-12345.f),residual(n);
+      for(unsigned r=0;r<n;++r)residual[r]=(int(r%17)-8)*.125f;
+      auto guarded=upload(guards,stream),res=upload(residual,stream);
+      for(unsigned variant=0;variant<4;++variant) {
+        auto shifted_w=w;auto shifted_q=q;
+        if(variant&1)shifted_w.codes=static_cast<std::byte*>(unaligned_weight.data())+4;
+        if(variant&2)shifted_q.codes=span<std::int8_t>(unaligned_codes).subspan(4,pk);
+        check(cuda::q4k_q8_project(shifted_w,shifted_q,span<float>(guarded).subspan(1,n),stream,span<float>(res)));
+        auto result=download<float>(guarded,stream);
+        for(unsigned r=0;r<n;++r)require(result[r+1]==y[r]+residual[r],"aligned/unaligned Q4 loads and residual exactly agree");
+        require(result.front()==guards.front() && result.back()==guards.back(),"Q4 M=1 row-tail output guards");
+      }
+    }
     if(m==127)small_tile=y;
     if(m>=128)require(std::equal(small_tile.begin(),small_tile.end(),y.begin()),
         "J128 preserves J32 K32 expression and accumulation order bitwise");
