@@ -15,7 +15,7 @@ namespace {
 // Adapted from llama.cpp e6ab7c1a41054a888ada952eab4c886444c2f5ad:
 // mmq-config-{blackwell,ampere}, mmq-load-tiles, mmq-vec-dot, mma and vecdotq.
 // MIT, copyright (c) 2023-2026 The ggml authors; see third_party/llama.cpp-q4k.
-// SM120 Q4_K selects the Ampere I128/J32/K256, 256-thread integer-MMA path.
+// SM120 Q4_K uses Ampere integer MMA: J32 for small M, J128 for M>=128.
 // Unlike upstream, group scale products and activation metadata remain FP32.
 constexpr unsigned I = 128, J = 32, Stride = 68;
 static_assert(kQ4KQ8DotBound < std::numeric_limits<int>::max());
@@ -139,6 +139,115 @@ __global__ void mmq(PrefillWeight w, std::int8_t const* x, float const* a,
   }
 }
 
+// FP32 metadata doubles upstream's half2 storage. Both row strides remain
+// 4 mod 8 words for the MMA bank layout: W=(64+8+8+4), X=(32+4+4+4).
+// 128 rows each consume 65536 shared bytes; only X's K128 half is replaced.
+struct WeightTile { unsigned codes[64]; float scale[8], minimum[8]; unsigned pad[4]; };
+struct InputTile { unsigned codes[32]; float scale[4]; int sum[4]; unsigned pad[4]; };
+struct MmqShared { WeightTile w[128]; InputTile x[128]; };
+static_assert(sizeof(MmqShared)==65536);
+
+template<bool Full>
+__global__ __launch_bounds__(256,1) void mmq_j128(PrefillWeight w,
+    std::int8_t const* x, float const* a, int const* sums, float* out,
+    unsigned m, float const* residual) {
+  extern __shared__ __align__(16) unsigned char storage[];
+  auto& tile=*reinterpret_cast<MmqShared*>(storage);
+  unsigned lane=threadIdx.x%32,warp=threadIdx.x/32;
+  // A pair of warps owns 32 output rows and alternating 8-token fragments.
+  unsigned r0=(warp/2)*32, j0=(warp%2)*8;
+  float acc[8][2][4]{};
+  for(unsigned kb=0;kb<w.padded_k/256;++kb) {
+    for(unsigned idx=threadIdx.x;idx<128*32;idx+=256) {
+      unsigned r=idx/32,c=idx%32,row=blockIdx.x*128+r,v=0;
+      if(Full || row<w.n)
+        v=reinterpret_cast<unsigned const*>(w.codes)[tile_row(w,row,kb)*32+c];
+      tile.w[r].codes[2*c]=unpack4(v&0xffff);
+      tile.w[r].codes[2*c+1]=unpack4(v>>16);
+    }
+    // One lane decodes each row/K32 metadata pair, shared by all fragments.
+    for(unsigned idx=threadIdx.x;idx<128*8;idx+=256) {
+      unsigned r=idx/8,g=idx%8;
+      auto dm=affine(w,blockIdx.x*128+r,kb,g);
+      tile.w[r].scale[g]=dm.x;tile.w[r].minimum[g]=dm.y;
+    }
+    #pragma unroll
+    for(unsigned half=0;half<2;++half) {
+      for(unsigned idx=threadIdx.x;idx<128*32;idx+=256) {
+        unsigned t=idx/32,c=idx%32,token=blockIdx.y*128+t;
+        tile.x[t].codes[c]=(Full || token<m) ?
+            reinterpret_cast<unsigned const*>(x)[std::size_t(token)*(w.padded_k/4)+kb*64+half*32+c] : 0;
+      }
+      for(unsigned idx=threadIdx.x;idx<128*4;idx+=256) {
+        unsigned t=idx/4,g=idx%4,token=blockIdx.y*128+t;
+        auto index=std::size_t(token)*(w.padded_k/32)+kb*8+half*4+g;
+        tile.x[t].scale[g]=(Full || token<m)?a[index]:0.f;
+        tile.x[t].sum[g]=(Full || token<m)?sums[index]:0;
+      }
+      __syncthreads();
+      unsigned av[2][4][4];
+      float2 dm[2][2][4];
+      // Preread both output fragments for this half, then reuse across J.
+      #pragma unroll
+      for(unsigned n=0;n<2;++n) {
+        #pragma unroll
+        for(unsigned g=0;g<4;++g) {
+          unsigned address=static_cast<unsigned>(__cvta_generic_to_shared(
+              &tile.w[r0+n*16+lane%16].codes[half*32+g*8+(lane/16)*4]));
+          asm("ldmatrix.sync.aligned.m8n8.x4.shared.b16 {%0,%1,%2,%3}, [%4];"
+              : "=r"(av[n][g][0]),"=r"(av[n][g][1]),"=r"(av[n][g][2]),"=r"(av[n][g][3]) : "r"(address));
+          #pragma unroll
+          for(unsigned l=0;l<2;++l) {
+            auto const& row=tile.w[r0+n*16+lane/4+l*8];
+            dm[n][l][g]={row.scale[half*4+g],row.minimum[half*4+g]};
+          }
+        }
+      }
+      #pragma unroll
+      for(unsigned j=0;j<8;++j) {
+        #pragma unroll
+        for(unsigned g=0;g<4;++g) {
+          auto const& row=tile.x[j*16+j0+lane/4];
+          unsigned bv0=row.codes[g*8+lane%4],bv1=row.codes[g*8+lane%4+4];
+          float scale[2];int sum[2];
+          #pragma unroll
+          for(unsigned l=0;l<2;++l) {
+            auto const& meta=tile.x[j*16+j0+(lane%4)*2+l];
+            scale[l]=meta.scale[g];sum[l]=meta.sum[g];
+          }
+          #pragma unroll
+          for(unsigned n=0;n<2;++n) {
+            int d[4]{};
+            asm("mma.sync.aligned.m16n8k32.row.col.s32.s8.s8.s32 "
+                "{%0,%1,%2,%3}, {%4,%5,%6,%7}, {%8,%9}, {%0,%1,%2,%3};"
+                : "+r"(d[0]),"+r"(d[1]),"+r"(d[2]),"+r"(d[3])
+                : "r"(av[n][g][0]),"r"(av[n][g][1]),"r"(av[n][g][2]),"r"(av[n][g][3]),"r"(bv0),"r"(bv1));
+            #pragma unroll
+            for(unsigned l=0;l<4;++l)
+              acc[j][n][l]+=scale[l%2]*(dm[n][l/2][g].x*float(d[l])-dm[n][l/2][g].y*float(sum[l%2]));
+          }
+        }
+      }
+      __syncthreads();
+    }
+  }
+  #pragma unroll
+  for(unsigned j=0;j<8;++j) {
+    #pragma unroll
+    for(unsigned n=0;n<2;++n) {
+      #pragma unroll
+      for(unsigned l=0;l<4;++l) {
+        unsigned row=blockIdx.x*128+r0+n*16+lane/4+(l/2)*8;
+        unsigned token=blockIdx.y*128+j*16+j0+(lane%4)*2+l%2;
+        if(Full || (row<w.n && token<m)) {
+          auto index=std::size_t(token)*w.n+row;
+          out[index]=acc[j][n][l]+(residual?residual[index]:0.f);
+        }
+      }
+    }
+  }
+}
+
 struct Region { void const* p; std::uint64_t n; unsigned alignment; };
 std::expected<void,Error> distinct(std::span<Region const> regions, Stream const& s) {
   if (s.empty()) return std::unexpected(make_error(ErrorCode::InvalidArgument,"q8.stream","closed stream"));
@@ -169,9 +278,15 @@ std::expected<void,Error> valid_weight(PrefillWeight w) {
     return std::unexpected(make_error(ErrorCode::InvalidArgument,"q8.weight","Q4_K geometry required"));
   return {};
 }
-void project(PrefillWeight w,Q8Input x,float* out,float const* residual,Stream const& s) {
+std::expected<void,Error> project(PrefillWeight w,Q8Input x,float* out,float const* residual,Stream const& s) {
   if (x.m==1) mmvq<<<(w.n+7)/8,256,0,s.native()>>>(w,x.codes.data(),x.scales.data(),x.sums.data(),out,residual);
+  else if(x.m>=128) {
+    auto kernel=(w.n%128==0 && w.k==w.padded_k && x.m%128==0)?mmq_j128<true>:mmq_j128<false>;
+    if(auto st=check(cudaFuncSetAttribute(kernel,cudaFuncAttributeMaxDynamicSharedMemorySize,sizeof(MmqShared)),"q4k_q8.shared");!st)return st;
+    kernel<<<dim3((w.n+127)/128,(x.m+127)/128),256,sizeof(MmqShared),s.native()>>>(w,x.codes.data(),x.scales.data(),x.sums.data(),out,x.m,residual);
+  }
   else mmq<<<dim3((w.n+I-1)/I,(x.m+J-1)/J),256,0,s.native()>>>(w,x.codes.data(),x.scales.data(),x.sums.data(),out,x.m,residual);
+  return check(cudaGetLastError(),"q4k_q8.project");
 }
 } // namespace
 
@@ -199,8 +314,7 @@ std::expected<void,Error> q4k_q8_project(PrefillWeight const& w,Q8Input x,
       Region{residual.data(),residual.size_bytes(),4}};
   if(auto st=distinct(std::span(regions).first(residual.empty()?6:7),stream);!st)return st;
   auto guard=stream.activate();if(!guard)return std::unexpected(guard.error());
-  project(w,x,out.data(),residual.data(),stream);
-  return check(cudaGetLastError(),"q4k_q8.project");
+  return project(w,x,out.data(),residual.data(),stream);
 }
 
 std::expected<void,Error> q4k_q8_mlp(PrefillWeight const& gate,PrefillWeight const& up,
@@ -235,15 +349,12 @@ std::expected<void,Error> q4k_q8_mlp(PrefillWeight const& gate,PrefillWeight con
     if(auto st=check(cudaMemsetAsync(failure,0,4,stream.native()),"q8.clear_failure");!st)return fail(st.error());
   if(auto st=launch_hidden_rms_q8(residual,gamma,eps,m,codes,scales,sums,failure,stream);!st)return fail(st.error());
   Q8Input x{{codes,std::size_t(m)*5120},{scales,std::size_t(m)*160},{sums,std::size_t(m)*160},m,5120,5120};
-  project(gate,x,g,nullptr,stream);
-  if(auto st=check(cudaGetLastError(),"q8.gate");!st)return fail(st.error());
-  project(up,x,u,nullptr,stream);
-  if(auto st=check(cudaGetLastError(),"q8.up");!st)return fail(st.error());
+  if(auto st=project(gate,x,g,nullptr,stream);!st)return fail(st.error());
+  if(auto st=project(up,x,u,nullptr,stream);!st)return fail(st.error());
   swiglu_pack_kernel<<<m*17408/256,256,0,stream.native()>>>(g,u,codes,scales,sums,failure);
   if(auto st=check(cudaGetLastError(),"q8.swiglu_pack");!st)return fail(st.error());
   x={{codes,std::size_t(m)*17408},{scales,std::size_t(m)*544},{sums,std::size_t(m)*544},m,17408,17408};
-  project(down,x,output,residual,stream);
-  if(auto st=check(cudaGetLastError(),"q8.down");!st)return fail(st.error());
+  if(auto st=project(down,x,output,residual,stream);!st)return fail(st.error());
   if (pending_failure) return {};
   int bad=0;
   if(auto st=check(cudaMemcpyAsync(&bad,failure,4,cudaMemcpyDeviceToHost,stream.native()),"q8.failure");!st)return fail(st.error());

@@ -479,7 +479,7 @@ Correctness and quality criteria remain unchanged; execute applicable checks onc
   existing ablations; new ablations need a specific diagnostic question.
 - Keep benchmarks separate from correctness tests. Preserve exact commands, results, artifact/binary identities, and hardware context in each completion report.
 - Executable status values are `TODO`, `IN_PROGRESS`, `BLOCKED`, and `DONE`.
-  TASK-001–030 and TASK-033–040 are `DONE`; TASK-041–043 are `TODO`.
+  TASK-001–030 and TASK-033–041 are `DONE`; TASK-042–043 are `TODO`.
   `SUPERSEDED` denotes
   retired TASK-031/032 cross-references, never implementation completion.
 - A rejected candidate is a useful experiment result. Record the reason and
@@ -688,7 +688,7 @@ an achieved performance target.
 | TASK-038 | Pipelined attention with shared KV reuse | M17 | TASK-037 | Retained by explicit user acceptance; attention costs and numerical/quality checks pass; matched prefill regression 247.119085 → 270.714379 ms remains recorded | DONE |
 | TASK-039 | Token-boundary submission and decode graph replay | M18 | TASK-038 | Internal enqueue with safe completion commits, reduced waits and bounded graph/eager dispatch | DONE |
 | TASK-040 | Quantized engine validation and delivery decision | M19 | TASK-039 | Frozen core-54/replay/capacity/PERF-01 evidence and promotion/retention with explicit speed gaps | DONE |
-| TASK-041 | Reuse-rich Q4_K×Q8 prefill MMQ | M20 | TASK-040 | J128 full-chunk consumer, cooperative FP32 metadata and fragment reuse, preserved MMVQ and shared packs | TODO |
+| TASK-041 | Reuse-rich Q4_K×Q8 prefill MMQ | M20 | TASK-040 | J128 full-chunk consumer, cooperative FP32 metadata and fragment reuse, preserved MMVQ and shared packs; complete M256 MLP and integrated prefill improve, matched decode does not regress; isolated M1 first-use regression recorded as FOLLOW_UP_REQUIRED | DONE |
 | TASK-042 | Shared-KV attention with bounded 512-token prefill | M21 | TASK-041 | Two-head prefill KV reuse, consistent larger capacity, selected short/tail path and verified handoff | TODO |
 | TASK-043 | Prefill engine validation and delivery decision | M22 | TASK-042 | Frozen quality/replay/capacity/PERF-01 gate, explicit promotion/retention and remaining costs | TODO |
 

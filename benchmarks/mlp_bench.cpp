@@ -68,6 +68,7 @@ int real_mlp(char const* artifact, char const* rows) {
   unsigned m=0;std::string_view text(rows);
   auto parsed=std::from_chars(text.data(),text.data()+text.size(),m);
   if(parsed.ec!=std::errc{} || parsed.ptr!=text.end() || (m!=1 && m!=256))return 2;
+  auto setup_started=std::chrono::steady_clock::now();
   auto rt=runtime::Runtime::create();if(!rt)return 1;
   auto source=format::Artifact::open(artifact);if(!source)return 1;
   auto model=rt->upload_diagnostic(*source,runtime::DiagnosticWeights::Layer,0);if(!model)return 1;
@@ -82,6 +83,7 @@ int real_mlp(char const* artifact, char const* rows) {
     h[t*5120+c]=(int((t*23+c*17)%97)-48)*.03125f;
   if(!cuda::copy_h2d(session->residual_h_mid().pointer,std::as_bytes(std::span(h)),stream) || !stream.sync())return 1;
   auto begin=Event::create_timing(),end=Event::create_timing();if(!begin || !end)return 1;
+  double setup_ms=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-setup_started).count();
   auto count=cuda::malloc_count();
   if(!begin->record(stream))return 1;
   auto started=std::chrono::steady_clock::now();
@@ -96,6 +98,7 @@ int real_mlp(char const* artifact, char const* rows) {
   if(!cuda::copy_d2h(out.data(),session->residual_h().pointer,out.size()*4,stream)||!stream.sync())return 1;
   for(float v:out)if(!std::isfinite(v))return 1;
   std::cout<<std::setprecision(12)<<"policy="<<unsigned(model->schema().precision.id)<<" m="<<m
+      <<" setup_ms="<<setup_ms
       <<" gpu_ms="<<*gpu_ms<<" host_ms="<<host_ms<<" q8_workspace_bytes="<<session->q8_mlp_workspace().size()
       <<" prefill_workspace_bytes="<<engine->workspace_bytes()<<" hot_allocations="<<allocations
       <<" runs=1 warmups=0 includes_library_first_use=true finite=true\n";

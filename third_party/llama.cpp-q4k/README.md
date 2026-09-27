@@ -11,8 +11,13 @@ to D256, Q32/K64 prefill and six-head grouped decode with a fixed split rule.
 
 `cuda/q4k_q8.cu` adapts the integer MMQ/MMVQ structure from the same full
 revision `e6ab7c1a41054a888ada952eab4c886444c2f5ad`: `mmq-config-blackwell.cuh`
-falls through to `mmq-config-ampere.cuh` for Q4_K. We select I128/J32/K256,
-256 threads, stage nibbles as INT8, use the `mma.cuh` m16n8k32 instruction,
+falls through to `mmq-config-ampere.cuh` for Q4_K. We select I128/J128/K256
+for M>=128 and retain J32 below it, with 256 threads. J128 adapts its
+32-output-row warp-pair ownership, K128 activation halves, cooperative
+metadata staging and weight-fragment register prereads. FP32 metadata
+expands the shared row strides to 84 weight words and 44 activation words,
+both 4 modulo 8; the complete tile uses 65536 shared bytes.
+We stage nibbles as INT8, use the `mma.cuh` m16n8k32 instruction,
 and apply each K32 affine correction as in `mmq-vec-dot.cuh` and `vecdotq.cuh`.
 The existing QW38 physical nibble order is retained. Activation scales,
 weight scale products and corrections remain FP32, and activation sums are

@@ -62,12 +62,14 @@ int main() {
   auto wc=upload(packed.codes,stream),ws=upload(packed.scales,stream);
   cuda::PrefillWeight w{wc.data(),ws.data(),cuda::kDecodeLayoutQ4KCandidateV2,cuda::kDecodeQuantizerQ4KCandidateV2,
       n,k,unsigned(packed.padded_n),pk,wc.bytes(),ws.bytes()};
-  for(unsigned m:{1u,3u,33u,256u}) {
+  std::vector<float> small_tile;
+  for(unsigned m:{1u,3u,33u,127u,128u,129u,256u}) {
     std::vector<std::uint16_t> x(m*k);
     for(unsigned r=0;r<m;++r)for(unsigned c=0;c<k;++c){
       float value=(int((r*23+c*19)%67)-44)*.125f*(1+r%5);
       if(c>=32 && c<64)value=0;
       if(c<5)value=std::array{127.f,.5f,1.5f,-.5f,-1.5f}[c];
+      if(r==2)value=0; // Whole zero token crosses both tile schedules.
       x[r*k+c]=format::fp32_to_bf16_rne(value);
     }
     auto dx=upload(x,stream);
@@ -91,6 +93,9 @@ int main() {
     require(z[0]==127 && z[1]==0 && z[2]==2 && z[3]==0 && z[4]==-2,"halfway ties and saturation endpoint");
     require(sum[2]<0,"negative activation sum fixture");
     check(cuda::q4k_q8_project(w,q,span<float>(out),stream));auto y=download<float>(out,stream);
+    if(m==127)small_tile=y;
+    if(m>=128)require(std::equal(small_tile.begin(),small_tile.end(),y.begin()),
+        "J128 preserves J32 K32 expression and accumulation order bitwise");
     for(unsigned t=0;t<m;++t)for(unsigned r=0;r<n;++r){
       double ref=0;
       for(unsigned g=0;g<groups;++g){int dot=0;

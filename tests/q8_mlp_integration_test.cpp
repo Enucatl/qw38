@@ -73,7 +73,7 @@ int main(){
   check(cuda::copy_h2d(input,std::as_bytes(std::span(h)),stream));check(stream.sync());
   auto allocations=cuda::malloc_count();
   check(runtime::execute_decode_mlp(decode));close(download(output,5120,stream),ref);
-  for(unsigned m:{3u,256u,1u}){
+  for(unsigned m:{3u,127u,128u,129u,256u,1u}){
     check(runtime::execute_prefill_mlp(prefill,engine,static_cast<float const*>(input),static_cast<float*>(output),m,0));
     auto values=download(output,m*5120,stream);
     for(unsigned r=0;r<m;++r)close(std::span(values).subspan(r*5120,5120),ref);
@@ -108,6 +108,10 @@ int main(){
   require(!runtime::execute_decode_mlp(decode),"nonfinite RMS typed failure");
   require(runtime::detail::SessionPlanAccess::execution_state(session)->is_poisoned(),"failure poisons session");
   require(!runtime::execute_decode_mlp(decode),"poison prevents continuation");
+  check(session.reset());check(cuda::copy_h2d(input,std::as_bytes(std::span(h)),stream));
+  require(!run_prefill(static_cast<float*>(output),256),"J128 nonfinite RMS typed failure");
+  require(runtime::detail::SessionPlanAccess::execution_state(session)->is_poisoned(),"J128 failure poisons session");
+  require(!run_prefill(static_cast<float*>(output),256),"J128 poison prevents continuation");
   check(session.reset());h[0]=-1;check(cuda::copy_h2d(input,std::as_bytes(std::span(h)),stream));
   check(runtime::execute_decode_mlp(decode));
   cuda::testing::fail_next_stream_sync();
@@ -116,5 +120,5 @@ int main(){
   check(session.reset());check(cuda::copy_h2d(input,std::as_bytes(std::span(h)),stream));check(runtime::execute_decode_mlp(decode));
   auto moved=std::move(session);check(runtime::execute_decode_mlp(decode));
   require(moved.q8_mlp_workspace().size()==cuda::q8_mlp_workspace_bytes(256),"bounded scratch follows Session move");
-  std::cout<<"real Session M=1/3/256 complete RMS/Q8/SwiGLU/down/residual reference, reuse, poison/reset/move PASS\n";
+  std::cout<<"real Session M=1/3/127/128/129/256 complete RMS/Q8/SwiGLU/down/residual reference, reuse, poison/reset/move PASS\n";
 }
