@@ -9,6 +9,74 @@ the existing V0 implementation. From TASK-018 onward, select quantization,
 physical weight layout, and execution kernels together, using measured SM120
 capabilities before committing to the production representation.
 
+## Prefill amendment — FAST-03 (2026-09-27)
+
+The user requested a thorough investigation of the remaining prefill gap,
+including DS4 phase selection and repeated conversion/reuse, followed by new
+implementation tasks and **no implementation in this planning turn**.
+The [source and saved-trace analysis](post-task040-prefill-analysis.md)
+governs TASK-041–043 with the task contracts below. TASK-001–040 completion
+records and TASK-030/036/040 RETAIN_CONTROL decisions remain historical.
+Development starts from TASK-040's policy-1030 candidate; production remains
+TASK-026/027 at `d2f02e2`. Development dependency acceptance is not promotion.
+
+The next sequence is **041 → 042 → 043**, all initially `TODO`:
+
+| Task | Name | Delivered milestone |
+| --- | --- | --- |
+| [041](tasks/TASK-041.md) | Reuse-rich Q4_K×Q8 prefill MMQ | Larger token tile, cooperative FP32 metadata staging and fragment reuse; unchanged compact weights/decode |
+| [042](tasks/TASK-042.md) | Shared-KV attention with bounded 512-token prefill | Two-head prefill KV reuse with sufficient blocks, consistent 512-token capacity and existing smaller-chunk path |
+| [043](tasks/TASK-043.md) | Prefill engine validation and delivery decision | One frozen final quality/replay/capacity/performance gate and explicit promotion decision |
+
+TASK-040 measured 32K prefill 29.422 s versus 12.373 s. Candidate MMQ alone
+takes 20.171 s; attention takes 4.658 s versus comparator 1.837 s. Candidate
+prefill GPU kernels total 29.323 s: host submission is not the main long-prompt
+gap. Gate/up Q8 and compatible FP8 producer packs are already shared. Global
+MLP weight expansion has already been eliminated. The remaining repeated work
+is inside the J32 MMQ tile and separate query-head attention CTAs.
+
+The actual pinned comparator selected J128 MMQ and 512-token microbatches.
+TASK-041 starts from that upstream I128/J128 ownership with K128 activation
+halves and FP32 metadata adaptation. TASK-042 pairs two Q32 query heads per
+CTA; M512 provides 192 blocks, whereas M256 would provide only 96 on 170 SMs.
+This is why grouped attention and larger bounded chunks are one milestone.
+Retain current per-head attention for smaller chunks. DS4 provides useful
+phase/shape selection patterns, but its integrated-device aligned paths,
+Q8-specific dimensions, precision and incomplete producer-fold APIs are not
+an RTX 5090 implementation prescription.
+
+### Reopened decisions and retained boundaries
+
+This amendment reopens T-02's fixed-256 execution choice for TASK-042's
+bounded 512-token chain and its required scratch capacity. It authorizes
+prefill MMQ/head-query tile ownership and fixed shape dispatch changes under
+A-01/A-02/T-01–03/M-01. It does not reopen model equations, quantization,
+activation scale scope, probability precision, persistent state ABI or
+production quality thresholds. Preserve one resident weight view, policy 1030
+FP32 K32 affine arithmetic, two-component BF16 attention P with FP32 PV,
+BF16 KV/history, FP32 residual/recurrence, safe chunk commits and decode graph
+behavior. No duplicate full weights/KV, generic dispatcher, tile sweep,
+prefill graph, FP8 reformat or GDN algorithm is required.
+
+TASK-041/042 own affected arithmetic/state checks and their specified small
+matched development observations. Run each once; rerun only for changed code,
+failure or a concrete unresolved concern. Keep complete operation costs,
+first-use boundaries and actual workspace. TASK-042's matched 4096-token
+prompt plus eight fixed continuation inputs replaces the old 256-only short
+check because the new path requires a full M512 chunk. No intermediate full
+quality suite or comparator rerun. A smaller isolated kernel win cannot waive
+a complete-operation or integrated regression; record failures without
+silently changing completion criteria.
+
+TASK-043 owns final core-54, the sole fixed 32K retrieval case, replay through
+512-token boundaries, capacity with the 2 GiB reserve, and six single-run
+PERF-01 executions yielding nine rows. Historical P100 failure and C92
+uncertainty remain unresolved until new valid evidence satisfies the unchanged
+gates. Full-216 stays human-only. All nine latency ratios >=1 additionally
+determine the fast-engine goal; completed retention is not goal completion.
+Manifest-only artifact identity, pinned tooling and `wake-run` remain binding.
+No engine workload was run for this amendment.
+
 ## Fast-engine amendment — FAST-02 (2026-09-27)
 
 The user requested an implementable next batch after reviewing
@@ -330,7 +398,7 @@ accepted quality or performance result.
 
 **This ledger's revised task rows and task contracts below are authoritative
 for TASK-018–027; DELIVERY-01 governs completed TASK-028–030, FAST-01 completed
-TASK-033–036, and FAST-02 future TASK-037–040.** The corresponding `tasks/TASK-018.md` through `TASK-032.md`
+TASK-033–036, FAST-02 completed TASK-037–040, and FAST-03 future TASK-041–043.** The corresponding `tasks/TASK-018.md` through `TASK-032.md`
 now expand these contracts with matching titles, dependencies, scopes and
 acceptance criteria. Their former specifications are superseded; the earlier
 TASK-018 report is explicitly preserved as historical evidence, valid only
@@ -367,11 +435,12 @@ historical and is not relabeled as a 54-case result.
 
 ## Normative authority
 
-- FAST-02 and its detailed task files for TASK-037–040;
+- FAST-03 and its detailed task files for TASK-041–043;
+  FAST-02 for completed TASK-037–040;
   FAST-01 for completed TASK-033–036; DELIVERY-01 for completed TASK-028–030;
   OVERALL-01 for completed TASK-018–027 contracts
 - `docs/architecture/architecture-v0.md` for retained semantics and controls;
-  reopened decisions are governed by OVERALL-01/DELIVERY-01/FAST-01/FAST-02
+  reopened decisions are governed by OVERALL-01/DELIVERY-01/FAST-01/FAST-02/FAST-03
 - `docs/architecture/evaluation-policy-v0.md` — EVAL-01 / PERF-01
 - `docs/architecture/evaluation-policy-core-54.md` — routine coverage and
   manual-only full-suite execution
@@ -395,7 +464,7 @@ Correctness and quality criteria remain unchanged; execute applicable checks onc
   TASK-001–030 completion records are historical and unchanged. Development
   prerequisites are not production promotion requirements; a checked fallback
   satisfies its task only as specified in that contract.
-- A conflict outside OVERALL-01/DELIVERY-01/FAST-01/FAST-02's authorized decisions stops the sequence with
+- A conflict outside OVERALL-01/DELIVERY-01/FAST-01/FAST-02/FAST-03's authorized decisions stops the sequence with
   `ARCHITECTURE_BLOCKER`; the obsolete Q4-only restrictions do not block the
   investigations explicitly authorized here.
 - Every blocker report contains: `Decision ID`, `Attempted implementation`, `Observed problem`, `Evidence`, `Why this is architectural rather than tuning`, `Smallest plausible alternative`, and `Affected downstream tasks`.
@@ -404,11 +473,13 @@ Correctness and quality criteria remain unchanged; execute applicable checks onc
   TASK-028/029 integrate improvements and TASK-030 decided retention;
   TASK-033–035 improved consumers/reuse and TASK-036 retained control;
   TASK-037–038 implement quantized MLP and attention improvements, TASK-039
-  implements submission improvements, and TASK-040 decides the next delivery. Reuse
+  implements submission improvements, and TASK-040 decided retention;
+  TASK-041/042 improve prefill MMQ and grouped attention/chunk scheduling,
+  and TASK-043 decides the next delivery. Reuse
   existing ablations; new ablations need a specific diagnostic question.
 - Keep benchmarks separate from correctness tests. Preserve exact commands, results, artifact/binary identities, and hardware context in each completion report.
 - Executable status values are `TODO`, `IN_PROGRESS`, `BLOCKED`, and `DONE`.
-  TASK-001–030 and TASK-033–039 are `DONE`; TASK-040 is `TODO`.
+  TASK-001–030 and TASK-033–040 are `DONE`; TASK-041–043 are `TODO`.
   `SUPERSEDED` denotes
   retired TASK-031/032 cross-references, never implementation completion.
 - A rejected candidate is a useful experiment result. Record the reason and
@@ -566,6 +637,12 @@ an achieved performance target.
   and tested static decode graph replay with measured default selection.
 - **M19 — Quantized engine delivery decision:** consolidated final candidate
   quality, replay, capacity and per-row performance decision.
+- **M20 — Efficient compact MLP prefill:** measured larger-token MMQ reuse,
+  cooperative metadata staging and unchanged decode/artifact behavior.
+- **M21 — Grouped attention and bounded prefill:** shared KV across sibling
+  prefill heads with consistent 512-token capacity and smaller-chunk dispatch.
+- **M22 — Prefill delivery decision:** consolidated new candidate quality,
+  replay, capacity and per-row performance decision.
 
 ## Task ledger
 
@@ -611,6 +688,9 @@ an achieved performance target.
 | TASK-038 | Pipelined attention with shared KV reuse | M17 | TASK-037 | Retained by explicit user acceptance; attention costs and numerical/quality checks pass; matched prefill regression 247.119085 → 270.714379 ms remains recorded | DONE |
 | TASK-039 | Token-boundary submission and decode graph replay | M18 | TASK-038 | Internal enqueue with safe completion commits, reduced waits and bounded graph/eager dispatch | DONE |
 | TASK-040 | Quantized engine validation and delivery decision | M19 | TASK-039 | Frozen core-54/replay/capacity/PERF-01 evidence and promotion/retention with explicit speed gaps | DONE |
+| TASK-041 | Reuse-rich Q4_K×Q8 prefill MMQ | M20 | TASK-040 | J128 full-chunk consumer, cooperative FP32 metadata and fragment reuse, preserved MMVQ and shared packs | TODO |
+| TASK-042 | Shared-KV attention with bounded 512-token prefill | M21 | TASK-041 | Two-head prefill KV reuse, consistent larger capacity, selected short/tail path and verified handoff | TODO |
+| TASK-043 | Prefill engine validation and delivery decision | M22 | TASK-042 | Frozen quality/replay/capacity/PERF-01 gate, explicit promotion/retention and remaining costs | TODO |
 
 TASK-037's original M=1 gate was superseded by the user-directed retention
 decision above. Its M=1 regression and review history remain recorded. TASK-038
@@ -921,8 +1001,9 @@ not block development; correctness/capacity failures require repair or fallback.
 
 ## Migration of former tasks and acceptance obligations
 
-Completed owners below remain historical. FAST-02 assigns new-candidate
-development to TASK-037–039 and final validation to TASK-040.
+Completed owners below remain historical. FAST-02 assigned development to
+TASK-037–039 and final validation to TASK-040. FAST-03 assigns new-candidate
+prefill development to TASK-041/042 and final validation to TASK-043.
 
 | Former obligation | Revised owner |
 | ----------------- | ------------- |
@@ -944,6 +1025,9 @@ development to TASK-037–039 and final validation to TASK-040.
 | Remaining attention staging/GQA/split-merge gap | TASK-038; both phase schedules and explicit decode P precision |
 | Deferred per-layer synchronization and CUDA graphs | TASK-039; internal enqueue, safe host commits and bounded static capture/replay |
 | New FAST-02 candidate's quality/replay/capacity/matched performance | TASK-040; retains every applicable final obligation and TASK-036 quality limitations until resolved |
+| Remaining J32 MMQ metadata/weight reuse gap | TASK-041; existing Q4_K/Q8 policy and one resident view retained |
+| Prefill sibling-head KV reuse and fixed-256 scheduling | TASK-042; grouped prefill plus bounded 512 capacity, existing smaller-chunk path |
+| New FAST-03 candidate's quality/replay/capacity/matched performance | TASK-043; retains every applicable obligation and TASK-040 quality limitations until resolved |
 
 ## Critical path
 
@@ -965,6 +1049,8 @@ TASK-001 → 002 → 003 → 004 → 005 → 006
                                       030 → 033 (attention reuse/PV) → 034 (compact consumers) → 035 (FP8 reuse) → 036 (validate/deliver)
 
                                       036 → 037 (integer MLP) → 038 (attention reuse) → 039 (submission/graphs) → 040 (validate/deliver)
+
+                                      040 → 041 (MMQ reuse) → 042 (grouped attention / 512 prefill) → 043 (validate/deliver)
 ```
 
 ## Architecture blocker log
