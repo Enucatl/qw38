@@ -1,4 +1,5 @@
 #include "runtime/submission.hpp"
+#include "runtime/profiling.hpp"
 #include "cuda/graph.hpp"
 
 #include "runtime/prefill.hpp"
@@ -180,10 +181,11 @@ std::expected<void, Error> detail::Submission::prefill_gdn(
   };
   bool const fp8=p.first.layout==qw38::cuda::kDecodeLayoutFp8V1 && valid_tokens>1;
   auto packed=fp8 ? engine.fp8_operand(valid_tokens,kHidden) : qw38::cuda::Fp8Input{};
-  auto project = [&](qw38::cuda::PrefillWeight const& weight,
+  auto project = [&](char const* role, qw38::cuda::PrefillWeight const& weight,
                      std::uint16_t const* input, void* output,
                      qw38::cuda::PrefillEpilogue epilogue,
                      float const* add = nullptr) -> std::expected<void, Error> {
+    profiling::ScopedRange range("qw38:op name=gdn_projection role=%s", role);
     return cuda_step(engine.project(qw38::cuda::PrefillProjection{
         .weight = weight, .input = input, .output = output, .residual = add,
         .valid_tokens = valid_tokens, .first_position = first_position,
@@ -199,13 +201,13 @@ std::expected<void, Error> detail::Submission::prefill_gdn(
           residual, static_cast<std::uint16_t const*>(f.gamma.pointer),
           f.eps, valid_tokens, s.normalized, *stream)); !st) return st;
   using qw38::cuda::PrefillEpilogue;
-  if (auto st = project(p.first, s.normalized, s.qkv, PrefillEpilogue::StoreBf16);
+  if (auto st = project("qkv", p.first, s.normalized, s.qkv, PrefillEpilogue::StoreBf16);
       !st) return st;
-  if (auto st = project(p.second, s.normalized, s.z, PrefillEpilogue::StoreBf16);
+  if (auto st = project("z", p.second, s.normalized, s.z, PrefillEpilogue::StoreBf16);
       !st) return st;
-  if (auto st = project(p.third, s.normalized, s.a, PrefillEpilogue::StoreFp32);
+  if (auto st = project("a", p.third, s.normalized, s.a, PrefillEpilogue::StoreFp32);
       !st) return st;
-  if (auto st = project(p.fourth, s.normalized, s.b, PrefillEpilogue::StoreFp32);
+  if (auto st = project("b", p.fourth, s.normalized, s.b, PrefillEpilogue::StoreFp32);
       !st) return st;
   if (auto st = cuda_step(qw38::cuda::launch_gdn_prefill_conv(
           s.qkv, static_cast<std::uint16_t const*>(f.taps.pointer),
@@ -228,7 +230,7 @@ std::expected<void, Error> detail::Submission::prefill_gdn(
           s.o, s.z, static_cast<std::uint16_t const*>(gdn.gated_gamma.pointer),
           f.eps, valid_tokens * kGdnValueHeads, s.u, *stream,
           const_cast<std::uint8_t*>(packed.codes.data()),const_cast<float*>(packed.scales.data()))); !st) return st;
-  if (auto st = project(p.mixer_out, s.u, h_mid,
+  if (auto st = project("out", p.mixer_out, s.u, h_mid,
                         PrefillEpilogue::ResidualAddFp32, residual); !st) return st;
   if (auto st = detail::Submission::prefill_mlp(p, engine, h_mid, next_h,
                                      valid_tokens, first_position, f.eps, failure); !st)

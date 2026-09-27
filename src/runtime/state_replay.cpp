@@ -1,6 +1,7 @@
 #include "runtime/language_model.hpp"
 #include "runtime/runtime.hpp"
 #include "format/floatcvt.hpp"
+#include "cuda/attention.hpp"
 
 #include <algorithm>
 #include <array>
@@ -184,7 +185,7 @@ int main(int argc, char** argv) {
     for (std::size_t offset = 0, chunk = 0; offset < ids.size(); ++chunk) {
       auto count = std::min<std::size_t>(ids.size() - offset,
                                          opt.partitions[chunk % opt.partitions.size()]);
-      result = plan.prefill_tokens(ids.subspan(offset, count));
+      result = plan.prefill_tokens(ids.subspan(offset, count), {}, {}, ids.size());
       if (!result) return result;
       offset += count;
     }
@@ -209,7 +210,7 @@ int main(int argc, char** argv) {
            << "\",\"decode_submission\":\"graph\",\"graph_fallback\":null"
               ",\"graph_buckets\":\"powers_of_two_from_256_capped_by_capacity\""
               ",\"attention_schedule\":\"decode_six_heads_two_bf16_p_fixed_order_merge\""
-              ",\"prefill_attention_schedule\":\"M512_two_heads_Q32_K64_else_per_head_Q32_K64\""
+              ",\"prefill_attention_schedule\":\"M512_prefix0_paired_K32_else_small_M512_paired_K64_else_per_head_K64\""
               ",\"attention_partitions\":\"min(ceil(populated/256),ceil(2*SMs/4),128)\""
               ",\"partitions\":[";
     for (std::size_t i = 0; i < opt.partitions.size(); ++i) {
@@ -339,7 +340,11 @@ int main(int argc, char** argv) {
                                             opt.partitions[chunk % opt.partitions.size()]);
         if (chunk) row << ',';
         row << "{\"tokens\":" << count << ",\"heads_per_cta\":"
-            << (count == 512 ? 2 : 1) << '}';
+            << qw38::cuda::prefill_attention_schedule(qw38::cuda::context_regime(length), count, offset).heads
+            << ",\"key_tile\":"
+            << qw38::cuda::prefill_attention_schedule(qw38::cuda::context_regime(length), count, offset).key_tile
+            << ",\"logical_prompt_tokens\":" << length
+            << ",\"regime\":\"" << (length <= 4096 ? "small" : "large") << "\"}";
         offset += count;
       }
     }

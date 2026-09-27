@@ -1,4 +1,5 @@
 #include "cuda/prefill.hpp"
+#include "src/runtime/profiling.hpp"
 #include "cuda/nvfp4.hpp"
 
 #include "cuda/activation.hpp"
@@ -17,6 +18,7 @@
 #include <utility>
 
 namespace qw38::cuda {
+namespace profiling = qw38::runtime::profiling;
 namespace {
 
 constexpr std::uint64_t kCublasWorkspaceBytes = 4u * 1024u * 1024u;
@@ -375,6 +377,7 @@ std::expected<PrefillEngine, Error> PrefillEngine::create(
   }
   auto guard = stream.activate();
   if (!guard) return std::unexpected(guard.error());
+  profiling::ScopedRange range("qw38:host name=prefill_engine_prepare");
   std::uint64_t const weight_bytes =
       static_cast<std::uint64_t>(weight_rows) * kPrefillMaxK * 2u;
   std::uint64_t const accum_bytes =
@@ -474,14 +477,19 @@ std::expected<void, Error> PrefillEngine::gemm_tile(
   auto guard = stream_->activate();
   if (!guard) return std::unexpected(guard.error());
   std::uint64_t const elements = static_cast<std::uint64_t>(tile_rows) * w.k;
+  profiling::ScopedRange unpack("qw38:op name=weight_unpack m=%u n=%u k=%u row_start=%u layout=%u",
+      unsigned(valid_tokens), unsigned(tile_rows), unsigned(w.k), unsigned(row_start), unsigned(w.layout));
   unpack_tile_kernel<<<static_cast<unsigned>((elements + 255u) / 256u), 256, 0,
                        stream_->native()>>>(
       static_cast<std::uint8_t const*>(w.codes),
       static_cast<std::uint8_t const*>(w.scales), weight_tile_, w.layout,
       w.n, w.k, w.padded_k, row_start, tile_rows);
   if (auto st = check(cudaGetLastError(), "prefill.unpack_tile"); !st) return st;
+  unpack.close();
   float const alpha = 1.0f;
   float const beta = 0.0f;
+  profiling::ScopedRange range("qw38:op name=bf16_gemm m=%u n=%u k=%u row_start=%u",
+      unsigned(valid_tokens), unsigned(tile_rows), unsigned(w.k), unsigned(row_start));
   return cublas_check(cublasGemmEx(
       handle_, CUBLAS_OP_T, CUBLAS_OP_N,
       static_cast<int>(tile_rows), static_cast<int>(valid_tokens),
@@ -500,6 +508,8 @@ Fp8Input PrefillEngine::fp8_operand(unsigned m,unsigned k) const noexcept {
 }
 
 std::expected<void, Error> PrefillEngine::project(PrefillProjection const& d) {
+  profiling::ScopedRange project_range("qw38:host name=prefill_project m=%u n=%u k=%u",
+      unsigned(d.valid_tokens), unsigned(d.weight.n), unsigned(d.weight.k));
   if (!stream_ || stream_->empty()) {
     return std::unexpected(make_error(ErrorCode::InvalidArgument, "prefill.project",
                                       "stream is closed"));
@@ -576,6 +586,8 @@ std::expected<void, Error> PrefillEngine::project(PrefillProjection const& d) {
     if(auto st=fp8_gemm(weight,d.packed,{accum,std::uint64_t(owned.m)*d.weight.n},
         {library_workspace_,kCublasWorkspaceBytes},fp8_sm_count_,*stream_);!st)return st;
     auto elems=std::uint64_t(d.valid_tokens)*d.weight.n;
+    profiling::ScopedRange range("qw38:op name=projection_epilogue m=%u n=%u k=%u epilogue=%u",
+        unsigned(d.valid_tokens), unsigned(d.weight.n), 1u, unsigned(d.epilogue));
     epilogue_kernel<<<(elems+255)/256,256,0,stream_->native()>>>(accum,d.output,d.residual,
         d.valid_tokens,d.weight.n,d.weight.n,0,d.epilogue);
     return check(cudaGetLastError(),"fp8.epilogue");
@@ -589,6 +601,8 @@ std::expected<void, Error> PrefillEngine::project(PrefillProjection const& d) {
       return launch_decode_mmv(desc,*stream_);
   }
   if (d.weight.layout == kDecodeLayoutQ4KCandidateV2 && dispatch_ == PrefillDispatch::LocalQ4K) {
+    profiling::ScopedRange range("qw38:op name=q4k_bf16_mma_project m=%u n=%u k=%u epilogue=%u",
+        unsigned(d.valid_tokens), unsigned(d.weight.n), unsigned(d.weight.k), unsigned(d.epilogue));
     q4k_prefill_kernel<false><<<dim3((d.weight.n+63)/64,(d.valid_tokens+31)/32),256,0,stream_->native()>>>(
         d.weight,{},d.input,d.output,d.residual,d.valid_tokens,d.epilogue);
     return check(cudaGetLastError(),"prefill.q4k_local");
@@ -602,6 +616,8 @@ std::expected<void, Error> PrefillEngine::project(PrefillProjection const& d) {
     if (auto st = gemm_tile(d.weight, d.input, d.valid_tokens, start, accum_a_); !st)
       return st;
     std::uint64_t const elems = static_cast<std::uint64_t>(rows) * d.valid_tokens;
+    profiling::ScopedRange range("qw38:op name=projection_epilogue m=%u n=%u k=%u row_start=%u epilogue=%u",
+        unsigned(d.valid_tokens), unsigned(rows), 1u, unsigned(start), unsigned(d.epilogue));
     epilogue_kernel<<<static_cast<unsigned>((elems + 255u) / 256u), 256, 0,
                       stream_->native()>>>(accum_a_, d.output, d.residual,
                                            d.valid_tokens, d.weight.n, rows,
@@ -669,6 +685,8 @@ std::expected<void, Error> PrefillEngine::paired_swiglu_impl(
   }
   if (auto st = distinct(std::span<Region const>{ranges.data(), count}); !st) return st;
   if (gate.layout == kDecodeLayoutQ4KCandidateV2 && dispatch_ == PrefillDispatch::LocalQ4K) {
+    profiling::ScopedRange range("qw38:op name=q4k_bf16_mma_pair_swiglu m=%u n=%u k=%u",
+        unsigned(valid_tokens), unsigned(gate.n), unsigned(gate.k));
     q4k_prefill_kernel<true><<<dim3((gate.n+63)/64,(valid_tokens+31)/32),256,0,stream_->native()>>>(
         gate,up,normalized,swiglu,nullptr,valid_tokens,PrefillEpilogue::StoreBf16);
     return check(cudaGetLastError(),"prefill.q4k_pair_local");
@@ -685,6 +703,8 @@ std::expected<void, Error> PrefillEngine::paired_swiglu_impl(
     if (auto st = gemm_tile(up, normalized, valid_tokens, start, accum_b_); !st)
       return st;
     std::uint64_t const elems = static_cast<std::uint64_t>(rows) * valid_tokens;
+    profiling::ScopedRange range("qw38:op name=swiglu m=%u n=%u k=%u row_start=%u",
+        unsigned(valid_tokens), unsigned(rows), 1u, unsigned(start));
     swiglu_kernel<<<static_cast<unsigned>((elems + 255u) / 256u), 256, 0,
                     stream_->native()>>>(accum_a_, accum_b_, swiglu,
                                          valid_tokens, gate.n, rows, start);
@@ -795,6 +815,8 @@ std::expected<void, Error> PrefillEngine::head_contract(
 std::expected<void, Error> PrefillEngine::head_generation(
     PrefillWeight const& head, std::uint16_t const* normalized,
     std::uint32_t valid_tokens, std::uint64_t first_position, float* logits) {
+  profiling::ScopedRange head_range("qw38:host name=head_generation m=1 n=%u k=%u",
+      unsigned(head.n), unsigned(head.k));
   if (!normalized || !logits || valid_tokens == 0 ||
       valid_tokens > token_capacity_ || head.n != 248320 ||
       head.k != 5120 ||
@@ -816,6 +838,8 @@ std::expected<void, Error> PrefillEngine::head_evaluation(
     PrefillWeight const& head, std::uint16_t const* normalized,
     std::uint32_t valid_tokens, std::uint64_t first_position,
     std::span<std::uint32_t const> requested_rows, float* logits) {
+  profiling::ScopedRange head_range("qw38:host name=head_evaluation m=%u n=%u k=%u",
+      unsigned(requested_rows.size()), unsigned(head.n), unsigned(head.k));
   if (!normalized || !logits || requested_rows.empty() ||
       requested_rows.size() > kPrefillHeadRows || head.n != 248320 ||
       head.k != 5120 || valid_tokens == 0 || valid_tokens > token_capacity_ ||

@@ -1,4 +1,5 @@
 #include "runtime/runtime.hpp"
+#include "runtime/profiling.hpp"
 
 #include <cuda_runtime.h>
 
@@ -59,6 +60,7 @@ std::expected<void, Error> Runtime::shutdown() {
 }
 
 std::expected<Model, Error> Runtime::load(std::filesystem::path const& path) {
+  profiling::ScopedRange range("qw38:host name=model_load");
   if (!stream_) {
     return std::unexpected(closed_error("runtime.load"));
   }

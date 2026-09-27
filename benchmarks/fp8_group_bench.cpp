@@ -30,7 +30,8 @@ template<class T> auto bytes(std::vector<T> const& v) {return std::as_bytes(std:
 template<class T> std::span<T> span(cuda::DeviceBuffer& b) {return {static_cast<T*>(b.data()),b.bytes()/sizeof(T)};}
 }
 // Policy-1030 decode groups, using the resident artifact and production ranged
-// launchers. Each process measures one first use including preparation/readout.
+// launchers. Each process measures one first use including preparation;
+// diagnostic readout is timed separately from the resident operation.
 int decode_group(char const* path, std::string const& group, char const* saved_path) {
   using namespace qw38;
   bool gdn=group=="gdn-in" || group=="gdn-out";
@@ -91,9 +92,15 @@ int decode_group(char const* path, std::string const& group, char const* saved_p
     check(cuda::launch_decode_mmv_ranges({std::span(desc).first(gdn?2:3)},stream));
     if(gdn)check(cuda::launch_decode_ab_bf16({desc[2],desc[3]},stream));
   } else check(cuda::launch_decode_mmv(desc[0],stream));
-  for(unsigned i=0;i<names.size();++i)check(cuda::copy_d2h(host[i],output[i].data(),stream));
   check(end.record(stream));check(end.sync());
   double host_ms=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-begin).count();
+  auto readout_start=std::chrono::steady_clock::now();
+  std::uint64_t readout_bytes=0;
+  for(unsigned i=0;i<names.size();++i) {
+    check(cuda::copy_d2h(host[i],output[i].data(),stream));readout_bytes+=output[i].bytes();
+  }
+  check(stream.sync());
+  double readout_ms=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-readout_start).count();
   std::ofstream saved(saved_path,std::ios::binary);
   for(unsigned i=0;i<names.size();++i) {
     for(unsigned j=0;j<desc[i].n;++j) {
@@ -105,9 +112,12 @@ int decode_group(char const* path, std::string const& group, char const* saved_p
     saved.write(reinterpret_cast<char const*>(host[i].data()),host[i].size());
   }
   std::cout<<std::setprecision(12)<<"group="<<group<<" calls_per_token="<<(gdn?48:16)
-      <<" setup_ms="<<setup_ms<<" gpu_ms="<<take(cuda::elapsed_ms(start,end))<<" host_ms="<<host_ms
+      <<" setup_ms="<<setup_ms<<" gpu_event_interval_ms="<<take(cuda::elapsed_ms(start,end))<<" host_ms="<<host_ms
       <<" weight_bytes="<<resident<<" workspace_bytes="<<x.bytes()+h.bytes()+gamma.bytes()
-      <<" hot_allocations="<<cuda::malloc_count()-allocations<<" first_use=1 warmups=0 repetitions=1 readout_included=1\n";
+      <<" hot_allocations="<<cuda::malloc_count()-allocations
+      <<" diagnostic_d2h_host_ms="<<readout_ms<<" diagnostic_d2h_bytes="<<readout_bytes
+      <<" timing_schema=2 boundary="<<(front?"rms_grouped_input_projections":"output_projection_residual")
+      <<" first_use=1 warmups=0 repetitions=1 readout_included=0\n";
   return saved && cuda::malloc_count()==allocations?0:1;
 }
 // One real layer-0 GDN projection group; no warmup or repeated measurement.
@@ -203,14 +213,23 @@ int main(int argc,char** argv) {
     check(cuda::launch_decode_ab_bf16({decode[2],decode[3]},stream));
   }
   check(end.record(stream));check(end.sync());double host=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-begin).count();
-  std::cout<<"mode="<<argv[4]<<" M="<<m<<" gpu_ms="<<take(cuda::elapsed_ms(start,end))<<" host_ms="<<host
+  std::array<std::vector<std::byte>,4> host_output;
+  for(unsigned i=0;i<4;++i)host_output[i].resize(output[i].bytes());
+  auto readout_start=std::chrono::steady_clock::now();
+  std::uint64_t readout_bytes=0;
+  for(unsigned i=0;i<4;++i) {
+    check(cuda::copy_d2h(host_output[i],output[i].data(),stream));readout_bytes+=output[i].bytes();
+  }
+  check(stream.sync());
+  double readout_ms=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-readout_start).count();
+  std::cout<<"mode="<<argv[4]<<" M="<<m<<" gpu_event_interval_ms="<<take(cuda::elapsed_ms(start,end))<<" host_ms="<<host
       <<" weight_bytes="<<resident<<" packed_bytes="<<(packed.codes.size_bytes()+packed.scales.size_bytes())
       <<" companion_bytes="<<bf.bytes()<<" engine_workspace="<<engine.workspace_bytes()
-      <<" first_use=1 warmups=0 repetitions=1\n";
+      <<" diagnostic_d2h_host_ms="<<readout_ms<<" diagnostic_d2h_bytes="<<readout_bytes
+      <<" timing_schema=2 boundary=rms_pack_grouped_input_projections readout_included=0 first_use=1 warmups=0 repetitions=1\n";
   std::ofstream saved(argv[6],std::ios::binary);
   for(unsigned i=0;i<4;++i) {
-    std::vector<std::byte> v(output[i].bytes());check(cuda::copy_d2h(v,output[i].data(),stream));check(stream.sync());
-    saved.write(reinterpret_cast<char const*>(v.data()),v.size());
+    saved.write(reinterpret_cast<char const*>(host_output[i].data()),host_output[i].size());
   }
   return saved?0:1;
 }

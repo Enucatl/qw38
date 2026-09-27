@@ -1,4 +1,5 @@
 #include "cuda/gdn.hpp"
+#include "src/runtime/profiling.hpp"
 
 #include "cuda/activation.hpp"
 #include "cuda/prefill.hpp"
@@ -10,6 +11,7 @@
 #include <string_view>
 
 namespace qw38::cuda {
+namespace profiling = qw38::runtime::profiling;
 namespace {
 
 inline constexpr std::uint32_t kGdnKernelHeadDim = 128;
@@ -419,6 +421,8 @@ std::expected<void, Error> launch_gdn_conv_silu(
       static_cast<unsigned>(kGdnConvThreads);
   auto guard = stream.activate();
   if (!guard) return std::unexpected(guard.error());
+  profiling::ScopedRange range("qw38:op name=gdn_conv_silu m=%u n=%u k=%u",
+      1u, unsigned(kGdnQkvWidth), unsigned(kGdnConvKernel));
   gdn_conv_silu_kernel<<<blocks, kGdnConvThreads, 0, stream.native()>>>(
       qkv, taps, history, cursor, convolved, control, cursor_index);
   return check(cudaGetLastError(), "gdn_conv_silu_kernel");
@@ -444,6 +448,8 @@ std::expected<void, Error> launch_gdn_prefill_conv(
   if (!guard) return std::unexpected(guard.error());
   dim3 const grid{(kGdnQkvWidth + kGdnConvThreads - 1u) / kGdnConvThreads,
                   valid_tokens};
+  profiling::ScopedRange range("qw38:op name=gdn_conv_silu m=%u n=%u k=%u",
+      unsigned(valid_tokens), unsigned(kGdnQkvWidth), unsigned(kGdnConvKernel));
   gdn_prefill_conv_kernel<<<grid, kGdnConvThreads, 0, stream.native()>>>(
       qkv, taps, history, cursor, convolved, valid_tokens);
   return check(cudaGetLastError(), "gdn_prefill_conv_kernel");
@@ -464,6 +470,8 @@ std::expected<void, Error> launch_gdn_prefill_history_commit(
       !st) return st;
   auto guard = stream.activate();
   if (!guard) return std::unexpected(guard.error());
+  profiling::ScopedRange range("qw38:op name=gdn_history_commit m=%u n=%u k=%u",
+      unsigned(valid_tokens), unsigned(kGdnQkvWidth), unsigned(kGdnConvHistoryTaps));
   gdn_prefill_history_commit_kernel<<<
       (kGdnQkvWidth + kGdnConvThreads - 1u) / kGdnConvThreads,
       kGdnConvThreads, 0, stream.native()>>>(qkv, history, cursor, valid_tokens);
@@ -494,6 +502,8 @@ std::expected<void, Error> launch_gdn_prepare(
   }
   auto guard = stream.activate();
   if (!guard) return std::unexpected(guard.error());
+  profiling::ScopedRange range("qw38:op name=gdn_prepare m=%u n=%u k=%u",
+      1u, unsigned(kGdnKeyHeads), unsigned(kGdnKernelHeadDim));
   gdn_prepare_kernel<<<kGdnKeyHeads, kGdnPrepThreads, 0, stream.native()>>>(
       convolved, a, b, a_log, dt_bias, eps, q_hat, k_hat, alpha, beta);
   return check(cudaGetLastError(), "gdn_prepare_kernel");
@@ -524,6 +534,8 @@ std::expected<void, Error> launch_gdn_prefill_prepare(
   auto guard = stream.activate();
   if (!guard) return std::unexpected(guard.error());
   dim3 const grid{kGdnKeyHeads, valid_tokens};
+  profiling::ScopedRange range("qw38:op name=gdn_prepare m=%u n=%u k=%u",
+      unsigned(valid_tokens), unsigned(kGdnKeyHeads), unsigned(kGdnKernelHeadDim));
   gdn_prepare_kernel<<<grid, kGdnPrepThreads, 0, stream.native()>>>(
       convolved, a, b, a_log, dt_bias, eps, q_hat, k_hat, alpha, beta);
   return check(cudaGetLastError(), "gdn_prefill_prepare_kernel");
@@ -557,6 +569,8 @@ std::expected<void, Error> launch_gdn_recurrence(
   float* layer_s = s + static_cast<std::size_t>(s_layer) * kGdnSElemsPerLayer;
   auto guard = stream.activate();
   if (!guard) return std::unexpected(guard.error());
+  profiling::ScopedRange range("qw38:op name=gdn_recurrence m=%u n=%u k=%u",
+      1u, unsigned(kGdnValueHeads), unsigned(kGdnKernelHeadDim));
   gdn_recurrence_kernel<<<kGdnRecurBlocksPerLayer, kGdnRecurThreads, 0,
                           stream.native()>>>(q_hat, k_hat, alpha, beta, v, layer_s,
                                            o);
@@ -589,6 +603,8 @@ std::expected<void, Error> launch_gdn_prefill_recurrence(
   for (std::uint32_t first = 0; first < valid_tokens; first += interval) {
     std::uint32_t const count =
         first + interval < valid_tokens ? interval : valid_tokens - first;
+    profiling::ScopedRange range("qw38:op name=gdn_recurrence m=%u n=%u k=%u token_offset=%u",
+        unsigned(count), unsigned(kGdnValueHeads), unsigned(kGdnKernelHeadDim), unsigned(first));
     gdn_prefill_recurrence_kernel<<<kGdnRecurBlocksPerLayer, kGdnRecurThreads,
                                     0, stream.native()>>>(
         q_hat, k_hat, alpha, beta, convolved, layer_s, o, first, count);

@@ -45,12 +45,16 @@ class LanguageModelPlan {
       std::span<std::uint32_t const> token_ids);
   // Logits passed to the sink are valid only during the callback. A returned
   // error or thrown exception poisons the session until reset/restore.
+  // For partitioned replay, logical_prompt_tokens is the same incoming total
+  // on every partition; otherwise the complete input span defines the regime.
+  // It excludes any preexisting prefix and does not latch session state.
   using LogitRowSink = std::function<std::expected<void, Error>(
       std::uint64_t, std::span<float const>)>;
   [[nodiscard]] std::expected<DecodeResult, Error> prefill_tokens(
       std::span<std::uint32_t const> token_ids,
       std::span<std::uint64_t const> requested_rows = {},
-      LogitRowSink const& sink = {});
+      LogitRowSink const& sink = {},
+      std::optional<std::uint64_t> logical_prompt_tokens = std::nullopt);
 
  private:
   struct PrefillState {

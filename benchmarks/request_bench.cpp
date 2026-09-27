@@ -259,6 +259,7 @@ struct Engine {
           (q8_mlp && digest.str() == "6ebcc402487aa92d4a6bb7d64ccfff00c20d74a738ac7e3fa2166522f4b35ff5"),
           "artifact differs from the accepted control or frozen candidate");
     out << "\"manifest_digest\":\"" << digest.str() << "\",\"capacity_requested\":" << capacity
+        << ",\"precision_policy\":" << unsigned(model.schema().precision.id)
         << ",\"capacity_allocated\":" << session.kv_capacity()
         << ",\"model_device_bytes\":" << model.device_bytes()
         << ",\"q8_mlp_workspace_bytes\":" << session.q8_mlp_workspace().size()
@@ -299,8 +300,8 @@ int main(int argc, char** argv) {
   std::string const mode(argv[3]);
   auto const depth = number(argv[4]);
   check(mode == "prefill" || mode == "decode" || mode == "request" || mode == "development", "invalid workload");
-  check(mode != "development" || depth == 256 || depth == 4096,
-        "development check requires frozen 256- or 4096-token prompt");
+  check(mode != "development" || depth == 256 || depth == 4096 || depth == 32768,
+        "development check requires frozen 256-, 4096- or 32768-token prompt");
   check(depth > 0 && depth <= 32768, "invalid depth");
   auto tokens = read_ids(argv[2], depth + 128);
   auto prompt = std::span<std::uint32_t const>{tokens}.first(depth);
@@ -308,6 +309,7 @@ int main(int argc, char** argv) {
   check(bool(out), "cannot open output");
   out << std::setprecision(17);
   qw38::runtime::profiling::enabled = std::getenv("QW38_PROFILE") != nullptr;
+  qw38::runtime::profiling::ScopedRange setup_range("qw38:phase name=setup");
   auto start = Clock::now();
   {
     qw38::runtime::profiling::ScopedRange range("cuda_initialization");
@@ -320,8 +322,11 @@ int main(int argc, char** argv) {
   Engine engine(argv[1], depth + 128, out);
   synchronize_gpu();
   out << ",\"cold_setup_ms\":" << elapsed(start) << ",\"cuda_init_ms\":" << cuda_init_ms
+      << ",\"telemetry_schema\":1,\"profiling_enabled\":"
+      << (qw38::runtime::profiling::enabled ? "true" : "false")
       << ",\"initial_free_bytes\":" << initial_free
       << ",\"after_bind_free_bytes\":" << free_bytes() << "}\n";
+  setup_range.close();
   // A fresh session is consumed exactly once. Only populated-decode setup
   // needs a prompt outside the timer; requests include first-use setup costs.
   double populated_setup_ms = 0;

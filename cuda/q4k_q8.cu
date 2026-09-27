@@ -1,4 +1,5 @@
 #include "cuda/q4k_q8.hpp"
+#include "src/runtime/profiling.hpp"
 #include "cuda/graph.hpp"
 #include "cuda/activation.hpp"
 #include "cuda/prefill.hpp"
@@ -11,6 +12,7 @@
 #include <limits>
 
 namespace qw38::cuda {
+namespace profiling = qw38::runtime::profiling;
 namespace {
 // Adapted from llama.cpp e6ab7c1a41054a888ada952eab4c886444c2f5ad:
 // mmq-config-{blackwell,ampere}, mmq-load-tiles, mmq-vec-dot, mma and vecdotq.
@@ -294,7 +296,10 @@ std::expected<void,Error> valid_weight(PrefillWeight w) {
     return std::unexpected(make_error(ErrorCode::InvalidArgument,"q8.weight","Q4_K geometry required"));
   return {};
 }
-std::expected<void,Error> project(PrefillWeight w,Q8Input x,float* out,float const* residual,Stream const& s) {
+std::expected<void,Error> project(PrefillWeight w,Q8Input x,float* out,float const* residual,Stream const& s, char const* role = "projection") {
+  profiling::ScopedRange range("qw38:op name=q4k_project m=%u n=%u k=%u role=%s residual=%u compute=%s",
+      unsigned(x.m), unsigned(w.n), unsigned(w.k), role, unsigned(residual != nullptr),
+      x.m == 1 ? "integer_dp4a" : "integer_mma");
   if (x.m==1) {
     auto kernel=(reinterpret_cast<std::uintptr_t>(w.codes)%16==0 &&
         reinterpret_cast<std::uintptr_t>(x.codes.data())%16==0)?mmvq<true>:mmvq<false>;
@@ -318,6 +323,8 @@ std::expected<void,Error> pack_q8(std::span<std::uint16_t const> input,Q8Input x
       Region{x.scales.data(),x.scales.size_bytes(),4},Region{x.sums.data(),x.sums.size_bytes(),4},Region{failure.data(),4,4}};
   if (auto st=distinct(regions,stream);!st) return st;
   auto guard=stream.activate();if(!guard)return std::unexpected(guard.error());
+  profiling::ScopedRange range("qw38:op name=q8_pack m=%u n=%u k=%u",
+      unsigned(x.m), unsigned(x.k), 1u);
   pack_kernel<<<dim3(x.padded_k/256,x.m),256,0,stream.native()>>>(input.data(),x.codes.data(),x.scales.data(),x.sums.data(),x.k,x.padded_k,failure.data());
   return check(cudaGetLastError(),"q8.pack");
 }
@@ -365,19 +372,26 @@ std::expected<void,Error> q4k_q8_mlp(PrefillWeight const& gate,PrefillWeight con
   auto* failure=pending_failure ? pending_failure : reinterpret_cast<int*>(u+std::size_t(m)*17408);
   auto fail=[&](Error e)->std::expected<void,Error> { if (!pending_failure) (void)stream.sync();return std::unexpected(std::move(e)); };
   submitted=true;
-  if (!pending_failure)
+  if (!pending_failure) {
+    profiling::ScopedRange range("qw38:op name=q8_clear_failure bytes=4");
     if(auto st=check(cudaMemsetAsync(failure,0,4,stream.native()),"q8.clear_failure");!st)return fail(st.error());
+  }
   if(auto st=launch_hidden_rms_q8(residual,gamma,eps,m,codes,scales,sums,failure,stream);!st)return fail(st.error());
   Q8Input x{{codes,std::size_t(m)*5120},{scales,std::size_t(m)*160},{sums,std::size_t(m)*160},m,5120,5120};
-  if(auto st=project(gate,x,g,nullptr,stream);!st)return fail(st.error());
-  if(auto st=project(up,x,u,nullptr,stream);!st)return fail(st.error());
+  if(auto st=project(gate,x,g,nullptr,stream,"gate");!st)return fail(st.error());
+  if(auto st=project(up,x,u,nullptr,stream,"up");!st)return fail(st.error());
+  profiling::ScopedRange swiglu("qw38:op name=swiglu_q8_pack m=%u n=%u k=%u",
+      unsigned(m), 17408u, 1u);
   swiglu_pack_kernel<<<m*17408/256,256,0,stream.native()>>>(g,u,codes,scales,sums,failure);
   if(auto st=check(cudaGetLastError(),"q8.swiglu_pack");!st)return fail(st.error());
+  swiglu.close();
   x={{codes,std::size_t(m)*17408},{scales,std::size_t(m)*544},{sums,std::size_t(m)*544},m,17408,17408};
-  if(auto st=project(down,x,output,residual,stream);!st)return fail(st.error());
+  if(auto st=project(down,x,output,residual,stream,"down");!st)return fail(st.error());
   if (pending_failure) return {};
   int bad=0;
+  profiling::ScopedRange readback("qw38:op name=q8_failure_readback bytes=4");
   if(auto st=check(cudaMemcpyAsync(&bad,failure,4,cudaMemcpyDeviceToHost,stream.native()),"q8.failure");!st)return fail(st.error());
+  readback.close();
   if(auto st=stream.sync();!st)return st;
   if(bad)return std::unexpected(make_error(ErrorCode::InvalidArgument,"q8.producer","nonfinite producer or invalid Q8 scale"));
   return {};

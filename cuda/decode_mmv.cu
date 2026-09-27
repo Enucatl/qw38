@@ -1,4 +1,5 @@
 #include "cuda/decode_mmv.hpp"
+#include "src/runtime/profiling.hpp"
 #include "cuda/fp8.hpp"
 #include "cuda/nvfp4_device.cuh"
 
@@ -8,6 +9,7 @@
 #include <limits>
 
 namespace qw38::cuda {
+namespace profiling = qw38::runtime::profiling;
 namespace {
 
 enum class WeightKind { NvFp4, Q4, Q4K, Q8, Bf16 };
@@ -556,6 +558,8 @@ std::expected<void, Error> launch_kind(DecodeMmvDesc const& a,
       DirectInput ? 0u : a.padded_k * sizeof(std::uint16_t);
   auto guard = stream.activate();
   if (!guard) return std::unexpected(guard.error());
+  profiling::ScopedRange range("qw38:op name=decode_mmv m=%u n=%u k=%u paired=%u layout=%u epilogue=%u compute=scalar_fp32",
+      1u, unsigned(a.n), unsigned(a.k), unsigned(Paired), unsigned(a.codes.layout), unsigned(a.epilogue));
   decode_mmv_kernel<Kind, Paired, DirectInput>
       <<<blocks, kDecodeThreads, shared_bytes, stream.native()>>>(
       static_cast<std::byte const*>(a.codes.pointer),
@@ -711,6 +715,8 @@ std::expected<void, Error> launch_range_kind(
   unsigned const blocks = tiles0 + tiles1 + tiles2;
   auto guard = stream.activate();
   if (!guard) return std::unexpected(guard.error());
+  profiling::ScopedRange range("qw38:op name=decode_mmv_ranges m=%u n=%u k=%u ranges=%u layout=%u compute=scalar_fp32",
+      1u, unsigned(d0.n + d1.n + (d2 ? d2->n : 0u)), unsigned(d0.k), unsigned(ranges.size()), unsigned(d0.codes.layout));
   decode_mmv_ranges_kernel<Kind><<<blocks, kDecodeThreads, 0, stream.native()>>>(
       static_cast<std::byte const*>(d0.codes.pointer),
       static_cast<std::byte const*>(d0.scales.pointer), d0.output.pointer, d0.n,
@@ -832,7 +838,10 @@ std::expected<void, Error> launch_decode_mmv_ranges(DecodeMmvRangeDesc const& de
     return launch_range_kind<WeightKind::Q4>(desc.ranges, stream);
   }
   if (first.layout == kDecodeLayoutFp8V1) {
-    for (auto const& d : desc.ranges) if (auto result = fp8_decode(d, stream); !result) return result;
+    for (std::size_t i = 0; i < desc.ranges.size(); ++i) {
+      profiling::ScopedRange range("qw38:op name=fp8_projection role_index=%u", unsigned(i));
+      if (auto result = fp8_decode(desc.ranges[i], stream); !result) return result;
+    }
     return {};
   }
   if (first.layout == kDecodeLayoutQ8G32V0 ||

@@ -13,6 +13,7 @@ add_library(qw38_format STATIC
   format/fp8.cpp
 )
 target_include_directories(qw38_format PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
+target_include_directories(qw38_format SYSTEM PRIVATE ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
 target_compile_features(qw38_format PUBLIC cxx_std_23)
 target_compile_options(qw38_format PRIVATE
   $<$<COMPILE_LANGUAGE:CXX>:-Wall -Wextra -Wpedantic>

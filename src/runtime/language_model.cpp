@@ -282,16 +282,19 @@ std::expected<qw38::cuda::DecodeControl, Error> LanguageModelPlan::pending(
 std::expected<void, Error> LanguageModelPlan::enqueue_decode(
     qw38::cuda::DecodeControl const& p, qw38::cuda::DecodeControl const* controls,
     std::uint64_t bucket) {
+  profiling::ScopedRange input_range("qw38:op name=decode_input m=1");
   if (auto st = qw38::cuda::zero(unit_failure_, *stream_); !st)
     return std::unexpected(from_cuda(st.error()));
   if (auto st = qw38::cuda::launch_embed_gather(
           embedding_, kVocab, p.token, residual_, *stream_, controls); !st)
     return std::unexpected(from_cuda(st.error()));
+  input_range.close();
   for (auto const& layer : layers_) {
     auto result = detail::Submission::layer(layer, p, controls, bucket,
         static_cast<int*>(unit_failure_.data()));
     if (!result) return std::unexpected(result.error());
   }
+  profiling::ScopedRange readout_range("qw38:op name=readout m=1");
   if (auto st = qw38::cuda::launch_hidden_rms(
           residual_, final_gamma_, kMlpRmsEps, 1, normalized_, *stream_); !st)
     return std::unexpected(from_cuda(st.error()));
@@ -301,11 +304,16 @@ std::expected<void, Error> LanguageModelPlan::enqueue_decode(
 }
 
 std::expected<void, Error> LanguageModelPlan::complete_unit() {
+  profiling::ScopedRange range("qw38:host name=complete_unit");
+  profiling::ScopedRange transfer("qw38:op name=status_readback");
   auto* host = reinterpret_cast<int*>(static_cast<std::byte*>(readback_.data()) +
       kLogitsBytesPerToken + sizeof(qw38::cuda::DecodeControl));
   if (auto st = qw38::cuda::copy_d2h(host, unit_failure_.data(), sizeof(int), *stream_); !st)
     return std::unexpected(from_cuda(st.error()));
+  transfer.close();
+  profiling::ScopedRange wait("qw38:host name=completion_wait");
   if (auto st = stream_->sync(); !st) return std::unexpected(from_cuda(st.error()));
+  wait.close();
   if (*host)
     return std::unexpected(from_cuda(qw38::cuda::make_error(
         qw38::cuda::ErrorCode::InvalidArgument, "q8.producer",
@@ -318,6 +326,8 @@ std::expected<void, Error> LanguageModelPlan::prepare_graph(
   auto const bucket = std::min(kv_capacity_,
       std::bit_ceil(std::max<std::uint64_t>(256, p.populated)));
   if (!graph_.empty() && graph_bucket_ == bucket) return {};
+  profiling::ScopedRange capture_range("qw38:phase name=graph_capture bucket=%llu",
+      static_cast<unsigned long long>(bucket));
   // Calls occur only at completed token boundaries. No warmup inference.
   graph_ = {};
   graph_bucket_ = 0;
@@ -350,7 +360,9 @@ std::expected<void, Error> LanguageModelPlan::prepare_graph(
 std::expected<DecodeResult, Error> LanguageModelPlan::decode_token(
     std::uint32_t token_id, std::uint64_t position) {
   profiling::ScopedRange token_range("decode_token");
+  profiling::ScopedRange validation_range("qw38:host name=decode_validate");
   auto p = pending(token_id, position, 1);
+  validation_range.close();
   if (!p) return std::unexpected(p.error());
   char detail[96] = "decode_token_detail";
   if (profiling::enabled) {
@@ -364,6 +376,15 @@ std::expected<DecodeResult, Error> LanguageModelPlan::decode_token(
         static_cast<unsigned long long>(bucket), graph);
   }
   profiling::ScopedRange detail_range(detail);
+  auto const telemetry_bucket = std::min(kv_capacity_,
+      std::bit_ceil(std::max<std::uint64_t>(256, p->populated)));
+  profiling::ScopedRange phase_range(
+      "qw38:phase name=decode position=%llu populated=%llu bucket=%llu graph=%s",
+      static_cast<unsigned long long>(position),
+      static_cast<unsigned long long>(p->populated),
+      static_cast<unsigned long long>(telemetry_bucket),
+      submission_ != DecodeSubmission::Graph || graph_failure_ ? "eager" :
+      graph_.empty() || graph_bucket_ != telemetry_bucket ? "build" : "replay");
   auto fail = [&](Error error) -> std::expected<DecodeResult, Error> {
     state_->poison();
     (void)stream_->sync(); // Drain before any borrowed/owned staging may die.
@@ -378,20 +399,25 @@ std::expected<DecodeResult, Error> LanguageModelPlan::decode_token(
     }
   }
   if (replay) {
+    profiling::ScopedRange input_range("qw38:op name=decode_control_upload");
     auto* host = reinterpret_cast<qw38::cuda::DecodeControl*>(
         static_cast<std::byte*>(readback_.data()) + kLogitsBytesPerToken);
     *host = *p;
     if (auto st = qw38::cuda::copy_h2d(controls_.data(), host, sizeof(*host), *stream_); !st)
       return fail(from_cuda(st.error()));
+    input_range.close();
     if (auto st = graph_.launch(*stream_); !st) return fail(from_cuda(st.error()));
     ++graph_replays_;
   } else {
     if (auto st = enqueue_decode(*p, nullptr, 0); !st) return fail(st.error());
   }
+  profiling::ScopedRange readback_range("qw38:op name=logits_readback");
   if (auto st = qw38::cuda::copy_d2h(logits_.data(), device_logits_,
                                      kLogitsBytesPerToken, *stream_); !st)
     return fail(from_cuda(st.error()));
+  readback_range.close();
   if (auto st = complete_unit(); !st) return fail(st.error());
+  profiling::ScopedRange argmax_range("qw38:host name=argmax");
   std::uint32_t best = 0;
   for (std::uint32_t i = 0; i < kVocab; ++i) {
     if (!std::isfinite(logits_[i]))
@@ -399,6 +425,8 @@ std::expected<DecodeResult, Error> LanguageModelPlan::decode_token(
                              "language head produced a non-finite logit"));
     if (logits_[i] > logits_[best]) best = i;
   }
+  argmax_range.close();
+  profiling::ScopedRange commit_range("qw38:host name=state_commit");
   state_->commit_unit(1);
   return DecodeResult{.logits = logits_, .argmax = best};
 }
@@ -420,6 +448,7 @@ std::expected<DecodeResult, Error> LanguageModelPlan::setup_prompt_slow(
 
 std::expected<void, Error> LanguageModelPlan::initialize_prefill() {
   if (prefill_) return {};
+  profiling::ScopedRange range("qw38:host name=prefill_initialize");
   try {
     PrefillState state;
     constexpr auto capacity = static_cast<std::uint32_t>(kArenaTokenCapacity);
@@ -459,12 +488,24 @@ std::expected<void, Error> LanguageModelPlan::initialize_prefill() {
 std::expected<DecodeResult, Error> LanguageModelPlan::prefill_tokens(
     std::span<std::uint32_t const> token_ids,
     std::span<std::uint64_t const> requested_rows,
-    LogitRowSink const& sink) {
+    LogitRowSink const& sink,
+    std::optional<std::uint64_t> logical_prompt_tokens) {
   if (!state_ || state_->is_poisoned() || state_->busy_ || !stream_ || stream_->empty()) {
     return std::unexpected(make_error(ErrorCode::InvalidArgument, "session",
                                       "session is poisoned or closed"));
   }
   auto const first = state_->token_position();
+  auto const prompt_tokens = logical_prompt_tokens.value_or(token_ids.size());
+  profiling::ScopedRange phase_range(
+      "qw38:phase name=prefill tokens=%llu logical_tokens=%llu prefix=%llu",
+      static_cast<unsigned long long>(token_ids.size()),
+      static_cast<unsigned long long>(prompt_tokens), static_cast<unsigned long long>(first));
+  if (prompt_tokens < token_ids.size() || prompt_tokens == 0 || prompt_tokens > kv_capacity_)
+    return std::unexpected(make_error(ErrorCode::InvalidCapacity, "prefill.prompt",
+                                      "logical prompt total must contain the span and fit capacity"));
+  auto const regime = qw38::cuda::context_regime(prompt_tokens);
+  profiling::ScopedRange regime_range(regime == qw38::cuda::ContextRegime::Small
+      ? "prefill_regime_small" : "prefill_regime_large");
   if (token_ids.empty() || first >= kv_capacity_ ||
       token_ids.size() > kv_capacity_ - first ||
       first > static_cast<std::uint64_t>(std::numeric_limits<std::int32_t>::max()) ||
@@ -506,11 +547,17 @@ std::expected<DecodeResult, Error> LanguageModelPlan::prefill_tokens(
     auto const count = static_cast<std::uint32_t>(std::min<std::size_t>(
         kArenaTokenCapacity, token_ids.size() - offset));
     auto const position = first + offset;
+    profiling::ScopedRange chunk_range(
+        "qw38:phase name=chunk m=%u prefix=%llu logical_tokens=%llu regime=%s",
+        count, static_cast<unsigned long long>(position),
+        static_cast<unsigned long long>(prompt_tokens),
+        regime == qw38::cuda::ContextRegime::Small ? "small" : "large");
     auto chunk_pending = *initial_pending;
     chunk_pending.position = position;
     chunk_pending.populated = position + count;
     for (auto& cursor : chunk_pending.cursor)
       cursor = (cursor + offset % kConvTaps) % kConvTaps;
+    profiling::ScopedRange input_range("qw38:op name=prefill_input m=%u", count);
     if (auto st = qw38::cuda::zero(unit_failure_, *stream_); !st)
       return fail(from_cuda(st.error()));
     if (auto st = qw38::cuda::copy_h2d(p.token_ids.data(), token_ids.data() + offset,
@@ -523,7 +570,11 @@ std::expected<DecodeResult, Error> LanguageModelPlan::prefill_tokens(
             embedding_, kVocab, static_cast<std::uint32_t const*>(p.token_ids.data()),
             count, residual, *stream_); !st)
       return fail(from_cuda(st.error()));
+    input_range.close();
+    unsigned layer_index = 0;
     for (auto& layer : prefill_layers_) {
+      profiling::ScopedRange layer_range("qw38:layer layer=%u kind=%s m=%u",
+          layer_index++, std::holds_alternative<PrefillGdnLayerPlan>(layer) ? "gdn" : "attention", count);
       std::expected<void, Error> status;
       if (auto* gdn = std::get_if<PrefillGdnLayerPlan>(&layer))
         status = detail::Submission::prefill_gdn(*gdn, p.gdn_workspace, p.engine,
@@ -531,7 +582,7 @@ std::expected<DecodeResult, Error> LanguageModelPlan::prefill_tokens(
       else
         status = detail::Submission::prefill_attention(
             std::get<PrefillAttentionLayerPlan>(layer), p.attention_workspace,
-            p.engine, residual, h_mid, next, count, position, false, static_cast<int*>(unit_failure_.data()));
+            p.engine, residual, h_mid, next, count, position, false, static_cast<int*>(unit_failure_.data()), regime);
       if (!status) return fail(status.error());
       auto* old = residual;
       residual = next;
@@ -540,6 +591,7 @@ std::expected<DecodeResult, Error> LanguageModelPlan::prefill_tokens(
     }
     bool completed = false;
     auto readout = [&](std::uint32_t row) -> std::expected<std::uint32_t, Error> {
+      profiling::ScopedRange readout_range("qw38:op name=readout m=1 row=%u", row);
       if (auto st = qw38::cuda::launch_hidden_rms(
               residual + static_cast<std::uint64_t>(row) * kHidden,
               final_gamma_, kMlpRmsEps, 1, normalized_, *stream_); !st)
@@ -547,11 +599,15 @@ std::expected<DecodeResult, Error> LanguageModelPlan::prefill_tokens(
       if (auto st = p.engine.head_generation(p.head, normalized_, 1,
                                              position + row, device_logits_); !st)
         return std::unexpected(from_cuda(st.error()));
+      readout_range.close();
+      profiling::ScopedRange readback_range("qw38:op name=logits_readback");
       if (auto st = qw38::cuda::copy_d2h(logits_.data(), device_logits_,
                                          kLogitsBytesPerToken, *stream_); !st)
         return std::unexpected(from_cuda(st.error()));
+      readback_range.close();
       if (auto st = complete_unit(); !st) return std::unexpected(st.error());
       completed = true;
+      profiling::ScopedRange argmax_range("qw38:host name=argmax");
       std::uint32_t argmax = 0;
       for (std::uint32_t i = 0; i < kVocab; ++i) {
         if (!std::isfinite(logits_[i]))
@@ -595,6 +651,7 @@ std::expected<DecodeResult, Error> LanguageModelPlan::prefill_tokens(
     if (!completed) {
       if (auto st = complete_unit(); !st) return fail(st.error());
     }
+    profiling::ScopedRange commit_range("qw38:host name=state_commit");
     state_->commit_unit(count);
     offset += count;
   }

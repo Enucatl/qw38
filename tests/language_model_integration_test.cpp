@@ -2,6 +2,7 @@
 #include "runtime/runtime.hpp"
 #include "runtime/profiling.hpp"
 #include "cuda/alloc.hpp"
+#include "cuda/attention.hpp"
 #include "cuda/copy.hpp"
 
 #include <algorithm>
@@ -160,6 +161,102 @@ int main(int argc, char** argv) {
               << " first_decode_completed=true maximum_graph_upload_completed=true\n";
   }
   if (capacity_only) return 0;
+  // FAST-04: logical incoming length survives both internal chunks and public
+  // replay partitions. The same chunks give exact outputs/state, without a
+  // session-latched regime. Profile ranges record the real consumer launches.
+  {
+    using Access = LanguageModelPlanTestAccess;
+    auto regime_session = runtime->create_session(*model, 4100);
+    if (!regime_session) return fail("regime session");
+    auto regime_plan = LanguageModelPlan::bind(*model, *regime_session, runtime->stream());
+    if (!regime_plan) return fail("regime plan");
+    std::vector<std::uint32_t> ids(4097);
+    for (unsigned i = 0; i < ids.size(); ++i) ids[i] = 1 + i % 19;
+    auto const input = std::span<std::uint32_t const>(ids);
+    for (unsigned total : {4095u, 4096u, 4097u}) {
+      if (!regime_session->reset()) return fail("regime reset");
+      profiling::ScopedRange range(total == 4095 ? "logical_4095"
+          : total == 4096 ? "logical_4096" : "logical_4097");
+      auto whole = regime_plan->prefill_tokens(input.first(total));
+      if (!whole) return fail("logical prompt prefill");
+      std::vector<float> logits(whole->logits.begin(), whole->logits.end());
+      auto state = regime_session->save();
+      if (!state || !regime_session->reset()) return fail("logical prompt snapshot");
+      for (unsigned offset = 0; offset < total;) {
+        auto const count = std::min(512u, total - offset);
+        auto part = regime_plan->prefill_tokens(input.subspan(offset, count), {}, {}, total);
+        if (!part) return fail("logical partition prefill");
+        offset += count;
+        if (offset == total && !std::equal(part->logits.begin(), part->logits.end(), logits.begin()))
+          return fail("bitwise logical partition logits");
+      }
+      auto replay = regime_session->save();
+      if (!replay || !equal_state(*state, *replay)) return fail("bitwise logical partition state");
+      std::cout << "logical_prompt=" << total << " internal/explicit M512 partition exact PASS\n";
+    }
+    if (!regime_session->reset()) return fail("logical validation reset");
+    auto clean = regime_session->save();
+    for (std::uint64_t invalid : {0ull, 510ull, 4101ull})
+      if (regime_plan->prefill_tokens(input.first(511), {}, {}, invalid))
+        return fail("reject invalid logical total");
+    auto unchanged = regime_session->save();
+    if (!clean || !unchanged || !equal_state(*clean, *unchanged))
+      return fail("logical validation leaves state unchanged");
+    // A populated prefix is distinct from incoming length. Both regime totals
+    // and M511/512/513 run through the real caller and exact reset replay.
+    for (unsigned total : {4096u, 4097u}) for (unsigned count : {511u, 512u, 513u}) {
+      auto run = [&]() -> std::expected<DecodeResult, Error> {
+        if (auto st = regime_session->reset(); !st) return std::unexpected(st.error());
+        auto prefix = regime_plan->prefill_tokens(input.first(1));
+        if (!prefix) return prefix;
+        return regime_plan->prefill_tokens(input.subspan(1, count), {}, {}, total);
+      };
+      auto first = run();
+      if (!first) return fail("populated regime tail");
+      std::vector<float> logits(first->logits.begin(), first->logits.end());
+      auto state = regime_session->save();
+      auto replay = run();
+      auto replay_state = regime_session->save();
+      if (!state || !replay || !replay_state || !equal_state(*state, *replay_state) ||
+          !std::equal(replay->logits.begin(), replay->logits.end(), logits.begin()))
+        return fail("populated regime tail exact replay");
+      auto const selected = qw38::cuda::prefill_attention_schedule(
+          qw38::cuda::context_regime(total), std::min(count, 512u), 1);
+      std::cout << "logical_prompt=" << total << " prefix=1 tokens=" << count
+                << " heads=" << selected.heads << " keys=" << selected.key_tile << " PASS\n";
+    }
+    if (!regime_session->reset() || !regime_plan->prefill_tokens(input.first(4094)))
+      return fail("decode regime prefix");
+    for (unsigned position : {4094u, 4095u, 4096u}) {
+      auto before = regime_session->save();
+      regime_plan->set_decode_submission(DecodeSubmission::Eager);
+      auto eager = regime_plan->decode_token(7, position);
+      if (!before || !eager) return fail("regime eager");
+      std::vector<float> logits(eager->logits.begin(), eager->logits.end());
+      auto state = regime_session->save();
+      if (!state || !regime_session->restore(*before)) return fail("regime restore");
+      auto const builds = Access::builds(*regime_plan);
+      regime_plan->set_decode_submission(DecodeSubmission::Graph);
+      auto replay = regime_plan->decode_token(7, position);
+      auto replay_state = regime_session->save();
+      if (!replay || !replay_state || regime_plan->graph_fallback() ||
+          Access::builds(*regime_plan) != builds + (position == 4095 ? 0 : 1) ||
+          !std::equal(replay->logits.begin(), replay->logits.end(), logits.begin()) ||
+          !equal_state(*state, *replay_state)) return fail("regime graph/eager exact boundary");
+      std::cout << "visible=" << position + 1 << " capacity=4100 keys=256 graph/eager exact PASS\n";
+    }
+    // Fail in the large-regime tail after eight safe M512 commits.
+    if (!regime_session->reset()) return fail("regime failure reset");
+    std::array<std::uint64_t, 1> row{4096};
+    auto failed = regime_plan->prefill_tokens(input, row,
+        [](std::uint64_t, std::span<float const>) -> std::expected<void, Error> {
+          return std::unexpected(make_error(ErrorCode::Internal, "regime.failure", "late sink failure"));
+        });
+    if (failed || failed.error().field != "regime.failure" ||
+        !Access::uncommitted(*regime_plan, 4096) || regime_session->save() ||
+        !regime_session->restore(*clean) || !regime_plan->prefill_tokens(input.first(511)))
+      return fail("regime late failure/restore without premature commit");
+  }
   auto session = runtime->create_session(*model, 3);
   if (!session) return fail("create session");
   auto plan = LanguageModelPlan::bind(*model, *session, runtime->stream());

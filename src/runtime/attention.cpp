@@ -1033,8 +1033,11 @@ std::expected<void, Error> detail::Submission::attention_prep(
 std::expected<TensorView, Error> detail::Submission::attention_core(
     AttentionCorePlan const& plan, std::uint64_t populated,
     qw38::cuda::DecodeControl const* control, std::uint64_t bucket) {
+  auto const regime = qw38::cuda::context_regime(populated);
+  auto const keys = qw38::cuda::attention_decode_key_target(regime);
+  auto const launch_length = control ? bucket : populated;
   std::uint64_t const nseg64 = std::min<std::uint64_t>(
-      attn_segment_count(control ? bucket : populated), plan.partition_limit);
+      launch_length / keys + (launch_length % keys != 0), plan.partition_limit);
   if (nseg64 > std::numeric_limits<std::uint32_t>::max()) {
     if (plan.session_state != nullptr) plan.session_state->poison();
     return std::unexpected(arg_error("populated", "segment count exceeds CUDA launch range"));

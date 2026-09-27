@@ -43,7 +43,8 @@ std::vector<T> download(qw38::cuda::DeviceBuffer const& src, std::size_t n,
 
 bool scan_case(qw38::cuda::Stream const& stream, std::uint32_t first,
                std::uint32_t count, std::uint32_t query_tile,
-               bool signed_values = false, std::uint32_t capacity = C) {
+               bool signed_values = false, std::uint32_t capacity = C,
+               qw38::cuda::ContextRegime regime = qw38::cuda::ContextRegime::Large) {
   std::vector<std::uint16_t> q((count + 1u) * H * D), g(q.size());
   std::vector<std::uint16_t> kv(16u * 2u * KVH * capacity * D,
                                fp32_to_bf16_rne(777.0f));
@@ -88,13 +89,13 @@ bool scan_case(qw38::cuda::Stream const& stream, std::uint32_t first,
   if (qw38::cuda::launch_attention_prefill_scan(
           q.data(), static_cast<std::uint16_t const*>(dg->data()),
           static_cast<std::uint16_t const*>(dkv->data()), 0, capacity, first, count,
-          static_cast<std::uint16_t*>(dy->data()), stream, query_tile))
+          static_cast<std::uint16_t*>(dy->data()), stream, query_tile, nullptr, nullptr, regime))
     return false;
   auto st = qw38::cuda::launch_attention_prefill_scan(
       static_cast<std::uint16_t const*>(dq->data()),
       static_cast<std::uint16_t const*>(dg->data()),
       static_cast<std::uint16_t const*>(dkv->data()), 0, capacity, first, count,
-      static_cast<std::uint16_t*>(dy->data()), stream, query_tile);
+      static_cast<std::uint16_t*>(dy->data()), stream, query_tile, nullptr, nullptr, regime);
   if (!st) { std::cerr << qw38::cuda::error_message(st.error()) << '\n'; return false; }
   auto got = download<std::uint16_t>(*dy, q.size(), stream);
   if (got.size() != q.size()) return false;
@@ -105,13 +106,13 @@ bool scan_case(qw38::cuda::Stream const& stream, std::uint32_t first,
           static_cast<std::uint16_t const*>(dq->data()),
           static_cast<std::uint16_t const*>(dg->data()),
           static_cast<std::uint16_t const*>(dkv->data()), 0, capacity, capacity - count + 1u,
-          count, static_cast<std::uint16_t*>(dy->data()), stream, query_tile) ||
+          count, static_cast<std::uint16_t*>(dy->data()), stream, query_tile, nullptr, nullptr, regime) ||
       got != download<std::uint16_t>(*dy, q.size(), stream)) return false;
   if (!qw38::cuda::launch_attention_prefill_scan(
           static_cast<std::uint16_t const*>(dq->data()),
           static_cast<std::uint16_t const*>(dg->data()),
           static_cast<std::uint16_t const*>(dkv->data()), 0, capacity, first, count,
-          static_cast<std::uint16_t*>(dy->data()), stream, query_tile) ||
+          static_cast<std::uint16_t*>(dy->data()), stream, query_tile, nullptr, nullptr, regime) ||
       got != download<std::uint16_t>(*dy, q.size(), stream)) return false;
   // A fixed seven-partition bucket includes empty/tail splits for this length.
   // All six asymmetric siblings also exercise the masked eight-head MMA tile.
@@ -216,7 +217,7 @@ bool scan_case(qw38::cuda::Stream const& stream, std::uint32_t first,
           static_cast<std::uint16_t const*>(dq->data()), static_cast<std::uint16_t const*>(dg->data()),
           static_cast<std::uint16_t const*>(dkv->data()), 0, capacity, first, count,
           static_cast<std::uint16_t*>(dy->data()), stream, query_tile,
-          static_cast<std::uint8_t*>(codes->data()), static_cast<float*>(scales->data())) ||
+          static_cast<std::uint8_t*>(codes->data()), static_cast<float*>(scales->data()), regime) ||
         download<std::uint8_t>(*codes, padded * H * D, stream) !=
           download<std::uint8_t>(*reference_codes, padded * H * D, stream) ||
         download<float>(*scales, padded * H * 2, stream) !=
@@ -235,7 +236,7 @@ bool scan_case(qw38::cuda::Stream const& stream, std::uint32_t first,
         !qw38::cuda::launch_attention_prefill_scan(
           static_cast<std::uint16_t const*>(dq->data()), static_cast<std::uint16_t const*>(dg->data()),
           static_cast<std::uint16_t const*>(dkv->data()), 0, capacity, first, count,
-          static_cast<std::uint16_t*>(dy->data()), stream)) return false;
+          static_cast<std::uint16_t*>(dy->data()), stream, query_tile, nullptr, nullptr, regime)) return false;
     auto changed = download<std::uint16_t>(*dy, q.size(), stream);
     for (unsigned t = 0; t < count; ++t)
       for (unsigned h = 0; h < H; h += 2)
@@ -274,7 +275,7 @@ int main(int argc, char** argv) {
             << " blocks_per_sm=" << resources->occupancy_blocks_per_sm << '\n';
   auto paired = qw38::cuda::attention_prefill_resources(qw38::cuda::kAttnPrefillQueryTile, 512);
   if (!paired || paired->occupancy_blocks_per_sm == 0 || paired->local_bytes != 0 ||
-      paired->shared_bytes != resources->shared_bytes) return 1;
+      paired->shared_bytes * 2 != resources->shared_bytes) return 1;
   std::cout << "paired blocks=192 threads=256 registers=" << paired->registers
             << " shared_bytes=" << paired->shared_bytes << " local_bytes=" << paired->local_bytes
             << " blocks_per_sm=" << paired->occupancy_blocks_per_sm << '\n';
@@ -290,5 +291,10 @@ int main(int argc, char** argv) {
       !scan_case(*stream, 271, 65, qw38::cuda::kAttnPrefillQueryTile, true)) return 1;
   for (unsigned count : {255u, 256u, 257u, 511u, 512u, 513u})
     if (!scan_case(*stream, 33, count, qw38::cuda::kAttnPrefillQueryTile, true, 557)) return 1;
+  // Prefix-zero M512 alone selects paired K32. Later large-regime chunks
+  // above exercise per-head K64, including populated tails and scratch guards.
+  if (!scan_case(*stream, 0, 512, qw38::cuda::kAttnPrefillQueryTile, true, 557)) return 1;
+  if (!scan_case(*stream, 33, 512, qw38::cuda::kAttnPrefillQueryTile, true, 557,
+                 qw38::cuda::ContextRegime::Small)) return 1;
   return 0;
 }

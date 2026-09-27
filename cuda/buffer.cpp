@@ -1,9 +1,11 @@
 #include "cuda/buffer.hpp"
+#include "src/runtime/profiling.hpp"
 
 #include "cuda/alloc.hpp"
 #include "cuda/device.hpp"
 
 namespace qw38::cuda {
+namespace profiling = qw38::runtime::profiling;
 
 DeviceBuffer::DeviceBuffer(DeviceBuffer&& other) noexcept
     : ptr_(other.ptr_), bytes_(other.bytes_), device_(other.device_) {
@@ -32,6 +34,8 @@ cudaError_t DeviceBuffer::destroy() noexcept {
     return cudaSuccess;
   }
 
+  profiling::ScopedRange range("qw38:host name=buffer_free bytes=%llu device=%d",
+      static_cast<unsigned long long>(bytes_), device_);
   int previous = 0;
   bool const restore =
       cudaGetDevice(&previous) == cudaSuccess && previous != device_ &&
@@ -68,6 +72,8 @@ std::expected<DeviceBuffer, Error> DeviceBuffer::allocate(std::uint64_t bytes,
                                       "DeviceBuffer::allocate",
                                       "zero-byte device allocation"));
   }
+  profiling::ScopedRange range("qw38:host name=buffer_allocate bytes=%llu device=%d",
+      static_cast<unsigned long long>(bytes), device);
   auto guard = DeviceGuard::activate(device, "cudaSetDevice(buffer.allocate)");
   if (!guard) {
     return std::unexpected(guard.error());
@@ -95,6 +101,8 @@ std::expected<void, Error> zero(void* ptr, std::uint64_t bytes,
   if (!guard) {
     return std::unexpected(guard.error());
   }
+  profiling::ScopedRange range("qw38:op name=buffer_zero bytes=%llu",
+      static_cast<unsigned long long>(bytes));
   return check(cudaMemsetAsync(ptr, 0, static_cast<std::size_t>(bytes),
                                stream.native()),
                "cudaMemsetAsync");

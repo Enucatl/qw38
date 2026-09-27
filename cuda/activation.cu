@@ -1,4 +1,5 @@
 #include "cuda/activation.hpp"
+#include "src/runtime/profiling.hpp"
 #include "cuda/nvfp4_device.cuh"
 #include "cuda/fp8_device.cuh"
 #include "cuda/q8_device.cuh"
@@ -11,6 +12,7 @@
 #include <limits>
 
 namespace qw38::cuda {
+namespace profiling = qw38::runtime::profiling;
 namespace {
 
 __device__ __forceinline__ float bf16_to_fp32(std::uint16_t h) {
@@ -446,6 +448,8 @@ std::expected<void, Error> launch_embed_gather(std::uint16_t const* table,
   }
   auto guard = stream.activate();
   if (!guard) return std::unexpected(guard.error());
+  profiling::ScopedRange range("qw38:op name=embed_gather m=%u n=%u k=%u",
+      1u, unsigned(kHidden), unsigned(vocab));
   embed_gather_kernel<<<1, kHiddenRmsThreads, 0, stream.native()>>>(
       table, token_id, residual, control);
   return check(cudaGetLastError(), "embed_gather_kernel");
@@ -463,6 +467,8 @@ std::expected<void, Error> launch_embed_gather_chunk(
   }
   auto guard = stream.activate();
   if (!guard) return std::unexpected(guard.error());
+  profiling::ScopedRange range("qw38:op name=embed_gather m=%u n=%u k=%u",
+      unsigned(valid_tokens), unsigned(kHidden), unsigned(vocab));
   embed_gather_chunk_kernel<<<valid_tokens, kHiddenRmsThreads, 0,
                               stream.native()>>>(table, token_ids, residual);
   return check(cudaGetLastError(), "embed_gather_chunk_kernel");
@@ -491,6 +497,8 @@ std::expected<void, Error> launch_hidden_rms(float const* residual,
   }
   auto guard = stream.activate();
   if (!guard) return std::unexpected(guard.error());
+  profiling::ScopedRange range("qw38:op name=hidden_rms m=%u n=%u k=%u",
+      unsigned(n_tokens), unsigned(kHidden), 1u);
   hidden_rms_kernel<false><<<n_tokens, kHiddenRmsThreads, 0, stream.native()>>>(
       residual, gamma, eps, out_bf16);
   return check(cudaGetLastError(), "hidden_rms_kernel");
@@ -504,6 +512,8 @@ std::expected<void, Error> launch_hidden_rms_nvfp4(float const* residual,
     return std::unexpected(make_error(ErrorCode::InvalidArgument,"nvfp4.rms","invalid operands"));
   auto guard = stream.activate();
   if (!guard) return std::unexpected(guard.error());
+  profiling::ScopedRange range("qw38:op name=hidden_rms_nvfp4_pack m=%u n=%u k=%u",
+      unsigned(n_tokens), unsigned(kHidden), 1u);
   hidden_rms_kernel<true><<<((n_tokens+127)/128)*128,kHiddenRmsThreads,0,stream.native()>>>(
       residual,gamma,eps,nullptr,n_tokens,codes,scales);
   return check(cudaGetLastError(),"nvfp4.rms_pack");
@@ -516,6 +526,8 @@ std::expected<void, Error> launch_hidden_rms_fp8(float const* residual,
       !finite_pos(eps) || stream.empty())
     return std::unexpected(make_error(ErrorCode::InvalidArgument,"fp8.rms","invalid operands"));
   auto guard=stream.activate(); if(!guard) return std::unexpected(guard.error());
+  profiling::ScopedRange range("qw38:op name=hidden_rms_fp8_pack m=%u n=%u k=%u",
+      unsigned(n_tokens), unsigned(kHidden), 1u);
   hidden_rms_kernel<2><<<((n_tokens+127)/128)*128,kHiddenRmsThreads,0,stream.native()>>>(
       residual,gamma,eps,companion,n_tokens,codes,nullptr,scales);
   return check(cudaGetLastError(),"fp8.rms_pack");
@@ -528,6 +540,8 @@ std::expected<void, Error> launch_hidden_rms_q8(float const* residual,
       !m || m > kQ8MlpMaxTokens || !finite_pos(eps) || stream.empty())
     return std::unexpected(make_error(ErrorCode::InvalidArgument, "q8.rms", "invalid operands"));
   auto guard = stream.activate(); if (!guard) return std::unexpected(guard.error());
+  profiling::ScopedRange range("qw38:op name=hidden_rms_q8_pack m=%u n=%u k=%u",
+      unsigned(m), unsigned(kHidden), 1u);
   hidden_rms_kernel<3><<<m,kHiddenRmsThreads,0,stream.native()>>>(residual,gamma,eps,
       nullptr,m,reinterpret_cast<std::uint8_t*>(codes),nullptr,scales,sums,failure);
   return check(cudaGetLastError(), "q8.rms_pack");
@@ -564,6 +578,8 @@ std::expected<void, Error> launch_qk_rms_rope(
   float const pos = static_cast<float>(position);
   auto guard = stream.activate();
   if (!guard) return std::unexpected(guard.error());
+  profiling::ScopedRange range("qw38:op name=qk_rms_rope m=%u n=%u k=%u",
+      unsigned(n_heads), unsigned(kHeadDim), 1u);
   qk_rms_rope_kernel<<<n_heads, kHeadNormThreads, 0, stream.native()>>>(
       projected_heads_bf16, gamma, eps, inv_freq, pos, out_bf16);
   return check(cudaGetLastError(), "qk_rms_rope_kernel");
@@ -592,6 +608,8 @@ std::expected<void, Error> launch_qk_rms(float const* heads,
   }
   auto guard = stream.activate();
   if (!guard) return std::unexpected(guard.error());
+  profiling::ScopedRange range("qw38:op name=qk_rms m=%u n=%u k=%u",
+      unsigned(n_heads), unsigned(kHeadDim), 1u);
   qk_rms_kernel<<<n_heads, kHeadNormThreads, 0, stream.native()>>>(
       heads, gamma, eps, out_bf16);
   return check(cudaGetLastError(), "qk_rms_kernel");
@@ -622,6 +640,8 @@ std::expected<void, Error> launch_gdn_gated_rms(
   }
   auto guard = stream.activate();
   if (!guard) return std::unexpected(guard.error());
+  profiling::ScopedRange range("qw38:op name=gdn_gated_rms m=%u n=%u k=%u packed=%u",
+      unsigned(n_heads), unsigned(kGdnHeadDim), 1u, unsigned(fp8_codes != nullptr));
   if(fp8_codes || fp8_scales) {
     if(!fp8_codes || !fp8_scales || n_heads%48 || n_heads>1024*48)
       return std::unexpected(make_error(ErrorCode::InvalidArgument,"fp8.gdn_norm","invalid pack geometry"));
@@ -645,6 +665,8 @@ std::expected<void, Error> launch_sigmoid_fp32(float const* in, float* out,
   }
   auto guard = stream.activate();
   if (!guard) return std::unexpected(guard.error());
+  profiling::ScopedRange range("qw38:op name=sigmoid m=%u n=%u k=%u",
+      1u, unsigned(n), 1u);
   sigmoid_fp32_kernel<<<elementwise_blocks(n), 256, 0, stream.native()>>>(in,
                                                                          out, n);
   return check(cudaGetLastError(), "sigmoid_fp32_kernel");
@@ -663,6 +685,8 @@ std::expected<void, Error> launch_silu_fp32(float const* in, float* out,
   }
   auto guard = stream.activate();
   if (!guard) return std::unexpected(guard.error());
+  profiling::ScopedRange range("qw38:op name=silu m=%u n=%u k=%u",
+      1u, unsigned(n), 1u);
   silu_fp32_kernel<<<elementwise_blocks(n), 256, 0, stream.native()>>>(in, out,
                                                                       n);
   return check(cudaGetLastError(), "silu_fp32_kernel");
@@ -693,6 +717,8 @@ std::expected<void, Error> launch_partial_rope(std::uint16_t const* heads_bf16,
   float const pos = static_cast<float>(position);
   auto guard = stream.activate();
   if (!guard) return std::unexpected(guard.error());
+  profiling::ScopedRange range("qw38:op name=partial_rope m=%u n=%u k=%u",
+      unsigned(n_heads), unsigned(kHeadDim), 1u);
   partial_rope_kernel<<<n_heads, kHeadNormThreads, 0, stream.native()>>>(
       heads_bf16, inv_freq, pos, out_bf16);
   return check(cudaGetLastError(), "partial_rope_kernel");
@@ -712,11 +738,14 @@ std::expected<void, Error> launch_argmax_fp32(float const* logits,
   }
   auto guard = stream.activate();
   if (!guard) return std::unexpected(guard.error());
+  profiling::ScopedRange range("qw38:op name=argmax m=%u n=%u k=%u",
+      1u, unsigned(n), 1u);
   argmax_fp32_kernel<<<1, kHiddenRmsThreads, 0, stream.native()>>>(logits, n,
                                                                   out_index);
   if (auto launch = check(cudaGetLastError(), "argmax_fp32_kernel"); !launch) {
     return launch;
   }
+  range.close();
   std::uint32_t host_index = 0xffffffffu;
   if (auto copy = copy_d2h(&host_index, out_index, sizeof(host_index), stream);
       !copy) {

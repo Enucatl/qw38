@@ -43,8 +43,10 @@ def thermal() -> str:
     return command_output(
         [
             "nvidia-smi",
-            "--query-gpu=name,uuid,driver_version,memory.total,memory.used,temperature.gpu,"
-            "power.draw,power.limit,clocks.current.graphics,clocks.current.memory,pstate",
+            (
+                "--query-gpu=name,uuid,driver_version,memory.total,memory.used,temperature.gpu,"
+                "power.draw,power.limit,clocks.current.graphics,clocks.current.memory,pstate"
+            ),
             "--format=csv,noheader",
         ]
     )
@@ -268,7 +270,9 @@ def capture() -> None:
             }
             print(record["command"], flush=True)
             with prefix.with_suffix(".log").open("w") as log:
-                result = subprocess.run(command, stdout=log, stderr=subprocess.STDOUT)
+                result = subprocess.run(
+                    command, stdout=log, stderr=subprocess.STDOUT, check=False
+                )
             record.update(
                 exit_code=result.returncode,
                 thermal_after=thermal(),
@@ -387,12 +391,322 @@ def summarize() -> None:
     print(json.dumps(result, indent=2))
 
 
+def read_development(path: Path, depth: int) -> dict:
+    """Validate one frozen prompt followed by eight fixed continuation inputs."""
+    rows = [json.loads(line) for line in path.read_text().splitlines()]
+    if [row.get("kind") for row in rows] != [
+        "setup",
+        "diagnostic",
+        "sample",
+        "complete",
+    ]:
+        raise ValueError("incomplete or repeated telemetry workload")
+    result = {row["kind"]: row for row in rows}
+    if result["complete"] != {"kind": "complete", "runs": 1, "warmups": 0}:
+        raise ValueError("incomplete or repeated telemetry workload")
+    setup, sample = result["setup"], result["sample"]
+    if (
+        setup["capacity_requested"] != depth + 128
+        or setup["capacity_allocated"] < depth + 128
+    ):
+        raise ValueError("incorrect telemetry context capacity")
+    if type(setup["profiling_enabled"]) is not bool:
+        raise ValueError("invalid telemetry profiling flag")
+    if (
+        sample["row"] != f"development-{depth}"
+        or len(sample["steps_ms"]) != 8
+        or sample["final_position"] != depth + 8
+    ):
+        raise ValueError("incorrect telemetry request boundary")
+    if len(sample["output_ids"]) != 9 or any(
+        type(token) is not int or not 0 <= token < 248320
+        for token in sample["output_ids"]
+    ):
+        raise ValueError("invalid telemetry output token work")
+    if sample["finite_logits"] is not True or any(
+        not math.isfinite(value) or value <= 0
+        for value in [
+            sample["total_ms"],
+            sample["ttft_ms"],
+            sample["tail_ms"],
+            sample["free_bytes"],
+            *sample["steps_ms"],
+        ]
+    ):
+        raise ValueError("nonpositive or nonfinite telemetry measurement")
+    if (
+        sample["populated_setup_ms"] != 0
+        or not sample["ttft_ms"] < sample["total_ms"]
+        or abs(sample["total_ms"] - sample["ttft_ms"] - sample["tail_ms"]) > 1
+        or sum(sample["steps_ms"]) > sample["tail_ms"] + 1
+    ):
+        raise ValueError("telemetry timing accounting mismatch")
+    diagnostic = result["diagnostic"]
+    if (
+        type(diagnostic["next_fixed_token"]) is not int
+        or not 0 <= diagnostic["next_fixed_token"] < 248320
+        or not math.isfinite(diagnostic["target_nll"])
+        or diagnostic["target_nll"] < 0
+    ):
+        raise ValueError("invalid telemetry next-token diagnostic")
+    return result
+
+
+def telemetry_summary(report: dict, depth: int) -> str:
+    """Summarize phase timing and the largest families in each execution mode."""
+    lines = [
+        f"Candidate telemetry: {depth} prompt tokens + 8 fixed inputs",
+        f"Unmapped inference activities: {len(report['unmapped_inference'])}",
+    ]
+    for window in report["windows"]:
+        if window["kind"] == "phase" and window["name"] in ("prefill", "decode"):
+            lines.append(
+                f"{window['name']} position={window.get('position', '-')} graph={window.get('graph', '-')} wall={window['host_wall_ms']:.3f} ms kernels={window['kernel_sum_ms']:.3f} ms GPU union={window['gpu_activity_union_ms']:.3f} ms without GPU activity={window['window_without_gpu_activity_ms']:.3f} ms"
+            )
+    families = report.get("measured_family_costs", [])
+    for phase, graph in sorted({(f["phase"], f["graph"]) for f in families}):
+        group = [f for f in families if (f["phase"], f["graph"]) == (phase, graph)]
+        total = sum(f["kernel_sum_ms"] for f in group)
+        for family in sorted(group, key=lambda f: -f["gpu_activity_sum_ms"])[:5]:
+            share = 100 * family["kernel_sum_ms"] / total if total else 0
+            lines.append(
+                f"family {phase} {graph} {family['family']}: kernels={family['kernel_sum_ms']:.3f} ms ({share:.1f}% of group kernel sum) copies={family['memcpy_ms']:.3f} ms memsets={family['memset_ms']:.3f} ms"
+            )
+    for key in ("instrumentation_comparison", "baseline_comparison"):
+        if key in report:
+            details = report[key]
+            if key == "baseline_comparison":
+                details = details["benchmark_host_deltas"]
+            lines.append(f"{key}: " + json.dumps(details, sort_keys=True))
+    return "\n".join(lines) + "\n"
+
+
+def capture_telemetry(
+    directory: Path,
+    artifact: str,
+    depth: int,
+    check_overhead: bool,
+    baseline: Path | None = None,
+) -> None:
+    """Capture one production development request and validate its attribution.
+
+    Args:
+        directory: Fresh output directory; existing evidence is never overwritten.
+        artifact: Candidate artifact; identity comes from its manifest, not payload hashing.
+        depth: Frozen prompt length, followed by eight fixed continuation inputs.
+        check_overhead: Also run once without markers/profiler and compare outputs.
+        baseline: Optional prior telemetry JSON from the same capture protocol.
+    """
+    from task027_profiles import compare_telemetry, telemetry
+
+    directory = directory.resolve()
+    directory.relative_to(ROOT)
+    artifact = str(Path(artifact).resolve())
+    Path(artifact).relative_to(ROOT)
+    directory.mkdir(parents=True, exist_ok=False)
+    image = "sha256:254963cc774290ddeae6ada94047607b5bed9eb668dfb344e58aac05889f2b49"
+    tokens = (
+        ROOT
+        / f".cache/evaluation/qw38-language-v2/task027-support/tokens-{depth}.u32le"
+    )
+    prefix = directory / f"development-{depth}-qw38"
+    tracked = subprocess.check_output(
+        [
+            "git",
+            "ls-files",
+            "-z",
+            "--cached",
+            "--others",
+            "--exclude-standard",
+            "src",
+            "cuda",
+            "benchmarks",
+            "scripts/task027_benchmark.py",
+            "scripts/task027_profiles.py",
+        ],
+        text=True,
+    ).split("\0")
+    files = [ROOT / name for name in tracked if name] + [ROOT / CANDIDATE, tokens]
+    identities = {str(path.relative_to(ROOT)): sha256_file(path) for path in files}
+    manifest = {
+        "schema_version": 1,
+        "status": "IN_PROGRESS",
+        "source_revision": command_output(["git", "rev-parse", "HEAD"]),
+        "image": image,
+        "sha256": identities,
+        "artifact": artifact,
+        "depth": depth,
+        "commands": [],
+        "hardware_before": thermal(),
+        "instrumentation": "Nsight CUDA/NVTX with graph-node tracing; timings include instrumentation; one observation, zero warmups",
+    }
+    manifest_path = directory / "manifest.json"
+    (directory / "candidate.diff").write_text(
+        subprocess.check_output(
+            ["git", "diff", "--", "src", "cuda", "benchmarks", "scripts"], text=True
+        )
+    )
+    base = [
+        "docker",
+        "run",
+        "--rm",
+        "--device",
+        "nvidia.com/gpu=all",
+        "-u",
+        f"{os.getuid()}:{os.getgid()}",
+        "-v",
+        f"{ROOT}:{ROOT}",
+        "-v",
+        f"{ROOT}:/workspace",
+        "-w",
+        str(ROOT),
+    ]
+
+    def run(command: list[str], log: Path) -> None:
+        """Persist the exact command before execution and fail on nonzero exit."""
+        if str(ROOT / CANDIDATE) in command:
+            active = command_output(
+                [
+                    "nvidia-smi",
+                    "--query-compute-apps=pid,process_name",
+                    "--format=csv,noheader",
+                ]
+            )
+            if active:
+                raise RuntimeError(f"GPU is not idle before telemetry: {active}")
+        manifest["commands"].append(command)
+        manifest_path.write_text(json.dumps(manifest, indent=2) + "\n")
+        print(shlex.join(command), flush=True)
+        with log.open("w") as output:
+            subprocess.run(command, stdout=output, stderr=subprocess.STDOUT, check=True)
+
+    try:
+        if check_overhead:
+            plain = directory / "unprofiled.jsonl"
+            run(
+                base
+                + [
+                    image,
+                    str(ROOT / CANDIDATE),
+                    artifact,
+                    str(tokens),
+                    "development",
+                    str(depth),
+                    str(plain),
+                ],
+                directory / "unprofiled.log",
+            )
+        run(
+            base
+            + [
+                "-e",
+                "QW38_PROFILE=1",
+                image,
+                "nsys",
+                "profile",
+                "--trace=cuda,nvtx",
+                "--cuda-memory-usage=true",
+                "--cuda-graph-trace=node",
+                "--sample=none",
+                "--cpuctxsw=none",
+                "-o",
+                str(prefix),
+                str(ROOT / CANDIDATE),
+                artifact,
+                str(tokens),
+                "development",
+                str(depth),
+                str(prefix.with_suffix(".jsonl")),
+            ],
+            prefix.with_suffix(".log"),
+        )
+        run(
+            base
+            + [
+                image,
+                "nsys",
+                "export",
+                "--type",
+                "sqlite",
+                "--output",
+                str(prefix.with_suffix(".sqlite")),
+                str(prefix.with_suffix(".nsys-rep")),
+            ],
+            directory / "export.log",
+        )
+        captured = read_development(prefix.with_suffix(".jsonl"), depth)
+        report = telemetry(prefix.with_suffix(".sqlite"))
+        report["capture_manifest"] = str(manifest_path)
+        report["report_parser_sha256"] = sha256_file(
+            ROOT / "scripts/task027_profiles.py"
+        )
+        if baseline is not None:
+            previous = json.loads(baseline.read_text())
+            prior_manifest = json.loads(Path(previous["capture_manifest"]).read_text())
+            token_key = str(tokens.relative_to(ROOT))
+            if (
+                prior_manifest["status"] != "COMPLETE"
+                or prior_manifest["image"] != image
+                or prior_manifest["sha256"].get(token_key) != identities[token_key]
+            ):
+                raise ValueError("baseline capture protocol/image/input mismatch")
+            report["baseline_comparison"] = compare_telemetry(report, previous)
+        if check_overhead:
+            control = read_development(plain, depth)
+            if (
+                control["setup"]["manifest_digest"]
+                != captured["setup"]["manifest_digest"]
+                or control["sample"]["output_ids"] != captured["sample"]["output_ids"]
+                or Path(str(plain) + ".logits.f32").read_bytes()
+                != Path(str(prefix.with_suffix(".jsonl")) + ".logits.f32").read_bytes()
+            ):
+                raise ValueError("profiling changed model identity or output")
+            report["instrumentation_comparison"] = {
+                "outputs_byte_identical": True,
+                "unprofiled_ms": control["sample"]["total_ms"],
+                "profiled_ms": captured["sample"]["total_ms"],
+                "observed_difference_ms": captured["sample"]["total_ms"]
+                - control["sample"]["total_ms"],
+                "scope": "single fresh process per arm; includes all profiler and marker effects plus run variation, not an isolated overhead estimate or correction",
+            }
+        if any(
+            sha256_file(ROOT / path) != digest for path, digest in identities.items()
+        ):
+            raise ValueError("source, binary or input changed during capture")
+        (directory / "telemetry.json").write_text(json.dumps(report, indent=2) + "\n")
+        (directory / "summary.txt").write_text(telemetry_summary(report, depth))
+        manifest.update(
+            status="COMPLETE",
+            hardware_after=thermal(),
+            artifact_manifest=captured["setup"]["manifest_digest"],
+        )
+    except Exception as error:
+        manifest.update(status="FAILED", error=str(error))
+        raise
+    finally:
+        manifest_path.write_text(json.dumps(manifest, indent=2) + "\n")
+
+
 def main() -> None:
     """Capture or summarize the authorized single-run performance protocol."""
     parser = argparse.ArgumentParser()
-    parser.add_argument("mode", choices=("run", "summarize"))
+    parser.add_argument("mode", choices=("run", "summarize", "telemetry"))
+    parser.add_argument("--depth", type=int, choices=(256, 4096, 32768), default=4096)
+    parser.add_argument("--output", type=Path)
+    parser.add_argument(
+        "--artifact", default=".cache/candidates/candidate-fp8-mixer-q8-mlp-v1.qw38"
+    )
+    parser.add_argument("--check-overhead", action="store_true")
+    parser.add_argument("--baseline", type=Path)
     args = parser.parse_args()
-    (capture if args.mode == "run" else summarize)()
+    if args.mode == "telemetry":
+        if args.output is None:
+            parser.error("telemetry requires a fresh --output directory")
+        capture_telemetry(
+            args.output, args.artifact, args.depth, args.check_overhead, args.baseline
+        )
+    else:
+        (capture if args.mode == "run" else summarize)()
 
 
 if __name__ == "__main__":

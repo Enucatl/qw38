@@ -1,4 +1,5 @@
 #include "format/reader.hpp"
+#include "runtime/profiling.hpp"
 #include "format/nvfp4.hpp"
 #include "format/fp8.hpp"
 
@@ -434,6 +435,7 @@ struct Validated {
 
 std::expected<Validated, FormatError> validate_bytes(
     std::span<std::byte const> bytes) {
+  qw38::runtime::profiling::ScopedRange range("qw38:host name=artifact_metadata_validation");
   if (bytes.size() < kHeaderSizeV0) {
     return std::unexpected(make_error(FormatErrorCode::Truncated, 0, "header",
                                       "file is smaller than the 64-byte header"));
@@ -482,6 +484,8 @@ std::expected<Validated, FormatError> validate_bytes(
   if (auto st = verify_manifest_digest(bytes, *schema); !st) {
     return std::unexpected(st.error());
   }
+  range.close();
+  qw38::runtime::profiling::ScopedRange payload_range("qw38:host name=artifact_payload_validation");
   if (auto st = validate_quantized_payloads(bytes, *schema); !st) {
     return std::unexpected(st.error());
   }
@@ -531,10 +535,12 @@ Artifact::~Artifact() = default;
 
 std::expected<Artifact, FormatError> Artifact::open(
     std::filesystem::path path) try {
+  qw38::runtime::profiling::ScopedRange range("qw38:host name=artifact_open_map");
   auto mapped = MappedFile::open(path);
   if (!mapped) {
     return std::unexpected(mapped.error());
   }
+  range.close();
   auto validated = validate_bytes(mapped->bytes());
   if (!validated) {
     return std::unexpected(validated.error());

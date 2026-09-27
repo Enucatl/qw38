@@ -1,7 +1,9 @@
 #include "cuda/graph.hpp"
+#include "src/runtime/profiling.hpp"
 #include <atomic>
 
 namespace qw38::cuda {
+namespace profiling = qw38::runtime::profiling;
 namespace { std::atomic<bool> fail_instantiation{false}; }
 void testing::fail_next_graph_instantiation() noexcept {
   fail_instantiation.store(true, std::memory_order_relaxed);
@@ -32,6 +34,7 @@ std::expected<Graph, Error> Graph::begin(Stream const& stream) {
   if (auto st = require_uncaptured(stream); !st) return std::unexpected(st.error());
   auto guard = stream.activate();
   if (!guard) return std::unexpected(guard.error());
+  profiling::ScopedRange range("qw38:host name=graph_capture_begin");
   if (auto st = check(cudaStreamBeginCapture(stream.native(), cudaStreamCaptureModeThreadLocal),
                       "cudaStreamBeginCapture"); !st) return std::unexpected(st.error());
   Graph result;
@@ -44,12 +47,16 @@ std::expected<Graph, Error> Graph::begin(Stream const& stream) {
 std::expected<void, Error> Graph::finish() {
   auto guard = DeviceGuard::activate(device_, "graph.finish");
   if (!guard) return std::unexpected(guard.error());
+  profiling::ScopedRange end_capture("qw38:host name=graph_capture_end");
   capturing_ = false;
   if (auto st = check(cudaStreamEndCapture(stream_, &graph_), "cudaStreamEndCapture"); !st) return st;
+  end_capture.close();
   if (fail_instantiation.exchange(false, std::memory_order_relaxed))
     return std::unexpected(make_error(ErrorCode::Status, "cudaGraphInstantiate",
                                       "injected construction failure before execution"));
+  profiling::ScopedRange instantiate("qw38:host name=graph_instantiate");
   if (auto st = check(cudaGraphInstantiate(&exec_, graph_, 0), "cudaGraphInstantiate"); !st) return st;
+  instantiate.close();
   auto const source = std::exchange(graph_, nullptr);
   return check(cudaGraphDestroy(source), "cudaGraphDestroy(source)");
 }
@@ -59,6 +66,7 @@ std::expected<void, Error> Graph::launch(Stream const& stream) const {
     return std::unexpected(make_error(ErrorCode::InvalidArgument, "graph.launch", "graph stream mismatch"));
   auto guard = stream.activate();
   if (!guard) return std::unexpected(guard.error());
+  profiling::ScopedRange range("qw38:host name=graph_launch");
   return check(cudaGraphLaunch(exec_, stream.native()), "cudaGraphLaunch");
 }
 

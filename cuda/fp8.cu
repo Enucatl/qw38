@@ -1,4 +1,5 @@
 #include "cuda/fp8.hpp"
+#include "src/runtime/profiling.hpp"
 #include "cuda/prefill.hpp"
 #include "cutlass/gemm/collective/collective_builder.hpp"
 #include "cutlass/epilogue/collective/collective_builder.hpp"
@@ -14,6 +15,7 @@
 #include <cmath>
 
 namespace qw38::cuda {
+namespace profiling = qw38::runtime::profiling;
 namespace {
 using namespace cute;
 using Tile=Shape<_128,_128,_128>;
@@ -116,6 +118,7 @@ __global__ void gemv_kernel(std::uint8_t const* codes,float const* scales,
 }
 std::expected<int,Error> prepare_fp8_gemm(Stream const& stream) {
   auto guard=stream.activate(); if(!guard) return std::unexpected(guard.error());
+  profiling::ScopedRange range("qw38:host name=fp8_prepare");
   int sm=0;
   if(auto s=check(cudaDeviceGetAttribute(&sm,cudaDevAttrMultiProcessorCount,stream.device()),"fp8.prepare");!s)
     return std::unexpected(s.error());
@@ -129,6 +132,8 @@ std::expected<void,Error> fp8_store_bf16(std::span<float const> x,
   std::array regions{Region{x.data(),x.size_bytes(),4,false},Region{y.data(),y.size_bytes(),2,true}};
   if(auto s=validate(regions,stream);!s) return s;
   auto guard=stream.activate(); if(!guard) return std::unexpected(guard.error());
+  profiling::ScopedRange range("qw38:op name=fp8_store_bf16 m=%u n=%u k=%u",
+      1u, unsigned(x.size()), 1u);
   store_kernel<<<(x.size()+255)/256,256,0,stream.native()>>>(x.data(),y.data(),x.size());
   return check(cudaGetLastError(),"fp8.store");
 }
@@ -141,6 +146,8 @@ std::expected<void,Error> pack_fp8(std::span<std::uint16_t const> input,unsigned
       Region{codes.data(),codes.size_bytes(),16,true},Region{scales.data(),scales.size_bytes(),16,true}};
   if(auto s=validate(regions,stream);!s) return s;
   auto guard=stream.activate(); if(!guard) return std::unexpected(guard.error());
+  profiling::ScopedRange range("qw38:op name=fp8_pack m=%u n=%u k=%u padded_m=%u padded_k=%u",
+      unsigned(m), unsigned(k), 1u, unsigned(pm), unsigned(pk));
   pack_kernel<<<dim3(pm,pk/128),128,0,stream.native()>>>(input.data(),m,k,pm,pk,codes.data(),scales.data());
   return check(cudaGetLastError(),"fp8.pack");
 }
@@ -165,12 +172,16 @@ std::expected<void,Error> fp8_gemm(Fp8Weight w,Fp8Input x,std::span<float> y,
   args.hw_info.device_id=stream.device(); args.hw_info.sm_count=sm_count;
   if(auto s=status(Gemm::can_implement(args));!s) return s;
   if(Gemm::get_workspace_size(args)>workspace.size()) return invalid();
+  profiling::ScopedRange range("qw38:op name=fp8_gemm m=%u n=%u k=%u compute=fp8_mma accum=fp32",
+      unsigned(x.m), unsigned(w.n), unsigned(w.k));
   if(auto s=status(Kernel::initialize_workspace(args,workspace.data(),stream.native()));!s) return s;
   auto params=Kernel::to_underlying_arguments(args,workspace.data());
   return status(Gemm::run(params,stream.native()));
 }
 std::expected<void,Error> fp8_decode(DecodeMmvDesc const& d,Stream const& stream) {
   auto guard=stream.activate(); if(!guard) return std::unexpected(guard.error());
+  profiling::ScopedRange range("qw38:op name=fp8_gemv m=%u n=%u k=%u epilogue=%u compute=scalar_fp32",
+      1u, unsigned(d.n), unsigned(d.k), unsigned(d.epilogue));
   gemv_kernel<<<(d.n+3)/4,dim3(32,4),0,stream.native()>>>(
       static_cast<std::uint8_t const*>(d.codes.pointer),static_cast<float const*>(d.scales.pointer),
       static_cast<std::uint16_t const*>(d.input.pointer),d.output.pointer?d.output.pointer:d.residual.pointer,
@@ -184,6 +195,8 @@ std::expected<void,Error> fp8_gemv(Fp8Weight w,std::span<std::uint16_t const> x,
       Region{x.data(),x.size_bytes(),2,false},Region{y.data(),y.size_bytes(),4,true}};
   if(auto s=validate(regions,stream);!s) return s;
   auto guard=stream.activate(); if(!guard) return std::unexpected(guard.error());
+  profiling::ScopedRange range("qw38:op name=fp8_gemv m=%u n=%u k=%u compute=scalar_fp32",
+      1u, unsigned(w.n), unsigned(w.k));
   gemv_kernel<<<(w.n+3)/4,dim3(32,4),0,stream.native()>>>(w.codes.data(),w.scales.data(),x.data(),y.data(),w.n,w.k);
   return check(cudaGetLastError(),"fp8.gemv");
 }

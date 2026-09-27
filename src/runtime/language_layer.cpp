@@ -66,6 +66,8 @@ std::expected<TensorView, Error> execute_decode_language_layer(
 std::expected<TensorView, Error> detail::Submission::layer(
     LanguageLayerPlan const& plan, qw38::cuda::DecodeControl const& pending,
     qw38::cuda::DecodeControl const* control, std::uint64_t bucket, int* failure) {
+  profiling::ScopedRange layer_range("qw38:layer layer=%u kind=%s m=1",
+      unsigned(plan.layer_), plan.kind_ == LanguageMixerKind::Gdn ? "gdn" : "attention");
   if (plan.kind_ == LanguageMixerKind::Gdn) {
     auto st = gdn(plan.gdn_, pending, control);
     if (!st) return st;

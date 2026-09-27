@@ -1,8 +1,10 @@
 #include "cuda/copy.hpp"
+#include "src/runtime/profiling.hpp"
 
 #include <algorithm>
 
 namespace qw38::cuda {
+namespace profiling = qw38::runtime::profiling;
 namespace {
 
 __global__ void fill_pattern_kernel(std::uint8_t* dst, std::uint64_t n,
@@ -31,6 +33,8 @@ std::expected<void, Error> copy_kind(void* dst, void const* src,
   if (!guard) {
     return std::unexpected(guard.error());
   }
+  profiling::ScopedRange range("qw38:op name=%.*s bytes=%llu",
+      int(op.size()), op.data(), static_cast<unsigned long long>(bytes));
   return check(cudaMemcpyAsync(dst, src, static_cast<std::size_t>(bytes), kind,
                                stream.native()),
                op);
@@ -84,6 +88,8 @@ std::expected<void, Error> fill_pattern(void* dst, std::uint64_t bytes,
   if (blocks == 0) {
     blocks = 1;
   }
+  profiling::ScopedRange range("qw38:op name=fill_pattern bytes=%llu",
+      static_cast<unsigned long long>(bytes));
   fill_pattern_kernel<<<blocks, threads, 0, stream.native()>>>(
       static_cast<std::uint8_t*>(dst), bytes, seed);
   return check(cudaGetLastError(), "fill_pattern_kernel");

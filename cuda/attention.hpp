@@ -26,12 +26,30 @@ inline constexpr int kAttnSubtileKeys = 32;    // T-03
 inline constexpr int kAttnPartialStride = 2 + static_cast<int>(kAttnHeadDim);
 inline constexpr std::uint32_t kAttnMaxPartitions = 128;
 
+enum class ContextRegime { Small, Large };
+[[nodiscard]] constexpr ContextRegime context_regime(std::uint64_t length) noexcept {
+  return length <= 4096 ? ContextRegime::Small : ContextRegime::Large;
+}
+struct PrefillAttentionSchedule { unsigned heads, key_tile; };
+// The measured 128-key small-regime experiment regressed complete cost.
+// Both decode regimes retain K256 partition targets and the same device rule.
+[[nodiscard]] constexpr unsigned attention_decode_key_target(ContextRegime) noexcept {
+  return 256;
+}
+[[nodiscard]] constexpr PrefillAttentionSchedule prefill_attention_schedule(
+    ContextRegime regime, unsigned tokens, std::uint64_t first_position) noexcept {
+  if (tokens != 512) return {1, 64};
+  if (first_position == 0) return {2, 32};
+  return {regime == ContextRegime::Small ? 2u : 1u, 64};
+}
+
 // At most two CTA waves for four KV/query tiles, with >=256 keys per split.
 // The capacity bound is independent of the active length and can be reused by
 // a fixed launch bucket. Every partition writes neutral data when empty.
 [[nodiscard]] constexpr std::uint32_t attention_partition_count(
     std::uint64_t length, unsigned sm_count) noexcept {
-  auto n = (length / 256 + (length % 256 != 0));
+  auto const keys = attention_decode_key_target(context_regime(length));
+  auto n = (length / keys + (length % keys != 0));
   auto waves = (2ull * sm_count + kAttnKvHeads - 1) / kAttnKvHeads;
   return static_cast<std::uint32_t>(std::min<std::uint64_t>(
       n, std::min<std::uint64_t>(waves, kAttnMaxPartitions)));
@@ -79,8 +97,9 @@ struct AttentionPrefillResources {
   int occupancy_blocks_per_sm{};
 };
 
-// M512 uses eight warps for two sibling heads x Q32, sharing K64/V64.
-// Other sizes use four warps per head x Q32. Register-resident BF16 Q,
+// Full M512 at prefix zero uses paired Q32/K32; later small-regime M512
+// uses paired Q32/K64. Large-regime later chunks and tails use per-head Q32/K64.
+// Register-resident BF16 Q,
 // FP32 softmax/PV, two BF16 P components and separately pipelined BF16 K/V.
 // Explicit query tiles 1 and 4 select the scalar diagnostic controls.
 [[nodiscard]] std::expected<void, Error> launch_attention_prefill_scan(
@@ -90,11 +109,14 @@ struct AttentionPrefillResources {
     std::uint32_t valid_tokens, std::uint16_t* y,
     Stream const& stream,
     std::uint32_t query_tile = kAttnPrefillQueryTile,
-    std::uint8_t* fp8_codes = nullptr, float* fp8_scales = nullptr);
+    std::uint8_t* fp8_codes = nullptr, float* fp8_scales = nullptr,
+    ContextRegime regime = ContextRegime::Large);
 
 [[nodiscard]] std::expected<AttentionPrefillResources, Error>
 attention_prefill_resources(std::uint32_t query_tile = kAttnPrefillQueryTile,
-                           std::uint32_t valid_tokens = 1);
+                           std::uint32_t valid_tokens = 1,
+                           ContextRegime regime = ContextRegime::Large,
+                           std::uint64_t first_position = 0);
 
 [[nodiscard]] std::expected<AttentionPrefillResources, Error> attention_decode_resources();
 

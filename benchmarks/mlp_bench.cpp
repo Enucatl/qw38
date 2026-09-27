@@ -69,7 +69,7 @@ int real_mlp(char const* artifact, char const* rows, char const* saved_path=null
   using namespace qw38;
   unsigned m=0;std::string_view text(rows);
   auto parsed=std::from_chars(text.data(),text.data()+text.size(),m);
-  if(parsed.ec!=std::errc{} || parsed.ptr!=text.end() || (m!=1 && m!=256))return 2;
+  if(parsed.ec!=std::errc{} || parsed.ptr!=text.end() || (m!=1 && m!=256 && m!=512))return 2;
   auto setup_started=std::chrono::steady_clock::now();
   auto rt=runtime::Runtime::create();if(!rt)return 1;
   auto source=format::Artifact::open(artifact);if(!source)return 1;
@@ -78,7 +78,7 @@ int real_mlp(char const* artifact, char const* rows, char const* saved_path=null
   auto const& stream=rt->stream();
   auto decode=bind_mlp_plan(*model,*session,0,stream);
   auto prefill=runtime::bind_prefill_layer_projections(*model,0,stream,&*session);
-  auto engine=cuda::PrefillEngine::create(stream,256);
+  auto engine=cuda::PrefillEngine::create(stream,std::max(256u,m));
   if(!decode || !prefill || !engine)return 1;
   std::vector<float> h(m*5120);
   for(unsigned t=0;t<m;++t)for(unsigned c=0;c<5120;++c)
@@ -93,11 +93,13 @@ int real_mlp(char const* artifact, char const* rows, char const* saved_path=null
   auto result=m==1?execute_decode_mlp(*decode):runtime::execute_prefill_mlp(*prefill,*engine,
       static_cast<float const*>(session->residual_h_mid().pointer),static_cast<float*>(session->residual_h().pointer),m,0);
   if(!result){std::cerr<<runtime::error_message(result.error())<<'\n';return 1;}
-  if(!cuda::copy_d2h(out.data(),session->residual_h().pointer,out.size()*4,stream) ||
-      !end->record(stream) || !stream.sync())return 1;
+  if(!end->record(stream) || !end->sync())return 1;
   double host_ms=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-started).count();
-  auto gpu_ms=elapsed_ms(*begin,*end);if(!gpu_ms)return 1;
+  auto gpu_event_interval_ms=elapsed_ms(*begin,*end);if(!gpu_event_interval_ms)return 1;
   auto allocations=cuda::malloc_count()-count;
+  auto readout_started=std::chrono::steady_clock::now();
+  if(!cuda::copy_d2h(out.data(),session->residual_h().pointer,out.size()*4,stream) || !stream.sync())return 1;
+  double readout_ms=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-readout_started).count();
   for(float v:out)if(!std::isfinite(v))return 1;
   if(saved_path) {
     std::ofstream saved(saved_path,std::ios::binary);
@@ -106,9 +108,10 @@ int real_mlp(char const* artifact, char const* rows, char const* saved_path=null
   }
   std::cout<<std::setprecision(12)<<"policy="<<unsigned(model->schema().precision.id)<<" m="<<m
       <<" setup_ms="<<setup_ms
-      <<" gpu_ms="<<*gpu_ms<<" host_ms="<<host_ms<<" q8_workspace_bytes="<<session->q8_mlp_workspace().size()
+      <<" gpu_event_interval_ms="<<*gpu_event_interval_ms<<" host_ms="<<host_ms<<" q8_workspace_bytes="<<session->q8_mlp_workspace().size()
       <<" prefill_workspace_bytes="<<engine->workspace_bytes()<<" hot_allocations="<<allocations
-      <<" runs=1 warmups=0 includes_library_first_use=true readout_included=true finite=true\n";
+      <<" diagnostic_d2h_host_ms="<<readout_ms<<" diagnostic_d2h_bytes="<<out.size()*4
+      <<" timing_schema=2 boundary=rms_pack_gate_up_swiglu_down_residual runs=1 warmups=0 includes_library_first_use=true readout_included=false finite=true\n";
   return allocations?1:0;
 }
 
@@ -155,24 +158,30 @@ int rms_bench(char const* mode, char const* rows, char const* saved_path) {
           static_cast<std::uint16_t const*>(g->data()), 1e-6f, m,
           static_cast<std::int8_t*>(y->data()), static_cast<float*>(scales->data()),
           static_cast<std::int32_t*>(sums->data()), static_cast<int*>(failure->data()), *stream);
-  if (!status || !cuda::copy_d2h(result.data(), y->data(), y->bytes(), *stream)) return 1;
+  if (!status || !end->record(*stream) || !end->sync()) return 1;
+  double const host_ms = std::chrono::duration<double, std::milli>(
+      std::chrono::steady_clock::now() - start).count();
+  auto const readout_start = std::chrono::steady_clock::now();
+  if (!cuda::copy_d2h(result.data(), y->data(), y->bytes(), *stream)) return 1;
   if (kind == "q8" &&
       (!cuda::copy_d2h(result.data() + y->bytes(), scales->data(), scales->bytes(), *stream) ||
        !cuda::copy_d2h(result.data() + y->bytes() + scales->bytes(), sums->data(), sums->bytes(), *stream) ||
        !cuda::copy_d2h(&failed, failure->data(), 4, *stream))) return 1;
-  if (!end->record(*stream) || !stream->sync() || failed) return 1;
-  double const host_ms = std::chrono::duration<double, std::milli>(
-      std::chrono::steady_clock::now() - start).count();
-  auto gpu_ms = elapsed_ms(*begin, *end);
-  if (!gpu_ms) return 1;
+  if (!stream->sync() || failed) return 1;
+  double const readout_ms = std::chrono::duration<double, std::milli>(
+      std::chrono::steady_clock::now() - readout_start).count();
+  auto gpu_event_interval_ms = elapsed_ms(*begin, *end);
+  if (!gpu_event_interval_ms) return 1;
   std::ofstream saved(saved_path, std::ios::binary);
   saved.write(reinterpret_cast<char const*>(result.data()), result.size());
   if (!saved) return 1;
   auto const hot = cuda::malloc_count() - count;
   std::cout << std::setprecision(12) << "rms=" << kind << " m=" << m
-            << " setup_ms=" << setup_ms << " gpu_ms=" << *gpu_ms
+            << " setup_ms=" << setup_ms << " gpu_event_interval_ms=" << *gpu_event_interval_ms
             << " host_ms=" << host_ms << " hot_allocations=" << hot
-            << " runs=1 warmups=0 first_use=true readout_included=true\n";
+            << " diagnostic_d2h_host_ms=" << readout_ms
+            << " diagnostic_d2h_bytes=" << result.size() + (kind == "q8" ? 4 : 0)
+            << " timing_schema=2 boundary=rms_output_pack runs=1 warmups=0 first_use=true readout_included=false\n";
   return hot ? 1 : 0;
 }
 
@@ -321,6 +330,7 @@ int main(int argc,char** argv) {
   std::cout << "decode-mlp q4 hidden=" << kHidden << " ffn=" << kFfnWidth
             << " regions=3 (rms, paired-swiglu, down-residual)"
             << " weight_bytes=" << weight_bytes << " launches=" << launches
-            << " ms=" << avg << '\n';
+            << " timing_schema=2 boundary=rms_gate_up_swiglu_down_residual first_use=false warmups=2 event_aggregation=mean_per_operation readout_included=false"
+            << " gpu_event_interval_ms=" << avg << '\n';
   return 0;
 }

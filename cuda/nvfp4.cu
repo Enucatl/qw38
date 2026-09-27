@@ -1,4 +1,5 @@
 #include "cuda/nvfp4.hpp"
+#include "src/runtime/profiling.hpp"
 #include "cuda/nvfp4_device.cuh"
 #include "cuda/decode_mmv.hpp"
 #include "cutlass/gemm/collective/collective_builder.hpp"
@@ -9,6 +10,7 @@
 #include "cutlass/util/packed_stride.hpp"
 
 namespace qw38::cuda {
+namespace profiling = qw38::runtime::profiling;
 namespace {
 using namespace cute;
 using Operand = cutlass::nv_float4_t<cutlass::float_e2m1_t>;
@@ -47,6 +49,7 @@ std::expected<int, Error> prepare_nvfp4_gemm(std::uint32_t max_m,
     return std::unexpected(make_error(ErrorCode::InvalidArgument,"nvfp4.prepare","invalid capacity"));
   auto guard = stream.activate();
   if (!guard) return std::unexpected(guard.error());
+  profiling::ScopedRange range("qw38:host name=nvfp4_prepare");
   Gemm::Arguments args{};
   int sm_count=0;
   if (auto st=check(cudaDeviceGetAttribute(&sm_count,cudaDevAttrMultiProcessorCount,stream.device()),"nvfp4.prepare"); !st)
@@ -68,6 +71,8 @@ std::expected<void, Error> launch_pack_nvfp4(std::uint16_t const* input,
     return std::unexpected(make_error(ErrorCode::InvalidArgument, "nvfp4.pack", "invalid operands"));
   auto guard = stream.activate();
   if (!guard) return std::unexpected(guard.error());
+  profiling::ScopedRange range("qw38:op name=nvfp4_pack m=%u n=%u k=%u",
+      unsigned(m), unsigned(k), 1u);
   pack_kernel<<<((m + 127) / 128) * 128,128,0,stream.native()>>>(input,codes,scales,m,k,decode_pad_k(k));
   return check(cudaGetLastError(), "nvfp4.pack");
 }
@@ -102,6 +107,8 @@ std::expected<void, Error> nvfp4_gemm_tile(void const* codes, void const* scales
   // Patch dynamic operands/shape without repeating device queries or kernel
   // attribute setup. Honor CUTLASS's workspace contract for the pinned schedule.
   static_assert(Kernel::ArchTag::kMinComputeCapability == 120);
+  profiling::ScopedRange range("qw38:op name=nvfp4_gemm m=%u n=%u k=%u row_start=%u compute=nvfp4_mma accum=fp32",
+      unsigned(m), unsigned(n), unsigned(k), unsigned(row_start));
   if (auto st=status(Kernel::initialize_workspace(args,workspace,stream.native())); !st) return st;
   auto params = Kernel::to_underlying_arguments(args,workspace);
   return status(Gemm::run(params,stream.native()));

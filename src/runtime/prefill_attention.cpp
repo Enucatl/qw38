@@ -2,6 +2,7 @@
 #include "cuda/graph.hpp"
 
 #include "runtime/prefill.hpp"
+#include "runtime/profiling.hpp"
 
 #include "cuda/activation.hpp"
 #include "cuda/attention.hpp"
@@ -80,7 +81,8 @@ std::expected<void, Error> detail::Submission::prefill_attention(
     PrefillAttentionLayerPlan const& plan, PrefillAttentionWorkspace& workspace,
     qw38::cuda::PrefillEngine& engine, float const* residual,
     float* h_mid, float* next_h, std::uint32_t valid_tokens,
-    std::uint64_t first_position, bool complete, int* failure) {
+    std::uint64_t first_position, bool complete, int* failure,
+    qw38::cuda::ContextRegime regime) {
   auto const& prep = plan.prep_;
   auto const& p = plan.projections_;
   auto const* stream = prep.stream;
@@ -157,10 +159,11 @@ std::expected<void, Error> detail::Submission::prefill_attention(
   };
   bool const fp8=p.first.layout==qw38::cuda::kDecodeLayoutFp8V1 && valid_tokens>1;
   auto packed=fp8 ? engine.fp8_operand(valid_tokens,kHidden) : qw38::cuda::Fp8Input{};
-  auto project = [&](qw38::cuda::PrefillWeight const& weight,
+  auto project = [&](char const* role, qw38::cuda::PrefillWeight const& weight,
                      std::uint16_t const* input, void* output,
                      qw38::cuda::PrefillEpilogue epilogue,
                      float const* add = nullptr) -> std::expected<void, Error> {
+    profiling::ScopedRange range("qw38:op name=attention_projection role=%s", role);
     return cuda_step(engine.project(qw38::cuda::PrefillProjection{
         .weight = weight, .input = input, .output = output, .residual = add,
         .valid_tokens = valid_tokens, .first_position = first_position,
@@ -175,11 +178,11 @@ std::expected<void, Error> detail::Submission::prefill_attention(
   } else if (auto st = cuda_step(qw38::cuda::launch_hidden_rms(
           residual, static_cast<std::uint16_t const*>(prep.gamma.pointer),
           prep.eps, valid_tokens, s.normalized, *stream)); !st) return st;
-  if (auto st = project(p.first, s.normalized, s.qg, PrefillEpilogue::StoreBf16);
+  if (auto st = project("qg", p.first, s.normalized, s.qg, PrefillEpilogue::StoreBf16);
       !st) return st;
-  if (auto st = project(p.second, s.normalized, s.k, PrefillEpilogue::StoreBf16);
+  if (auto st = project("k", p.second, s.normalized, s.k, PrefillEpilogue::StoreBf16);
       !st) return st;
-  if (auto st = project(p.third, s.normalized, s.v, PrefillEpilogue::StoreBf16);
+  if (auto st = project("v", p.third, s.normalized, s.v, PrefillEpilogue::StoreBf16);
       !st) return st;
   if (auto st = cuda_step(qw38::cuda::launch_attention_prepare_chunk(
           s.qg, s.k, s.v,
@@ -190,12 +193,16 @@ std::expected<void, Error> detail::Submission::prefill_attention(
           static_cast<std::uint16_t*>(prep.kv.pointer), prep.attn_layer,
           prep.kv_capacity, *stream)); !st) return st;
   packed=fp8 ? engine.fp8_operand(valid_tokens,kAttnOutWidth) : qw38::cuda::Fp8Input{};
+  auto const schedule = qw38::cuda::prefill_attention_schedule(regime, valid_tokens, first_position);
+  profiling::ScopedRange scan_range(schedule.key_tile == 32 ? "attention_paired_Q32_K32"
+      : schedule.heads == 2 ? "attention_paired_Q32_K64" : "attention_per_head_Q32_K64");
   if (auto st = cuda_step(qw38::cuda::launch_attention_prefill_scan(
           s.q, s.g, static_cast<std::uint16_t const*>(prep.kv.pointer),
           prep.attn_layer, prep.kv_capacity, first_position,
           valid_tokens, s.y, *stream, qw38::cuda::kAttnPrefillQueryTile,
-          const_cast<std::uint8_t*>(packed.codes.data()),const_cast<float*>(packed.scales.data()))); !st) return st;
-  if (auto st = project(p.mixer_out, s.y, h_mid,
+          const_cast<std::uint8_t*>(packed.codes.data()),const_cast<float*>(packed.scales.data()), regime)); !st) return st;
+  scan_range.close();
+  if (auto st = project("out", p.mixer_out, s.y, h_mid,
                         PrefillEpilogue::ResidualAddFp32, residual); !st) return st;
   if (auto st = detail::Submission::prefill_mlp(p, engine, h_mid, next_h,
                                     valid_tokens, first_position, prep.eps, failure); !st)
@@ -216,7 +223,8 @@ std::expected<void, Error> execute_prefill_attention_layer(
     if (auto st = qw38::cuda::require_uncaptured(*plan.prep_.stream); !st)
       return std::unexpected(from_cuda(st.error()));
   }
-  return detail::Submission::prefill_attention(plan, workspace, engine, residual, h_mid, next_h, valid_tokens, first_position, true);
+  return detail::Submission::prefill_attention(plan, workspace, engine, residual, h_mid, next_h, valid_tokens, first_position, true,
+      nullptr, qw38::cuda::context_regime(valid_tokens));
 }
 
 }  // namespace qw38::runtime

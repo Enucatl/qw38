@@ -1,4 +1,5 @@
 #include "runtime/model.hpp"
+#include "runtime/profiling.hpp"
 
 #include "cuda/stream.hpp"
 #include "cuda/upload.hpp"
@@ -222,7 +223,9 @@ std::expected<Model, Error> Model::upload(qw38::format::Artifact const& artifact
                                           qw38::cuda::Stream const& stream,
                                           std::optional<DiagnosticWeights> selection,
                                           std::uint32_t layer) {
+  profiling::ScopedRange upload_range("qw38:host name=model_upload");
   try {
+  profiling::ScopedRange validation_range("qw38:host name=model_compatibility_validation");
   Model model;
   model.schema_ = artifact.schema();
   model.device_ = stream.device();
@@ -294,6 +297,8 @@ std::expected<Model, Error> Model::upload(qw38::format::Artifact const& artifact
                           qw38::format::SpanKind kind,
                           qw38::format::ByteSpan span)
       -> std::expected<void*, Error> {
+    profiling::ScopedRange tensor_range("qw38:host name=tensor_upload tensor=%.*s bytes=%llu",
+        int(logical_name.size()), logical_name.data(), static_cast<unsigned long long>(span.length));
     if (span.empty()) {
       return nullptr;
     }
@@ -316,6 +321,7 @@ std::expected<Model, Error> Model::upload(qw38::format::Artifact const& artifact
     return ptr;
   };
 
+  validation_range.close();
   for (auto const& rec : model.schema_.tensors) {
     if (!selected(rec) || is_alias(model.schema_, rec.tensor_id)) {
       continue;

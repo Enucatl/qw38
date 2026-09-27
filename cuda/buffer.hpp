@@ -2,6 +2,7 @@
 
 #include "cuda/error.hpp"
 #include "cuda/stream.hpp"
+#include "src/runtime/profiling.hpp"
 
 #include <cstddef>
 #include <cstdint>
@@ -26,6 +27,9 @@ class HostBuffer {
   HostBuffer(HostBuffer const&) = delete;
   HostBuffer& operator=(HostBuffer const&) = delete;
   static std::expected<HostBuffer, Error> allocate(std::size_t bytes) {
+    qw38::runtime::profiling::ScopedRange range(
+        "qw38:host name=pinned_buffer_allocate bytes=%llu",
+        static_cast<unsigned long long>(bytes));
     HostBuffer result;
     if (auto st = check(cudaMallocHost(&result.ptr_, bytes), "cudaMallocHost"); !st)
       return std::unexpected(st.error());

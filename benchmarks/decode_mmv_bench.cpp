@@ -298,21 +298,25 @@ int main(int argc, char** argv) {
       if (!begin->record(*stream)) return 1;
       auto const start = std::chrono::steady_clock::now();
       if (!launch_decode_mmv(d, *stream) ||
-          !qw38::cuda::copy_d2h(logits.data(), out->data(), out->bytes(), *stream) ||
-          !end->record(*stream) || !stream->sync()) return 1;
+          !end->record(*stream) || !end->sync()) return 1;
       double const host_ms = std::chrono::duration<double, std::milli>(
           std::chrono::steady_clock::now() - start).count();
-      auto gpu_ms = elapsed_ms(*begin, *end);
-      if (!gpu_ms) return 1;
+      auto gpu_event_interval_ms = elapsed_ms(*begin, *end);
+      if (!gpu_event_interval_ms) return 1;
+      auto const readout_start = std::chrono::steady_clock::now();
+      if (!qw38::cuda::copy_d2h(logits.data(), out->data(), out->bytes(), *stream) || !stream->sync()) return 1;
+      double const readout_ms = std::chrono::duration<double, std::milli>(
+          std::chrono::steady_clock::now() - readout_start).count();
       for (float value : logits) if (!std::isfinite(value)) return 1;
       std::ofstream saved(argv[2], std::ios::binary);
       saved.write(reinterpret_cast<char const*>(logits.data()), out->bytes());
       if (!saved) return 1;
       auto const hot = qw38::cuda::malloc_count() - allocations;
       std::cout << std::setprecision(12) << "head n=" << c.n << " k=" << c.k
-                << " setup_ms=" << setup_ms << " gpu_ms=" << *gpu_ms
+                << " setup_ms=" << setup_ms << " gpu_event_interval_ms=" << *gpu_event_interval_ms
                 << " host_ms=" << host_ms << " hot_allocations=" << hot
-                << " runs=1 warmups=0 first_use=true readout_included=true\n";
+                << " diagnostic_d2h_host_ms=" << readout_ms << " diagnostic_d2h_bytes=" << out->bytes()
+                << " timing_schema=2 boundary=head_projection_logits runs=1 warmups=0 first_use=true readout_included=false\n";
       return hot ? 1 : 0;
     }
 
@@ -447,8 +451,9 @@ int main(int argc, char** argv) {
               << " device_to_device_copies=0" << " launch_path="
               << (c.grouped_ab ? "paired_bf16" : "single_isolated")
               << " epilogue=" << static_cast<int>(c.epi)
-              << " input_scaling=none activation=bf16" << " kernel_ms=" << ms
-              << " host_complete_ms=" << host_complete_ms
+              << " input_scaling=none activation=bf16" << " gpu_event_interval_ms=" << ms
+              << " timing_schema=2 boundary=projection_epilogue first_use=false warmups=2 event_aggregation=mean_per_operation readout_included=false"
+              << " diagnostic_repeat_with_d2h_host_ms=" << host_complete_ms
               << " host_readout_copies=" << iterations * (c.grouped_ab ? 2 : 1)
               << " readout_bytes="
               << out->bytes() + (c.grouped_ab ? out_b->bytes() : 0) << '\n';
@@ -618,8 +623,9 @@ int main(int argc, char** argv) {
               << (c.swiglu ? "paired_swiglu" : "grouped_ranges")
               << " epilogue=" << (c.swiglu ? "swiglu_store_bf16" : "store_bf16")
               << " input_scaling=none activation=bf16"
-              << " kernel_ms=" << *elapsed / iterations
-              << " host_complete_ms=" << host_complete_ms
+              << " gpu_event_interval_ms=" << *elapsed / iterations
+              << " timing_schema=2 boundary=projection_epilogue first_use=false warmups=2 event_aggregation=mean_per_operation readout_included=false"
+              << " diagnostic_repeat_with_d2h_host_ms=" << host_complete_ms
               << " host_readout_copies="
               << iterations * (c.swiglu ? 1 : c.count)
               << " readout_bytes=" << readout_bytes << '\n';

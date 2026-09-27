@@ -3,6 +3,7 @@
 #include "runtime/language_layer.hpp"
 #include "runtime/prefill.hpp"
 #include "cuda/decode_control.hpp"
+#include "cuda/attention.hpp"
 
 namespace qw38::runtime::detail {
 // Private full-model route. The caller validates the complete boundary, owns
@@ -25,6 +26,7 @@ struct Submission {
       qw38::cuda::DecodeControl const* = nullptr);
   static std::expected<void, Error> prefill_attention(PrefillAttentionLayerPlan const&,
       PrefillAttentionWorkspace&, qw38::cuda::PrefillEngine&, float const*, float*, float*,
-      std::uint32_t, std::uint64_t, bool, int* = nullptr);
+      std::uint32_t, std::uint64_t, bool, int* = nullptr,
+      qw38::cuda::ContextRegime = qw38::cuda::ContextRegime::Large);
 };
 }  // namespace qw38::runtime::detail

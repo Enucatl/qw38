@@ -8,14 +8,27 @@
 #include <cuda_runtime.h>
 
 #include <cstdint>
+#include <charconv>
+#include <chrono>
 #include <iostream>
 #include <span>
 #include <vector>
 
-// FAST-02: one complete operation per phase, no warmups or repetitions.
-int main() {
+// Core diagnostic only: no output projection/residual. For the resident M1
+// boundary: qw38_bench_attention_prefill --decode ARTIFACT 4096 output.f32
+// FAST-02: one first-use operation per phase, no warmups or repetitions.
+int main(int argc, char** argv) {
   using namespace qw38::cuda;
-  constexpr std::uint32_t prefix = 32768, rows = 32, capacity = prefix + rows;
+  unsigned visible = 32769;
+  if (argc == 2 || argc == 3) {
+    std::string_view arg(argv[1]);
+    auto [end, ec] = std::from_chars(arg.data(), arg.data() + arg.size(), visible);
+    if (ec != std::errc{} || end != arg.end() ||
+        (visible != 4096 && visible != 32768)) return 2;
+  } else if (argc != 1) return 2;
+  bool const short_split = argc == 3 && std::string_view(argv[2]) == "short128";
+  if (argc == 3 && !short_split) return 2;
+  std::uint32_t const prefix = visible - 1, rows = 32, capacity = prefix + rows;
   constexpr std::uint32_t H = kAttnQueryHeads, D = kAttnHeadDim;
   constexpr std::uint32_t W = kAttnKvHeads * D;
   auto stream = Stream::create();
@@ -45,7 +58,9 @@ int main() {
   auto y = DeviceBuffer::allocate(rows * H * D * 2u);
   cudaDeviceProp prop{};
   if (cudaGetDeviceProperties(&prop, stream->device()) != cudaSuccess) return 1;
-  auto const segments = attention_partition_count(prefix + 1, prop.multiProcessorCount);
+  auto const segments = short_split && visible <= 4096
+      ? std::min((visible + 127) / 128, attention_partition_count(capacity * 2, prop.multiProcessorCount))
+      : attention_partition_count(visible, prop.multiProcessorCount);
   auto partials = DeviceBuffer::allocate(H * segments * kAttnPartialStride * 4u);
   auto frequencies = DeviceBuffer::allocate(kAttnRopeFreqs * 4u);
   auto start = Event::create_timing();
@@ -69,6 +84,8 @@ int main() {
             << " local_bytes=" << decode_resources->local_bytes
             << " blocks_per_sm=" << decode_resources->occupancy_blocks_per_sm << '\n';
   for (bool prefill : {true, false}) {
+    if (argc >= 2 && prefill) continue;
+    auto const host_start = std::chrono::steady_clock::now();
     if (!start->record(*stream) || !launch_attention_prepare_chunk(
         static_cast<std::uint16_t const*>(qg->data()),
         static_cast<std::uint16_t const*>(k->data()),
@@ -96,6 +113,9 @@ int main() {
     auto ms = elapsed_ms(*start, *end);
     if (!ms) return 1;
     std::cout << "phase=" << (prefill ? "prefill" : "decode")
-              << " rows=" << (prefill ? rows : 1u) << " complete_gpu_ms=" << *ms << '\n';
+              << " rows=" << (prefill ? rows : 1u) << " gpu_event_interval_ms=" << *ms
+              << " timing_schema=2 boundary=prepare_append_scan_gate_core_only"
+              << " first_use=true readout_included=false host_ms=" << std::chrono::duration<double, std::milli>(
+                     std::chrono::steady_clock::now() - host_start).count() << '\n';
   }
 }

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <nvtx3/nvToolsExt.h>
+#include <cstdio>
 
 namespace qw38::runtime::profiling {
 
@@ -11,6 +12,14 @@ class ScopedRange {
  public:
   explicit ScopedRange(char const* name) noexcept : active_(enabled) {
     if (active_) nvtxRangePushA(name);
+  }
+  template<class... Args>
+  ScopedRange(char const* format, Args... args) noexcept : active_(enabled) {
+    if (active_) {
+      char name[384];
+      std::snprintf(name, sizeof(name), format, args...);
+      nvtxRangePushA(name);
+    }
   }
   ~ScopedRange() { close(); }
   void close() noexcept {
