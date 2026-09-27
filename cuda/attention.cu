@@ -2,7 +2,8 @@
 #include "cuda/fp8_device.cuh"
 #include "cuda/prefill.hpp"
 
-#include <mma.h>
+#include <cute/arch/mma_sm80.hpp>
+#include <cute/arch/copy_sm80.hpp>
 
 #include <array>
 #include <cstddef>
@@ -168,190 +169,38 @@ __global__ void attention_prepare_kernel(
   copy_head(v_src, v_dst);
 }
 
-// The segment scan deliberately keeps scores and K/V staging in shared memory.
-// A block owns one query head and one 256-key segment.  Only one 32-key tile is
-// staged at a time; partials are the sole sequence-length-dependent global
-// output.
-__global__ void attention_scan_kernel(
-    std::uint16_t const* q, std::uint16_t const* kv,
-    std::uint32_t attn_layer, std::uint64_t capacity,
-    std::uint64_t populated, float* partials, std::uint32_t n_segments) {
-  __shared__ float q_shared[kAttnHeadDim];
-  __shared__ std::uint16_t tile[kAttnSubtileKeys * kAttnHeadDim];
-  __shared__ float scores[kAttnSubtileKeys];
-  __shared__ float m_shared;
-  __shared__ float l_shared;
-  __shared__ float num_shared[kAttnHeadDim];
-  __shared__ float old_scale;
-
-  std::uint32_t const h = blockIdx.x;
-  std::uint32_t const segment = blockIdx.y;
-  std::uint32_t const tid = threadIdx.x;
-  std::size_t const head_stride =
-      static_cast<std::size_t>(capacity) * kAttnHeadDim;
-  std::size_t const comp_stride =
-      static_cast<std::size_t>(kAttnKvHeads) * head_stride;
-  std::size_t const layer_stride = 2u * comp_stride;
-  std::uint16_t const* layer =
-      kv + static_cast<std::size_t>(attn_layer) * layer_stride;
-  std::uint16_t const* k_base = layer;
-  std::uint16_t const* v_base = layer + comp_stride;
-  std::uint32_t const kv_h = h / kAttnGqaGroup;
-  std::uint16_t const* q_head = q + static_cast<std::size_t>(h) * kAttnHeadDim;
-  std::size_t const kv_head_base = static_cast<std::size_t>(kv_h) * head_stride;
-
-  for (std::uint32_t d = tid; d < kAttnHeadDim; d += kAttnScanThreads) {
-    q_shared[d] = bf16_to_fp32(q_head[d]);
-    num_shared[d] = 0.0f;
-  }
-  if (tid == 0) {
-    m_shared = -INFINITY;
-    l_shared = 0.0f;
-  }
-  __syncthreads();
-
-  std::uint64_t const segment_begin =
-      static_cast<std::uint64_t>(segment) * kAttnSegmentKeys;
-  for (std::uint32_t sub = 0; sub < kAttnSegmentKeys;
-       sub += kAttnSubtileKeys) {
-    std::uint32_t const key_count = kAttnSubtileKeys;
-    for (std::uint32_t i = tid; i < key_count * kAttnHeadDim;
-         i += kAttnScanThreads) {
-      std::uint32_t const local_key = i / kAttnHeadDim;
-      std::uint32_t const d = i % kAttnHeadDim;
-      std::uint64_t const token = segment_begin + sub + local_key;
-      if (token < populated && token < capacity) {
-        tile[i] = k_base[kv_head_base + token * kAttnHeadDim + d];
-      } else {
-        tile[i] = 0;
-      }
-    }
-    __syncthreads();
-
-    // Each warp reduces one dot product; all four warps cover the key tile.
-    for (std::uint32_t key = tid / 32u; key < kAttnSubtileKeys; key += 4u) {
-      std::uint64_t const token = segment_begin + sub + key;
-      float score = 0.0f;
-      if (token < populated && token < capacity) {
-        for (std::uint32_t d = tid % 32u; d < kAttnHeadDim; d += 32u) {
-          score += q_shared[d] * bf16_to_fp32(tile[key * kAttnHeadDim + d]);
-        }
-      }
-      score = warp_sum(score);
-      if (tid % 32u == 0)
-        scores[key] = token < populated && token < capacity
-            ? score * kAttnScale : -INFINITY;
-    }
-    __syncthreads();
-
-    if (tid == 0) {
-      float tile_max = -INFINITY;
-      for (std::uint32_t i = 0; i < key_count; ++i) {
-        tile_max = fmaxf(tile_max, scores[i]);
-      }
-      float const m_new = fmaxf(m_shared, tile_max);
-      old_scale = (m_shared == -INFINITY)
-                      ? 0.0f
-                      : expf(m_shared - m_new);
-      m_shared = m_new;
-    }
-    __syncthreads();
-    // Reuse one FP32 probability for the denominator and every value lane.
-    if (tid < key_count)
-      scores[tid] = scores[tid] == -INFINITY
-          ? 0.0f : expf(scores[tid] - m_shared);
-    for (std::uint32_t d = tid; d < kAttnHeadDim; d += kAttnScanThreads)
-      num_shared[d] *= old_scale;
-    __syncthreads();
-    if (tid == 0) {
-      float tile_sum = 0.0f;
-      for (std::uint32_t i = 0; i < key_count; ++i) tile_sum += scores[i];
-      l_shared = l_shared * old_scale + tile_sum;
-    }
-
-    for (std::uint32_t i = tid; i < key_count * kAttnHeadDim;
-         i += kAttnScanThreads) {
-      std::uint32_t const local_key = i / kAttnHeadDim;
-      std::uint32_t const d = i % kAttnHeadDim;
-      std::uint64_t const token = segment_begin + sub + local_key;
-      if (token < populated && token < capacity) {
-        tile[i] = v_base[kv_head_base + token * kAttnHeadDim + d];
-      } else {
-        tile[i] = 0;
-      }
-    }
-    __syncthreads();
-    // There are 256 value coordinates but only 128 threads, so each thread
-    // owns two coordinates.  Every numerator lane must be updated; leaving
-    // the upper half untouched would silently zero half of attention output.
-    for (std::uint32_t d = tid; d < kAttnHeadDim; d += kAttnScanThreads) {
-      float add = 0.0f;
-      for (std::uint32_t i = 0; i < key_count; ++i)
-        add += scores[i] * bf16_to_fp32(tile[i * kAttnHeadDim + d]);
-      num_shared[d] += add;
-    }
-    __syncthreads();
-  }
-
-  std::size_t const out =
-      (static_cast<std::size_t>(h) * n_segments + segment) *
-      static_cast<std::size_t>(kAttnPartialStride);
-  for (std::uint32_t d = tid; d < kAttnHeadDim; d += kAttnScanThreads) {
-    partials[out + 2u + d] = num_shared[d];
-  }
-  if (tid == 0) {
-    partials[out] = m_shared;
-    partials[out + 1u] = l_shared;
-  }
-}
-
+// Cooperatively stage split statistics, then combine each coordinate in a
+// deterministic partition order. No barrier is needed inside that order.
 __global__ void attention_merge_kernel(
     float const* partials, std::uint16_t const* g, std::uint32_t n_segments,
     std::uint16_t* y_out) {
-  __shared__ float num[kAttnHeadDim];
-  __shared__ float m;
-  __shared__ float l;
-  __shared__ float old_scale;
-  __shared__ float tile_scale;
-  std::uint32_t const h = blockIdx.x;
-  std::uint32_t const tid = threadIdx.x;
-  if (tid == 0) {
-    m = -INFINITY;
-    l = 0.0f;
-  }
-  for (std::uint32_t d = tid; d < kAttnHeadDim; d += kAttnMergeThreads) {
-    num[d] = 0.0f;
+  __shared__ float maxima[kAttnMaxPartitions], sums[kAttnMaxPartitions];
+  __shared__ float weights[kAttnMaxPartitions], denominator;
+  unsigned const tid = threadIdx.x, h = blockIdx.x;
+  auto const* head = partials + std::size_t(h) * n_segments * kAttnPartialStride;
+  if (tid < n_segments) {
+    maxima[tid] = head[tid * kAttnPartialStride];
+    sums[tid] = head[tid * kAttnPartialStride + 1];
   }
   __syncthreads();
-  for (std::uint32_t s = 0; s < n_segments; ++s) {
-    std::size_t const off =
-        (static_cast<std::size_t>(h) * n_segments + s) *
-        static_cast<std::size_t>(kAttnPartialStride);
-    if (tid == 0) {
-      float const bm = partials[off];
-      float const bl = partials[off + 1u];
-      float const mn = fmaxf(m, bm);
-      old_scale = (m == -INFINITY) ? 0.0f : expf(m - mn);
-      tile_scale = (bm == -INFINITY) ? 0.0f : expf(bm - mn);
-      l = old_scale * l + tile_scale * bl;
-      m = mn;
-    }
-    __syncthreads();
-    for (std::uint32_t d = tid; d < kAttnHeadDim; d += kAttnMergeThreads) {
-      num[d] = old_scale * num[d] + tile_scale * partials[off + 2u + d];
-    }
-    __syncthreads();
-  }
+  float best = -INFINITY;
+  for (unsigned s = 0; s < n_segments; ++s) best = fmaxf(best, maxima[s]);
+  if (tid < n_segments)
+    weights[tid] = maxima[tid] == -INFINITY ? 0.f : expf(maxima[tid] - best);
+  __syncthreads();
   if (tid == 0) {
-    for (std::uint32_t d = 0; d < kAttnHeadDim; ++d) {
-      float const a = (l > 0.0f) ? num[d] / l : 0.0f;
-      float const gate = bf16_to_fp32(g[static_cast<std::size_t>(h) * kAttnHeadDim + d]);
-      float const sig = sigmoid_fp32(gate);
-      float gated = a;
-      gated *= sig;
-      y_out[static_cast<std::size_t>(h) * kAttnHeadDim + d] =
-          fp32_to_bf16_rne(gated);
-    }
+    float total = 0;
+    for (unsigned s = 0; s < n_segments; ++s) total += weights[s] * sums[s];
+    denominator = total;
+  }
+  __syncthreads();
+  for (unsigned d = tid; d < kAttnHeadDim; d += kAttnMergeThreads) {
+    float num = 0;
+    for (unsigned s = 0; s < n_segments; ++s)
+      num += weights[s] * head[s * kAttnPartialStride + 2 + d];
+    auto const off = std::size_t(h) * kAttnHeadDim + d;
+    y_out[off] = fp32_to_bf16_rne((denominator > 0 ? num / denominator : 0.f) *
+        sigmoid_fp32(bf16_to_fp32(g[off])));
   }
 }
 
@@ -553,163 +402,225 @@ __global__ void attention_prefill_scan_kernel(
   }
 }
 
-constexpr int kPrefillThreads = 256;
-constexpr std::size_t kPrefillSharedBytes =
-    (kAttnPrefillQueryTile + kAttnPrefillKeyTile) * kAttnHeadDim * 2u +
-    kAttnPrefillQueryTile * kAttnPrefillKeyTile * 4u +
-    (kAttnPrefillQueryTile * kAttnPrefillKeyTile +
-     3u * kAttnPrefillQueryTile) * sizeof(float);
+constexpr int kPrefillThreads = 128;
+constexpr int kKvTileStride = 264; // Eight BF16 padding elements avoid bank aliasing.
+constexpr std::size_t kPrefillSharedBytes = 2u * 64 * kKvTileStride * 2u;
 
-__global__ void attention_prefill_mma_kernel(
+__device__ __forceinline__ unsigned bf16_pair(unsigned short a, unsigned short b) {
+  return unsigned(a) | (unsigned(b) << 16);
+}
+
+__device__ __forceinline__ void attention_mma(float (&c)[4],
+    unsigned a0, unsigned a1, unsigned a2, unsigned a3, unsigned b0, unsigned b1) {
+  cute::SM80_16x8x16_F32BF16BF16F32_TN::fma(c[0], c[1], c[2], c[3],
+      a0, a1, a2, a3, b0, b1, c[0], c[1], c[2], c[3]);
+}
+
+__device__ void stage_attention_kv(std::uint16_t const* source,
+    std::uint16_t* tile, std::uint64_t base, std::uint64_t end) {
+  for (int i = threadIdx.x; i < 64 * 32; i += kPrefillThreads) {
+    auto const token = base + i / 32;
+    bool const valid = token < end;
+    // Even a zero-fill copy uses an in-bounds source address.
+    auto const* src = reinterpret_cast<uint4 const*>(source +
+        (valid ? token * 256 + (i % 32) * 8 : 0));
+    auto* dst = reinterpret_cast<uint4*>(tile + (i / 32) * kKvTileStride + (i % 32) * 8);
+    cute::SM80_CP_ASYNC_CACHEGLOBAL_ZFILL<uint4>::copy(*src, *dst, valid);
+  }
+  cute::cp_async_fence();
+}
+
+// KQ is [key,query], PV is [value,query]. Each m16n8 accumulator lane owns
+// rows lane/4 and lane/4+8, columns 2*(lane%4) and 2*(lane%4)+1.
+// The eight-column register layout, separate K/V pipeline and grouped heads
+// follow pinned llama.cpp fattn-mma-f16.cuh (see third_party attribution).
+// Both probability components and all statistics/accumulators remain FP32/BF16.
+template <bool Decode>
+__global__ void attention_mma_kernel(
     std::uint16_t const* q, std::uint16_t const* g,
     std::uint16_t const* kv, std::uint32_t attn_layer,
     std::uint64_t capacity, std::uint64_t first_position,
-    std::uint32_t valid_tokens, std::uint16_t* y, std::uint8_t* fp8_codes, float* fp8_scales) {
-  namespace wmma = nvcuda::wmma;
-  constexpr int Q = kAttnPrefillQueryTile, K = kAttnPrefillKeyTile;
-  constexpr int D = kAttnHeadDim;
-  extern __shared__ __align__(32) unsigned char storage[];
-  auto* qs = reinterpret_cast<__nv_bfloat16*>(storage);
-  auto* tile = qs + Q * D;  // K and V share storage after QK completes.
-  auto* scores = reinterpret_cast<float*>(tile + K * D);
-  auto* probabilities = reinterpret_cast<__nv_bfloat16*>(scores + Q * K);
-  auto* probability_residual = probabilities + Q * K;
-  float* m = reinterpret_cast<float*>(probability_residual + Q * K);
-  float* l = m + Q;
-  float* rescale = l + Q;
-  int const tid = threadIdx.x, warp = tid / 32, lane = tid % 32;
-  std::uint32_t const h = blockIdx.x, row0 = blockIdx.y * Q;
-  unsigned const pm=(valid_tokens+127)/128*128;
-  if(fp8_codes && row0>=valid_tokens) {
-    for(unsigned r=0;r<Q;++r)
-      fp8_pack_row(nullptr,row0+r,pm,D,fp8_codes,fp8_scales,h*2,6144);
-    return;
+    std::uint32_t valid_tokens, std::uint16_t* y,
+    std::uint8_t* fp8_codes, float* fp8_scales,
+    float* partials = nullptr, std::uint32_t partitions = 0) {
+  constexpr int D = 256, K = 64, Q = 32;
+  constexpr int ValueTiles = Decode ? 4 : 16;
+  extern __shared__ __align__(16) unsigned char storage[];
+  auto* ks = reinterpret_cast<std::uint16_t*>(storage);
+  auto* vs = ks + K * kKvTileStride;
+  int const warp = threadIdx.x / 32, lane = threadIdx.x % 32;
+  unsigned const h = blockIdx.x, row0 = Decode ? 0 : blockIdx.y * Q;
+  unsigned const pm = (valid_tokens + 127) / 128 * 128;
+  if constexpr (!Decode) {
+    if (fp8_codes && row0 >= valid_tokens) {
+      for (unsigned r = 0; r < Q; ++r)
+        fp8_pack_row(nullptr, row0 + r, pm, D, fp8_codes, fp8_scales, h * 2, 6144);
+      return;
+    }
   }
-  std::size_t const head_stride = static_cast<std::size_t>(capacity) * D;
+  std::size_t const head_stride = capacity * D;
   std::size_t const comp_stride = kAttnKvHeads * head_stride;
-  auto const* k_base = kv + attn_layer * 2u * comp_stride +
-      (h / kAttnGqaGroup) * head_stride;
-  auto const* v_base = k_base + comp_stride;
-  for (int i = tid; i < Q * D; i += kPrefillThreads) {
-    std::uint32_t const row = row0 + i / D;
-    qs[i] = __ushort_as_bfloat16(row < valid_tokens
-        ? q[(static_cast<std::size_t>(row) * kAttnQueryHeads + h) * D + i % D]
-        : 0);
+  auto const* kb = kv + attn_layer * 2u * comp_stride +
+      (Decode ? h : h / kAttnGqaGroup) * head_stride;
+  auto const* vb = kb + comp_stride;
+  // Decode's four warps share six Q heads and divide the output coordinates.
+  // Prefill's four warps each own eight query rows and all 256 coordinates.
+  unsigned const qcol = Decode ? lane / 4 : row0 + warp * 8 + lane / 4;
+  bool const qvalid = Decode ? qcol < 6 : qcol < valid_tokens;
+  std::size_t const qoff = (Decode ? h * 6 + qcol : qcol * kAttnQueryHeads + h) * D;
+  unsigned qr[16][2];
+#pragma unroll
+  for (int d = 0; d < 16; ++d) {
+#pragma unroll
+    for (int j = 0; j < 2; ++j) {
+      auto const off = qoff + d * 16 + (lane % 4) * 2 + j * 8;
+      qr[d][j] = qvalid ? bf16_pair(q[off], q[off + 1]) : 0;
+    }
   }
-  if (tid < Q) { m[tid] = -INFINITY; l[tid] = 0.0f; }
-  // Each thread owns one value coordinate across the 32 query rows.
-  float numerator[Q]{};
+  float pv[ValueTiles][4]{};
+  float maximum[2] = {-INFINITY, -INFINITY}, denominator[2]{};
+  std::uint64_t begin = 0;
+  std::uint64_t end = first_position + min(valid_tokens, row0 + Q);
+  if constexpr (Decode) {
+    // Partition the active tiles, independently of the allocated KV capacity.
+    // Fixed launch buckets may contain empty partitions; those store neutral data.
+    auto const tiles = (first_position + K - 1) / K;
+    begin = (tiles * blockIdx.y / partitions) * K;
+    end = min(first_position, (tiles * (blockIdx.y + 1) / partitions) * K);
+  }
+  stage_attention_kv(kb, ks, begin, end);
+  cute::cp_async_wait<0>();
   __syncthreads();
-  std::uint64_t const last = first_position + min(valid_tokens, row0 + Q);
-  for (std::uint64_t base = 0; base < last; base += K) {
-    for (int i = tid; i < K * D; i += kPrefillThreads) {
-      std::uint64_t const token = base + i / D;
-      tile[i] = __ushort_as_bfloat16(token < last
-          ? k_base[token * D + i % D] : 0);
-    }
-    __syncthreads();
-    wmma::fragment<wmma::matrix_a, 16, 16, 16, __nv_bfloat16, wmma::row_major> a;
-    wmma::fragment<wmma::matrix_b, 16, 16, 16, __nv_bfloat16, wmma::col_major> b;
-    wmma::fragment<wmma::accumulator, 16, 16, 16, float> dot;
-    wmma::fill_fragment(dot, 0.0f);
-    for (int d = 0; d < D; d += 16) {
-      wmma::load_matrix_sync(a, qs + (warp / 4) * 16 * D + d, D);
-      wmma::load_matrix_sync(b, tile + (warp % 4) * 16 * D + d, D);
-      wmma::mma_sync(dot, a, b, dot);
-    }
-    wmma::store_matrix_sync(scores + (warp / 4) * 16 * K + (warp % 4) * 16,
-                            dot, K, wmma::mem_row_major);
-    __syncthreads();
-    // A warp owns each row's two groups of 32 scores. All reductions,
-    // exponentials and running statistics stay FP32, including masked tails.
-    // A single BF16 P failed the real-layer tolerance. Split P into BF16 high
-    // and residual components for two MMA contributions (TASK-033 fallback).
-    for (int r = warp; r < Q; r += kPrefillThreads / 32) {
-      bool const valid = row0 + r < valid_tokens;
-      float s0 = valid && base + lane <= first_position + row0 + r
-          ? scores[r * K + lane] * kAttnScale : -INFINITY;
-      float s1 = valid && base + lane + 32 <= first_position + row0 + r
-          ? scores[r * K + lane + 32] * kAttnScale : -INFINITY;
-      float best = fmaxf(m[r], fmaxf(s0, s1));
+  for (std::uint64_t base = begin; base < end; base += K) {
+    stage_attention_kv(vb, vs, base, end); // Overlap V with QK.
+    float score[4][4]{};
 #pragma unroll
-      for (int off = 16; off > 0; off >>= 1)
-        best = fmaxf(best, __shfl_xor_sync(0xffffffffu, best, off));
-      float const scale = m[r] == -INFINITY ? 0.0f : expf(m[r] - best);
-      float const p0 = s0 == -INFINITY ? 0.0f : expf(s0 - best);
-      float const p1 = s1 == -INFINITY ? 0.0f : expf(s1 - best);
-      float const sum = warp_sum(p0 + p1);
-      probabilities[r * K + lane] = __float2bfloat16_rn(p0);
-      probabilities[r * K + lane + 32] = __float2bfloat16_rn(p1);
-      probability_residual[r * K + lane] = __float2bfloat16_rn(
-          p0 - __bfloat162float(probabilities[r * K + lane]));
-      probability_residual[r * K + lane + 32] = __float2bfloat16_rn(
-          p1 - __bfloat162float(probabilities[r * K + lane + 32]));
-      if (lane == 0) {
-        m[r] = best;
-        l[r] = l[r] * scale + sum;
-        rescale[r] = scale;
+    for (int d = 0; d < 16; ++d) {
+#pragma unroll
+      for (int t = 0; t < 4; ++t) {
+        int const r = t * 16 + lane / 4, c = d * 16 + (lane % 4) * 2;
+        attention_mma(score[t],
+            bf16_pair(ks[r * kKvTileStride + c], ks[r * kKvTileStride + c + 1]),
+            bf16_pair(ks[(r + 8) * kKvTileStride + c], ks[(r + 8) * kKvTileStride + c + 1]),
+            bf16_pair(ks[r * kKvTileStride + c + 8], ks[r * kKvTileStride + c + 9]),
+            bf16_pair(ks[(r + 8) * kKvTileStride + c + 8], ks[(r + 8) * kKvTileStride + c + 9]),
+            qr[d][0], qr[d][1]);
       }
     }
-    __syncthreads();
-    for (int i = tid; i < K * D; i += kPrefillThreads) {
-      std::uint64_t const token = base + i / D;
-      tile[i] = __ushort_as_bfloat16(token < last
-          ? v_base[token * D + i % D] : 0);
-    }
-    __syncthreads();
+    __syncthreads(); // All K readers finish before the next K tile arrives.
+    stage_attention_kv(kb, ks, base + K, end); // Overlap next K with softmax/PV.
+    float best[2] = {maximum[0], maximum[1]};
 #pragma unroll
-    for (int r = 0; r < Q; ++r) numerator[r] *= rescale[r];
-    wmma::fragment<wmma::matrix_b, 16, 16, 16, __nv_bfloat16, wmma::row_major> values;
-    wmma::fragment<wmma::accumulator, 16, 16, 16, float> pv[4];
+    for (int t = 0; t < 4; ++t) {
 #pragma unroll
-    for (int col = 0; col < 4; ++col) wmma::fill_fragment(pv[col], 0.0f);
-    for (int key = 0; key < K; key += 16) {
-      wmma::load_matrix_sync(a, probabilities + (warp / 4) * 16 * K + key, K);
-      wmma::fragment<wmma::matrix_a, 16, 16, 16, __nv_bfloat16, wmma::row_major> low;
-      wmma::load_matrix_sync(low, probability_residual + (warp / 4) * 16 * K + key, K);
-#pragma unroll
-      for (int col = 0; col < 4; ++col) {
-        wmma::load_matrix_sync(values, tile + key * D + (warp % 4) * 64 + col * 16, D);
-        wmma::mma_sync(pv[col], a, values, pv[col]);
-        wmma::mma_sync(pv[col], low, values, pv[col]);
+      for (int i = 0; i < 4; ++i) {
+        unsigned const col = (Decode ? 0 : row0 + warp * 8) + (lane % 4) * 2 + i % 2;
+        auto const key = base + t * 16 + lane / 4 + (i / 2) * 8;
+        bool const visible = Decode ? col < 6 && key < end
+            : col < valid_tokens && key < end && key <= first_position + col;
+        score[t][i] = visible ? score[t][i] * kAttnScale : -INFINITY;
+        best[i % 2] = fmaxf(best[i % 2], score[t][i]);
       }
     }
-    // All V readers finish before its 32 KiB staging becomes FP32 PV output.
-    // This avoids assumptions about WMMA fragment element-to-row mappings.
-    __syncthreads();
-    auto* product = reinterpret_cast<float*>(tile);
-    static_assert(Q * D * sizeof(float) <= K * D * sizeof(__nv_bfloat16));
 #pragma unroll
-    for (int col = 0; col < 4; ++col)
-      wmma::store_matrix_sync(product + (warp / 4) * 16 * D +
-          (warp % 4) * 64 + col * 16, pv[col], D, wmma::mem_row_major);
+    for (int c = 0; c < 2; ++c) {
+#pragma unroll
+      for (int off = 16; off >= 4; off /= 2)
+        best[c] = fmaxf(best[c], __shfl_xor_sync(0xffffffff, best[c], off));
+      float const scale = maximum[c] == -INFINITY ? 0.f : expf(maximum[c] - best[c]);
+      float sum = 0;
+#pragma unroll
+      for (int t = 0; t < 4; ++t) {
+#pragma unroll
+        for (int i = c; i < 4; i += 2) {
+          score[t][i] = score[t][i] == -INFINITY ? 0.f : expf(score[t][i] - best[c]);
+          sum += score[t][i];
+        }
+      }
+#pragma unroll
+      for (int off = 16; off >= 4; off /= 2) sum += __shfl_xor_sync(0xffffffff, sum, off);
+      denominator[c] = denominator[c] * scale + sum;
+      maximum[c] = best[c];
+#pragma unroll
+      for (int d = 0; d < ValueTiles; ++d) {
+        pv[d][c] *= scale;
+        pv[d][c + 2] *= scale;
+      }
+    }
+    cute::cp_async_wait<1>(); // V is ready; the next K group may remain in flight.
     __syncthreads();
 #pragma unroll
-    for (int r = 0; r < Q; ++r) numerator[r] += product[r * D + tid];
-    __syncthreads();
+    for (int t = 0; t < 4; ++t) {
+      unsigned high[2], low[2];
+#pragma unroll
+      for (int j = 0; j < 2; ++j) {
+        int const src = (lane % 4) * 8 + (lane / 4) / 2;
+        float const a = __shfl_sync(0xffffffff, score[t][j * 2], src);
+        float const b = __shfl_sync(0xffffffff, score[t][j * 2 + 1], src);
+        float const c = __shfl_sync(0xffffffff, score[t][j * 2], src + 4);
+        float const d = __shfl_sync(0xffffffff, score[t][j * 2 + 1], src + 4);
+        float const p0 = (lane / 4) % 2 ? b : a;
+        float const p1 = (lane / 4) % 2 ? d : c;
+        auto const hi0 = fp32_to_bf16_rne(p0), hi1 = fp32_to_bf16_rne(p1);
+        high[j] = bf16_pair(hi0, hi1);
+        low[j] = bf16_pair(fp32_to_bf16_rne(p0 - bf16_to_fp32(hi0)),
+                           fp32_to_bf16_rne(p1 - bf16_to_fp32(hi1)));
+      }
+#pragma unroll
+      for (int d = 0; d < ValueTiles; ++d) {
+        int const r = (Decode ? warp * 64 : 0) + d * 16 + lane / 4;
+        int const c = t * 16 + (lane % 4) * 2;
+        unsigned const a0 = bf16_pair(vs[c * kKvTileStride + r], vs[(c + 1) * kKvTileStride + r]);
+        unsigned const a1 = bf16_pair(vs[c * kKvTileStride + r + 8], vs[(c + 1) * kKvTileStride + r + 8]);
+        unsigned const a2 = bf16_pair(vs[(c + 8) * kKvTileStride + r], vs[(c + 9) * kKvTileStride + r]);
+        unsigned const a3 = bf16_pair(vs[(c + 8) * kKvTileStride + r + 8], vs[(c + 9) * kKvTileStride + r + 8]);
+        attention_mma(pv[d], a0, a1, a2, a3, high[0], high[1]);
+        attention_mma(pv[d], a0, a1, a2, a3, low[0], low[1]);
+      }
+    }
+    cute::cp_async_wait<0>();
+    __syncthreads(); // Next K ready; all V readers done before V is reused.
   }
 #pragma unroll
-  for (int r = 0; r < Q; ++r) {
-    if (row0 + r < valid_tokens) {
-      std::size_t const off = (static_cast<std::size_t>(row0 + r) *
-          kAttnQueryHeads + h) * D + tid;
-      auto rounded = fp32_to_bf16_rne(numerator[r] / l[r] *
-                                sigmoid_fp32(bf16_to_fp32(g[off])));
-      if(fp8_codes) reinterpret_cast<std::uint16_t*>(tile)[tid]=rounded;
-      else y[off]=rounded;
-    } else if(fp8_codes) reinterpret_cast<std::uint16_t*>(tile)[tid]=0;
-    if(fp8_codes) {
+  for (int d = 0; d < ValueTiles; ++d) {
+#pragma unroll
+    for (int i = 0; i < 4; ++i) {
+      unsigned const col = (Decode ? 0 : row0 + warp * 8) + (lane % 4) * 2 + i % 2;
+      unsigned const coord = (Decode ? warp * 64 : 0) + d * 16 + lane / 4 + (i / 2) * 8;
+      if constexpr (Decode) {
+        if (col < 6) {
+          auto const off = ((h * 6 + col) * std::size_t(partitions) + blockIdx.y) * kAttnPartialStride;
+          partials[off + 2 + coord] = pv[d][i];
+          if (coord == 0) {
+            partials[off] = maximum[i % 2];
+            partials[off + 1] = denominator[i % 2];
+          }
+        }
+      } else {
+        std::uint16_t rounded = 0;
+        if (col < valid_tokens) {
+          auto const off = (std::size_t(col) * kAttnQueryHeads + h) * D + coord;
+          rounded = fp32_to_bf16_rne(pv[d][i] / denominator[i % 2] * sigmoid_fp32(bf16_to_fp32(g[off])));
+          if (!fp8_codes) y[off] = rounded;
+        }
+        if (fp8_codes) ks[(col - row0) * D + coord] = rounded;
+      }
+    }
+  }
+  if constexpr (!Decode) {
+    if (fp8_codes) {
       __syncthreads();
-      fp8_pack_row(reinterpret_cast<std::uint16_t*>(tile),row0+r,pm,D,fp8_codes,fp8_scales,h*2,6144);
-      __syncthreads();
+      for (unsigned r = 0; r < Q; ++r)
+        fp8_pack_row(ks + r * D, row0 + r, pm, D, fp8_codes, fp8_scales, h * 2, 6144);
     }
   }
 }
 
+template <bool Decode = false>
 std::expected<void, Error> configure_prefill_mma() {
-  return check(cudaFuncSetAttribute(attention_prefill_mma_kernel,
+  return check(cudaFuncSetAttribute(attention_mma_kernel<Decode>,
       cudaFuncAttributeMaxDynamicSharedMemorySize, kPrefillSharedBytes),
-      "cudaFuncSetAttribute(attention_prefill_mma_kernel)");
+      "cudaFuncSetAttribute(attention_mma_kernel)");
 }
 
 }  // namespace
@@ -825,7 +736,8 @@ std::expected<void, Error> launch_attention_prefill_scan(
     std::uint32_t valid_tokens, std::uint16_t* y,
     Stream const& stream, std::uint32_t query_tile, std::uint8_t* fp8_codes, float* fp8_scales) {
   if (auto st = require_stream(stream, "attention_prefill_scan"); !st) return st;
-  if (!q || !g || !kv || !y || attn_layer >= kAttnLayers ||
+  if (!q || !g || !kv || !y || reinterpret_cast<std::uintptr_t>(kv) % 16 != 0 ||
+      attn_layer >= kAttnLayers ||
       !valid_tokens || valid_tokens > 1024u ||
       first_position >= capacity || valid_tokens > capacity - first_position ||
       (query_tile != kAttnPrefillQueryTile &&
@@ -879,7 +791,7 @@ std::expected<void, Error> launch_attention_prefill_scan(
   dim3 const grid(kAttnQueryHeads,(rows + query_tile - 1u) / query_tile);
   if (query_tile == kAttnPrefillQueryTile) {
     if (auto st = configure_prefill_mma(); !st) return st;
-    attention_prefill_mma_kernel
+    attention_mma_kernel<false>
         <<<grid, kPrefillThreads, kPrefillSharedBytes, stream.native()>>>(
             q, g, kv, attn_layer, capacity, first_position, valid_tokens, y, fp8_codes, fp8_scales);
   } else if (query_tile == kAttnPrefillQueryTileScalar)
@@ -901,7 +813,7 @@ std::expected<AttentionPrefillResources, Error> attention_prefill_resources(
     return std::unexpected(make_error(ErrorCode::InvalidArgument,
                                       "attention_prefill_resources", "invalid query tile"));
   void const* kernel = query_tile == kAttnPrefillQueryTile
-      ? reinterpret_cast<void const*>(attention_prefill_mma_kernel)
+      ? reinterpret_cast<void const*>(attention_mma_kernel<false>)
       : query_tile == kAttnPrefillQueryTileScalar
           ? reinterpret_cast<void const*>(attention_prefill_scan_kernel<kAttnPrefillQueryTileScalar>)
           : reinterpret_cast<void const*>(attention_prefill_scan_kernel<kAttnPrefillQueryTileControl>);
@@ -924,6 +836,19 @@ std::expected<AttentionPrefillResources, Error> attention_prefill_resources(
       static_cast<std::size_t>(attr.localSizeBytes), occupancy};
 }
 
+std::expected<AttentionPrefillResources, Error> attention_decode_resources() {
+  if (auto st = configure_prefill_mma<true>(); !st) return std::unexpected(st.error());
+  cudaFuncAttributes attr{};
+  int occupancy = 0;
+  if (auto st = check(cudaFuncGetAttributes(&attr, attention_mma_kernel<true>),
+          "attention decode attributes"); !st) return std::unexpected(st.error());
+  if (auto st = check(cudaOccupancyMaxActiveBlocksPerMultiprocessor(&occupancy,
+          attention_mma_kernel<true>, kPrefillThreads, kPrefillSharedBytes),
+          "attention decode occupancy"); !st) return std::unexpected(st.error());
+  return AttentionPrefillResources{attr.numRegs, attr.sharedSizeBytes + kPrefillSharedBytes,
+      attr.localSizeBytes, occupancy};
+}
+
 std::expected<void, Error> launch_attention_scan(
     std::uint16_t const* q, std::uint16_t const* kv, std::uint32_t attn_layer,
     std::uint64_t capacity, std::uint64_t populated, float* partials,
@@ -942,18 +867,25 @@ std::expected<void, Error> launch_attention_scan(
     return std::unexpected(make_error(ErrorCode::InvalidArgument, "attention_scan",
                                        "populated length exceeds capacity"));
   }
-  if (n_segments == 0) return {};
-  auto const expected = static_cast<std::uint64_t>(n_segments) * kAttnSegmentKeys;
-  if (populated > expected) {
+  if (n_segments > kAttnMaxPartitions || (n_segments == 0 && populated != 0)) {
     return std::unexpected(make_error(ErrorCode::InvalidArgument, "attention_scan",
-                                       "n_segments is smaller than populated length"));
+                                       "invalid bounded partition count"));
   }
+  if (n_segments == 0) return {};
+  constexpr auto kv_bytes_per_token = 16ull * 2 * kAttnKvHeads * kAttnHeadDim * 2;
+  if (capacity > std::numeric_limits<std::size_t>::max() / kv_bytes_per_token)
+    return std::unexpected(make_error(ErrorCode::Overflow, "attention_scan", "KV bytes overflow"));
+  if (auto st = validate_prefill_device_span(kv, capacity * kv_bytes_per_token, 16, stream.device()); !st) return st;
+  if (auto st = validate_prefill_device_span(q, kAttnQueryHeads * kAttnHeadDim * 2u, 2, stream.device()); !st) return st;
+  if (auto st = validate_prefill_device_span(partials,
+      std::size_t(kAttnQueryHeads) * n_segments * kAttnPartialStride * 4u, 4, stream.device()); !st) return st;
   auto guard = stream.activate();
   if (!guard) return std::unexpected(guard.error());
-  attention_scan_kernel<<<dim3(kAttnQueryHeads, n_segments, 1), kAttnScanThreads, 0,
-                          stream.native()>>>(q, kv, attn_layer, capacity, populated,
-                                              partials, n_segments);
-  return check(cudaGetLastError(), "attention_scan_kernel");
+  if (auto st = configure_prefill_mma<true>(); !st) return st;
+  attention_mma_kernel<true><<<dim3(kAttnKvHeads, n_segments), kPrefillThreads,
+      kPrefillSharedBytes, stream.native()>>>(q, nullptr, kv, attn_layer, capacity,
+          populated, 1, nullptr, nullptr, nullptr, partials, n_segments);
+  return check(cudaGetLastError(), "attention_mma_kernel<true>");
 }
 
 std::expected<void, Error> launch_attention_merge(
@@ -961,7 +893,7 @@ std::expected<void, Error> launch_attention_merge(
     std::uint16_t* y_out, Stream const& stream) {
   auto st = require_stream(stream, "attention_merge");
   if (!st) return st;
-  if (partials == nullptr || g == nullptr || y_out == nullptr) {
+  if (partials == nullptr || g == nullptr || y_out == nullptr || n_segments > kAttnMaxPartitions) {
     return std::unexpected(make_error(ErrorCode::InvalidArgument, "attention_merge",
                                        "null merge operand"));
   }

@@ -1,5 +1,14 @@
 # Pinned Q4_K reference
 
+`cuda/attention.cu` uses the eight-column KQ/PV MMA fragment orientation,
+separate asynchronous K/V staging, grouped-query reuse, bounded split
+scheduling and cooperative merge patterns from `fattn-mma-f16.cuh`,
+`fattn-common.cuh` and `fattn.cu` at the same pinned revision below.
+The implementation uses installed CuTe BF16/FP32 MMA and asynchronous-copy
+primitives, FP32 softmax/statistics and two BF16 probability components;
+it does not adopt upstream FP16 accumulation. It specializes these patterns
+to D256, Q32/K64 prefill and six-head grouped decode with a fixed split rule.
+
 `cuda/q4k_q8.cu` adapts the integer MMQ/MMVQ structure from the same full
 revision `e6ab7c1a41054a888ada952eab4c886444c2f5ad`: `mmq-config-blackwell.cuh`
 falls through to `mmq-config-ampere.cuh` for Q4_K. We select I128/J32/K256,

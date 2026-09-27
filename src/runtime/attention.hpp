@@ -122,6 +122,7 @@ struct AttentionCorePlan {
   KvPopulatedSlot populated{};
   std::uint64_t kv_capacity{};
   std::uint32_t attn_layer{};
+  std::uint32_t partition_limit{};
   qw38::cuda::Stream const* stream{nullptr};
   SessionExecutionState* session_state{};
 };

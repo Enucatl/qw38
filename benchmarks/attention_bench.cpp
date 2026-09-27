@@ -12,10 +12,10 @@
 #include <span>
 #include <vector>
 
-// FAST-01: one complete operation per phase, no warmups or repetitions.
+// FAST-02: one complete operation per phase, no warmups or repetitions.
 int main() {
   using namespace qw38::cuda;
-  constexpr std::uint32_t prefix = 4096, rows = 32, capacity = prefix + rows;
+  constexpr std::uint32_t prefix = 32768, rows = 32, capacity = prefix + rows;
   constexpr std::uint32_t H = kAttnQueryHeads, D = kAttnHeadDim;
   constexpr std::uint32_t W = kAttnKvHeads * D;
   auto stream = Stream::create();
@@ -43,7 +43,9 @@ int main() {
   auto q = DeviceBuffer::allocate(rows * H * D * 2u);
   auto g = DeviceBuffer::allocate(rows * H * D * 2u);
   auto y = DeviceBuffer::allocate(rows * H * D * 2u);
-  constexpr auto segments = (prefix + 1 + kAttnSegmentKeys - 1) / kAttnSegmentKeys;
+  cudaDeviceProp prop{};
+  if (cudaGetDeviceProperties(&prop, stream->device()) != cudaSuccess) return 1;
+  auto const segments = attention_partition_count(prefix + 1, prop.multiProcessorCount);
   auto partials = DeviceBuffer::allocate(H * segments * kAttnPartialStride * 4u);
   auto frequencies = DeviceBuffer::allocate(kAttnRopeFreqs * 4u);
   auto start = Event::create_timing();
@@ -52,14 +54,20 @@ int main() {
       !frequencies || !start || !end || !zero(*frequencies, *stream) ||
       !stream->sync()) return 1;
   auto resources = attention_prefill_resources();
-  cudaDeviceProp prop{};
-  if (!resources || cudaGetDeviceProperties(&prop, 0) != cudaSuccess) return 1;
+  auto decode_resources = attention_decode_resources();
+  if (!resources || !decode_resources) return 1;
   std::cout << "device=" << prop.name << " prefix=" << prefix
             << " capacity=" << capacity << " warmups=0 repetitions=1"
             << " registers=" << resources->registers
             << " shared_bytes=" << resources->shared_bytes
             << " local_bytes=" << resources->local_bytes
             << " blocks_per_sm=" << resources->occupancy_blocks_per_sm << '\n';
+  std::cout << "decode_partitions=" << segments << " sm_count=" << prop.multiProcessorCount
+            << " workspace_bytes=" << H * segments * kAttnPartialStride * 4u
+            << " registers=" << decode_resources->registers
+            << " shared_bytes=" << decode_resources->shared_bytes
+            << " local_bytes=" << decode_resources->local_bytes
+            << " blocks_per_sm=" << decode_resources->occupancy_blocks_per_sm << '\n';
   for (bool prefill : {true, false}) {
     if (!start->record(*stream) || !launch_attention_prepare_chunk(
         static_cast<std::uint16_t const*>(qg->data()),

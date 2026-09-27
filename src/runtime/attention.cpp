@@ -672,6 +672,11 @@ std::expected<AttentionCorePlan, Error> bind_attention_core_plan(
   }
 
   AttentionCorePlan plan;
+  int sm_count = 0;
+  if (auto st = qw38::cuda::check(cudaDeviceGetAttribute(&sm_count,
+          cudaDevAttrMultiProcessorCount, stream.device()), "attention SM count"); !st)
+    return std::unexpected(from_cuda(st.error()));
+  plan.partition_limit = qw38::cuda::attention_partition_count(views.kv_capacity, sm_count);
   plan.out = *out;
   plan.q = *q;
   plan.g = *g;
@@ -1033,7 +1038,8 @@ std::expected<TensorView, Error> execute_attention_core(
     return std::unexpected(current.error());
   }
   std::uint64_t const populated = *current;
-  std::uint64_t const nseg64 = attn_segment_count(populated);
+  std::uint64_t const nseg64 = std::min<std::uint64_t>(
+      attn_segment_count(populated), plan.partition_limit);
   if (nseg64 > std::numeric_limits<std::uint32_t>::max()) {
     if (plan.session_state != nullptr) plan.session_state->poison();
     return std::unexpected(arg_error("populated", "segment count exceeds CUDA launch range"));

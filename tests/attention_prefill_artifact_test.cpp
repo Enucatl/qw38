@@ -6,6 +6,7 @@
 #include "cuda/alloc.hpp"
 #include "cuda/upload.hpp"
 #include "format/floatcvt.hpp"
+#include "reference/math.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -72,7 +73,12 @@ int run(char const* artifact) {
   auto plan = bind_prefill_attention_layer(*model, *session, 3, stream);
   auto decode = bind_attention_mixer_plan(*model, *session, 3, stream);
   auto mlp = bind_mlp_plan(*model, *session, 3, stream);
-  auto engine = qw38::cuda::PrefillEngine::create(stream, 8);
+  auto const policy = model->schema().precision.id;
+  auto engine = qw38::cuda::PrefillEngine::create(stream, 8,
+      qw38::cuda::kPrefillDefaultWeightRows,
+      qw38::cuda::PrefillDispatch::BoundedUnpackBf16Cublas,
+      policy == qw38::format::PrecisionPolicyId::Fp8MixerV1 ||
+      policy == qw38::format::PrecisionPolicyId::Fp8MixerQ8MlpV1);
   auto workspace = PrefillAttentionWorkspace::create(8, stream.device());
   if (!plan || !decode || !mlp || !engine || !workspace) {
     std::cerr << "attention prefill bind failed\n"; return 1;
@@ -135,6 +141,69 @@ int run(char const* artifact) {
       full_kv.empty() || !full_meta || *full_meta != count || !tail_untouched ||
       !std::all_of(full_out.begin() + count * kHidden, full_out.end(),
                    [](float v) { return v == 77.0f; })) return 1;
+  if (policy == qw38::format::PrecisionPolicyId::Fp8MixerV1 ||
+      policy == qw38::format::PrecisionPolicyId::Fp8MixerQ8MlpV1) {
+    // FP8 prefill and BF16-input GEMV prepare different Q/K/V. Compare each
+    // selected phase against independent FP32 attention on its actual prepared
+    // operands, followed by the same unchanged output projection. The legacy
+    // cross-phase Q4/MLP check below remains unchanged for its original policy.
+    auto projections = bind_prefill_layer_projections(*model, 3, stream, &*session);
+    if (!projections) return 1;
+    auto slices = workspace->slices();
+    for (bool decode_phase : {false, true}) {
+      unsigned const rows = decode_phase ? 1 : count;
+      unsigned const first = decode_phase ? count : 0;
+      auto const allocations_before = qw38::cuda::malloc_count();
+      if (decode_phase) {
+        if (!qw38::cuda::copy_h2d(session->residual_h().pointer,
+              input.data() + count * kHidden, kHidden * 4u, stream) ||
+            !execute_decode_attention_prep(decode->prep, count)) return 1;
+      }
+      auto prepared_q = download<std::uint16_t>(
+          decode_phase ? decode->core.q.pointer : slices.q, rows * kAttnOutWidth, stream);
+      auto prepared_g = download<std::uint16_t>(
+          decode_phase ? decode->core.g.pointer : slices.g, rows * kAttnOutWidth, stream);
+      auto cache = download<std::uint16_t>(session->kv().pointer,
+          16u * 2u * kKvHeads * 9u * kHeadDim, stream);
+      if (prepared_q.size() != rows * kAttnOutWidth ||
+          prepared_g.size() != rows * kAttnOutWidth || cache.empty()) return 1;
+      // The production merge overwrites Q with gated Y. Capture Q first.
+      if (decode_phase && (!execute_attention_core(decode->core) ||
+          qw38::cuda::malloc_count() != allocations_before)) return 1;
+      std::vector<std::uint16_t> reference_y;
+      for (unsigned r = 0; r < rows; ++r) {
+        auto reference = qw38::reference::attn_online_core(
+            std::span(prepared_q).subspan(r * kAttnOutWidth, kAttnOutWidth),
+            std::span(prepared_g).subspan(r * kAttnOutWidth, kAttnOutWidth),
+            cache, 0, 9, first + r + 1, false);
+        if (!reference) return 1;
+        reference_y.insert(reference_y.end(), reference->y.begin(), reference->y.end());
+      }
+      auto dy = qw38::cuda::upload(bytes(reference_y), stream);
+      auto dm = qw38::cuda::DeviceBuffer::allocate(rows * kHidden * 4u);
+      if (!dy || !dm) return 1;
+      auto packed = decode_phase ? qw38::cuda::Fp8Input{} : engine->fp8_operand(rows, kAttnOutWidth);
+      if (!decode_phase && !qw38::cuda::pack_fp8(
+          {static_cast<std::uint16_t const*>(dy->data()), reference_y.size()}, rows, kAttnOutWidth,
+          {const_cast<std::uint8_t*>(packed.codes.data()), packed.codes.size()},
+          {const_cast<float*>(packed.scales.data()), packed.scales.size()}, stream)) return 1;
+      if (!engine->project({.weight = projections->mixer_out,
+          .input = static_cast<std::uint16_t const*>(dy->data()), .output = dm->data(),
+          .residual = in + first * kHidden, .valid_tokens = rows, .first_position = first,
+          .epilogue = qw38::cuda::PrefillEpilogue::ResidualAddFp32, .packed = packed})) return 1;
+      auto reference_mid = download<float>(dm->data(), rows * kHidden, stream);
+      auto actual_mid = decode_phase
+          ? download<float>(session->residual_h_mid().pointer, kHidden, stream) : full_mid;
+      float max_diff = 0;
+      if (!close(actual_mid, reference_mid, kLayerAbs, kLayerRel, max_diff)) {
+        std::cerr << "FP8 independent mixer mismatch decode=" << decode_phase
+                  << " max=" << max_diff << '\n'; return 1;
+      }
+      std::cout << "FP8 independent mixer decode=" << decode_phase
+                << " max_diff=" << max_diff << " no_hot_allocations=1\n";
+    }
+    return 0;
+  }
   if (!session->reset() || PrefillAttentionWorkspace::create(0, stream.device()) ||
       PrefillAttentionWorkspace::create(qw38::cuda::kPrefillMaxTokens + 1u,
                                          stream.device()) ||
@@ -204,9 +273,10 @@ int run(char const* artifact) {
                 decode_mid.begin() + t * kHidden);
     } else {
       float diff = 0.0f, mid_diff = 0.0f;
-      if (!close(row, continuation, kLayerAbs, kLayerRel, diff) ||
-          !close(mixer_row, continuation_mid,
-                 kLayerAbs, kLayerRel, mid_diff)) {
+      bool const output_close = close(row, continuation, kLayerAbs, kLayerRel, diff);
+      bool const mixer_close = close(mixer_row, continuation_mid,
+                                     kLayerAbs, kLayerRel, mid_diff);
+      if (!output_close || !mixer_close) {
         std::cerr << "prefill-to-decode continuation mismatch "
                   << diff << ',' << mid_diff << '\n';
         return 1;

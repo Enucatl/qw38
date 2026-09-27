@@ -4,6 +4,7 @@
 #include "cuda/stream.hpp"
 
 #include <cstddef>
+#include <algorithm>
 #include <cstdint>
 #include <expected>
 
@@ -22,6 +23,18 @@ inline constexpr int kAttnMergeThreads = 128;  // T-03: one block/query head
 inline constexpr int kAttnSegmentKeys = 256;   // T-03
 inline constexpr int kAttnSubtileKeys = 32;    // T-03
 inline constexpr int kAttnPartialStride = 2 + static_cast<int>(kAttnHeadDim);
+inline constexpr std::uint32_t kAttnMaxPartitions = 128;
+
+// At most two CTA waves for four KV/query tiles, with >=256 keys per split.
+// The capacity bound is independent of the active length and can be reused by
+// a fixed launch bucket. Every partition writes neutral data when empty.
+[[nodiscard]] constexpr std::uint32_t attention_partition_count(
+    std::uint64_t length, unsigned sm_count) noexcept {
+  auto n = (length / 256 + (length % 256 != 0));
+  auto waves = (2ull * sm_count + kAttnKvHeads - 1) / kAttnKvHeads;
+  return static_cast<std::uint32_t>(std::min<std::uint64_t>(
+      n, std::min<std::uint64_t>(waves, kAttnMaxPartitions)));
+}
 inline constexpr float kAttnScale = 1.0f / 16.0f;
 inline constexpr int kAttnPrepQueryBlocks = static_cast<int>(kAttnQueryHeads);
 inline constexpr int kAttnPrepKvBlocks = static_cast<int>(kAttnKvHeads);
@@ -65,9 +78,8 @@ struct AttentionPrefillResources {
   int occupancy_blocks_per_sm{};
 };
 
-// One block per query head and 32 query rows. BF16 tensor-core QK, FP32
-// softmax, two BF16 P components, BF16 V and FP32 PV accumulation. K/V/PV
-// staging is reused; statistics/numerators remain block-local.
+// One block per query head and 32 query rows. Register-resident BF16 Q,
+// FP32 softmax/PV, two BF16 P components and separately pipelined BF16 K/V.
 // Explicit query tiles 1 and 4 select the scalar diagnostic controls.
 [[nodiscard]] std::expected<void, Error> launch_attention_prefill_scan(
     std::uint16_t const* q, std::uint16_t const* g,
@@ -81,9 +93,12 @@ struct AttentionPrefillResources {
 [[nodiscard]] std::expected<AttentionPrefillResources, Error>
 attention_prefill_resources(std::uint32_t query_tile = kAttnPrefillQueryTile);
 
-// One 128-thread block per query head per 256-key segment. FP32 online softmax
-// over causal range [0, populated). Writes FP32 max, sum, and 256-value
-// numerator. Empty/tail keys are masked. Staging is one 32-key K or V subtile.
+[[nodiscard]] std::expected<AttentionPrefillResources, Error> attention_decode_resources();
+
+// One 128-thread block per six-query GQA tile and contiguous partition.
+// n_segments is a bounded launch partition count (not keys/256); active
+// length determines tile boundaries. Writes FP32 max/sum/numerator, including
+// neutral empty partitions. Two BF16 P components feed FP32 MMA accumulation.
 [[nodiscard]] std::expected<void, Error> launch_attention_scan(
     std::uint16_t const* q, std::uint16_t const* kv, std::uint32_t attn_layer,
     std::uint64_t capacity, std::uint64_t populated, float* partials,

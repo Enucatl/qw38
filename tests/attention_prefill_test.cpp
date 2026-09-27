@@ -9,6 +9,7 @@
 #include <cstdint>
 #include <iostream>
 #include <span>
+#include <string_view>
 #include <vector>
 
 namespace {
@@ -21,8 +22,8 @@ using qw38::format::bf16_to_fp32;
 using qw38::format::fp32_to_bf16_rne;
 
 std::size_t kv_index(std::uint32_t component, std::uint32_t head,
-                     std::uint32_t token, std::uint32_t d) {
-  return ((component * KVH + head) * C + token) * D + d;
+                     std::uint32_t token, std::uint32_t d, std::uint32_t capacity) {
+  return ((component * KVH + head) * capacity + token) * D + d;
 }
 
 template <typename T>
@@ -42,9 +43,9 @@ std::vector<T> download(qw38::cuda::DeviceBuffer const& src, std::size_t n,
 
 bool scan_case(qw38::cuda::Stream const& stream, std::uint32_t first,
                std::uint32_t count, std::uint32_t query_tile,
-               bool signed_values = false) {
+               bool signed_values = false, std::uint32_t capacity = C) {
   std::vector<std::uint16_t> q((M + 1u) * H * D), g(q.size());
-  std::vector<std::uint16_t> kv(16u * 2u * KVH * C * D,
+  std::vector<std::uint16_t> kv(16u * 2u * KVH * capacity * D,
                                fp32_to_bf16_rne(777.0f));
   for (std::uint32_t t = 0; t < count; ++t)
     for (std::uint32_t h = 0; h < H; ++h) {
@@ -63,14 +64,14 @@ bool scan_case(qw38::cuda::Stream const& stream, std::uint32_t first,
     }
   for (std::uint32_t head = 0; head < KVH; ++head)
     for (std::uint32_t t = 0; t < first + count; ++t) {
-      kv[kv_index(0, head, t, 0)] = fp32_to_bf16_rne(
+      kv[kv_index(0, head, t, 0, capacity)] = fp32_to_bf16_rne(
           (t < 64u ? 6.25f : 6.4375f) + 0.0625f * head);
-      kv[kv_index(0, head, t, 1)] = fp32_to_bf16_rne(0.2f * t);
+      kv[kv_index(0, head, t, 1, capacity)] = fp32_to_bf16_rne(0.2f * t);
       for (std::uint32_t d = 2; d < D; ++d)
-        kv[kv_index(0, head, t, d)] = fp32_to_bf16_rne(
+        kv[kv_index(0, head, t, d, capacity)] = fp32_to_bf16_rne(
             0.02f * (static_cast<int>((d * 3u + head + t * 5u) % 29u) - 14));
       for (std::uint32_t d = 0; d < D; ++d)
-        kv[kv_index(1, head, t, d)] = fp32_to_bf16_rne(
+        kv[kv_index(1, head, t, d, capacity)] = fp32_to_bf16_rne(
             signed_values
                 ? 0.1f * (static_cast<int>((t * 13u + d * 7u + head * 3u) % 101u) - 50)
                 : (t < 64u ? 0.05f : 0.8f) * static_cast<float>(head + 1u) +
@@ -86,13 +87,13 @@ bool scan_case(qw38::cuda::Stream const& stream, std::uint32_t first,
   if (!upload(*dy, guard, stream)) return false;
   if (qw38::cuda::launch_attention_prefill_scan(
           q.data(), static_cast<std::uint16_t const*>(dg->data()),
-          static_cast<std::uint16_t const*>(dkv->data()), 0, C, first, count,
+          static_cast<std::uint16_t const*>(dkv->data()), 0, capacity, first, count,
           static_cast<std::uint16_t*>(dy->data()), stream, query_tile))
     return false;
   auto st = qw38::cuda::launch_attention_prefill_scan(
       static_cast<std::uint16_t const*>(dq->data()),
       static_cast<std::uint16_t const*>(dg->data()),
-      static_cast<std::uint16_t const*>(dkv->data()), 0, C, first, count,
+      static_cast<std::uint16_t const*>(dkv->data()), 0, capacity, first, count,
       static_cast<std::uint16_t*>(dy->data()), stream, query_tile);
   if (!st) { std::cerr << qw38::cuda::error_message(st.error()) << '\n'; return false; }
   auto got = download<std::uint16_t>(*dy, q.size(), stream);
@@ -103,24 +104,27 @@ bool scan_case(qw38::cuda::Stream const& stream, std::uint32_t first,
   if (qw38::cuda::launch_attention_prefill_scan(
           static_cast<std::uint16_t const*>(dq->data()),
           static_cast<std::uint16_t const*>(dg->data()),
-          static_cast<std::uint16_t const*>(dkv->data()), 0, C, C - count + 1u,
+          static_cast<std::uint16_t const*>(dkv->data()), 0, capacity, capacity - count + 1u,
           count, static_cast<std::uint16_t*>(dy->data()), stream, query_tile) ||
       got != download<std::uint16_t>(*dy, q.size(), stream)) return false;
   if (!qw38::cuda::launch_attention_prefill_scan(
           static_cast<std::uint16_t const*>(dq->data()),
           static_cast<std::uint16_t const*>(dg->data()),
-          static_cast<std::uint16_t const*>(dkv->data()), 0, C, first, count,
+          static_cast<std::uint16_t const*>(dkv->data()), 0, capacity, first, count,
           static_cast<std::uint16_t*>(dy->data()), stream, query_tile) ||
       got != download<std::uint16_t>(*dy, q.size(), stream)) return false;
-  // The last row also goes through the production 256-key segmented scan and
-  // merge. Dense asymmetric Q/K exercise every lane of the new warp reduction.
-  std::uint32_t const segments = (first + count + 255u) / 256u;
+  // A fixed seven-partition bucket includes empty/tail splits for this length.
+  // All six asymmetric siblings also exercise the masked eight-head MMA tile.
+  std::uint32_t const segments = signed_values ? 7u : (first + count + 255u) / 256u;
+  auto const partial_count = H * segments * qw38::cuda::kAttnPartialStride;
   auto partials = qw38::cuda::DeviceBuffer::allocate(
-      H * segments * qw38::cuda::kAttnPartialStride * sizeof(float));
+      (partial_count + 32u) * sizeof(float));
+  std::vector<float> partial_guard(partial_count + 32u, 777.f);
+  if (!partials || !upload(*partials, partial_guard, stream)) return false;
   std::size_t const last_off = (count - 1u) * H * D;
   if (!partials || !qw38::cuda::launch_attention_scan(
           static_cast<std::uint16_t const*>(dq->data()) + last_off,
-          static_cast<std::uint16_t const*>(dkv->data()), 0, C, first + count,
+          static_cast<std::uint16_t const*>(dkv->data()), 0, capacity, first + count,
           static_cast<float*>(partials->data()), segments, stream) ||
       !qw38::cuda::launch_attention_merge(
           static_cast<float const*>(partials->data()),
@@ -128,6 +132,27 @@ bool scan_case(qw38::cuda::Stream const& stream, std::uint32_t first,
           static_cast<std::uint16_t*>(dy->data()) + last_off, stream)) return false;
   auto decoded = download<std::uint16_t>(*dy, q.size(), stream);
   if (decoded.size() != q.size()) return false;
+  auto saved_partials = download<float>(*partials, partial_guard.size(), stream);
+  if (saved_partials.size() != partial_guard.size() ||
+      !std::equal(saved_partials.begin() + partial_count, saved_partials.end(),
+          partial_guard.begin() + partial_count)) return false;
+  if (signed_values) {
+    if (!qw38::cuda::launch_attention_scan(
+          static_cast<std::uint16_t const*>(dq->data()) + last_off,
+          static_cast<std::uint16_t const*>(dkv->data()), 0, capacity, first + count,
+          static_cast<float*>(partials->data()), segments, stream) ||
+        !qw38::cuda::launch_attention_merge(static_cast<float const*>(partials->data()),
+          static_cast<std::uint16_t const*>(dg->data()) + last_off, segments,
+          static_cast<std::uint16_t*>(dy->data()) + last_off, stream) ||
+        saved_partials != download<float>(*partials, partial_guard.size(), stream) ||
+        decoded != download<std::uint16_t>(*dy, q.size(), stream)) return false;
+    for (unsigned h = 0; h < H; ++h) {
+      auto off = h * segments * qw38::cuda::kAttnPartialStride;
+      if (saved_partials[off] != -INFINITY || saved_partials[off + 1] != 0.f)
+        return false;
+      for (unsigned d = 0; d < D; ++d) if (saved_partials[off + 2 + d] != 0.f) return false;
+    }
+  }
   float max_diff = 0.0f;
   for (std::uint32_t t = 0; t < count; ++t)
     for (std::uint32_t h = 0; h < H; ++h) {
@@ -139,7 +164,7 @@ bool scan_case(qw38::cuda::Stream const& stream, std::uint32_t first,
         double dot = 0.0;
         for (std::uint32_t d = 0; d < D; ++d)
           dot += static_cast<double>(bf16_to_fp32(q[off + d])) *
-                 bf16_to_fp32(kv[kv_index(0, head, key, d)]);
+                 bf16_to_fp32(kv[kv_index(0, head, key, d, capacity)]);
         scores[key] = dot * qw38::cuda::kAttnScale;
         best = std::max(best, scores[key]);
       }
@@ -148,7 +173,7 @@ bool scan_case(qw38::cuda::Stream const& stream, std::uint32_t first,
       for (std::uint32_t d = 0; d < D; ++d) {
         double acc = 0.0;
         for (std::uint32_t key = 0; key < scores.size(); ++key)
-          acc += scores[key] * bf16_to_fp32(kv[kv_index(1, head, key, d)]);
+          acc += scores[key] * bf16_to_fp32(kv[kv_index(1, head, key, d, capacity)]);
         double const gate = 1.0 / (1.0 + std::exp(-bf16_to_fp32(g[off + d])));
         float const expected = bf16_to_fp32(fp32_to_bf16_rne(
             static_cast<float>(acc / sum * gate)));
@@ -178,9 +203,16 @@ bool scan_case(qw38::cuda::Stream const& stream, std::uint32_t first,
 }
 }  // namespace
 
-int main() {
+int main(int argc, char** argv) {
+  static_assert(qw38::cuda::attention_partition_count(256, 170) == 1);
+  static_assert(qw38::cuda::attention_partition_count(257, 170) == 2);
+  static_assert(qw38::cuda::attention_partition_count(32769, 170) == 85);
+  static_assert(qw38::cuda::attention_partition_count(131072, 1024) == 128);
   auto stream = qw38::cuda::Stream::create();
   if (!stream) return 1;
+  if (argc == 2 && std::string_view(argv[1]) == "4k")
+    return scan_case(*stream, 4095, 3, qw38::cuda::kAttnPrefillQueryTile, false, 4101)
+        ? 0 : 1;
   auto resources = qw38::cuda::attention_prefill_resources();
   if (!resources || resources->local_bytes != 0 ||
       resources->occupancy_blocks_per_sm == 0) return 1;
