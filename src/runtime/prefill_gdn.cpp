@@ -50,7 +50,7 @@ std::expected<PrefillGdnLayerPlan, Error> bind_prefill_gdn_layer(
                                       "prefill GDN requires a GDN layer"));
   auto gdn = bind_gdn_plan(model, session, layer, stream);
   if (!gdn) return std::unexpected(gdn.error());
-  auto projections = bind_prefill_layer_projections(model, layer, stream);
+  auto projections = bind_prefill_layer_projections(model, layer, stream, &session);
   if (!projections) return std::unexpected(projections.error());
   return PrefillGdnLayerPlan{*gdn, *projections};
 }

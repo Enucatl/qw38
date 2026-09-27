@@ -105,6 +105,7 @@ enum class PrecisionPolicyId : std::uint16_t {
   CandidateV2 = 0x0403,
   NvFp4MlpV1 = 0x0404,
   Fp8MixerV1 = 0x0405,
+  Fp8MixerQ8MlpV1 = 0x0406,
 };
 
 enum class SemanticScope : std::uint16_t {

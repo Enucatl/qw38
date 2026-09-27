@@ -165,6 +165,9 @@ class Session {
       std::array<std::uint32_t, kConvLayers> cursor);
 
   [[nodiscard]] ArenaPlan const& arena_plan() const noexcept { return arena_; }
+  [[nodiscard]] std::span<std::byte> q8_mlp_workspace() const noexcept {
+    return {const_cast<std::byte*>(q8_mlp_.as_bytes()), q8_mlp_.bytes()};
+  }
   [[nodiscard]] std::uint64_t persistent_bytes() const noexcept {
     return persistent_bytes_;
   }
@@ -195,6 +198,7 @@ class Session {
   qw38::cuda::DeviceBuffer residual_h_;
   qw38::cuda::DeviceBuffer residual_h_mid_;
   qw38::cuda::DeviceBuffer scratch_;
+  qw38::cuda::DeviceBuffer q8_mlp_;
   ArenaPlan arena_{};
   std::array<std::uint32_t, kConvLayers> conv_cursor_{};
   std::array<std::uint64_t, kGdnLayers> gdn_position_{};

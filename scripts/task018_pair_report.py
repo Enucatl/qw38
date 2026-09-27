@@ -1079,10 +1079,13 @@ def main() -> int:
         0x0402: "QW38 CandidateV1",
         0x0403: "QW38 CandidateV2",
         0x0405: "QW38 FP8MixerV1",
+        0x0406: "QW38 FP8MixerQ8MlpV1",
     }
     candidate_name = candidate_names[candidate_policy]
     task_name = (
-        "TASK-036"
+        "TASK-040"
+        if candidate_policy == 0x0406
+        else "TASK-036"
         if candidate_policy == 0x0405
         else "TASK-018"
         if candidate_policy == 0x0401

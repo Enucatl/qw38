@@ -227,9 +227,12 @@ int main(int argc, char** argv) {
            << ",\"q4_k_candidate_v2\":" << quantizer_counts[5];
   if (quantizer_counts[7]) identity << ",\"fp8_v1\":" << quantizer_counts[7];
   if (quantizer_counts[6]) identity << ",\"nvfp4_v1\":" << quantizer_counts[6];
-  identity << "},\"decode_dispatch\":{\"activation_policy\":\"bf16\","
-              "\"quantized_kernel\":\"grouped_gemv\","
-              "\"fallback\":null}";
+  bool const q8_mlp = schema.precision.id == qw38::format::PrecisionPolicyId::Fp8MixerQ8MlpV1;
+  identity << "},\"decode_dispatch\":{\"activation_policy\":\""
+           << (q8_mlp ? "bf16_mixers_q8_k32_mlp" : "bf16")
+           << "\",\"quantized_kernel\":\"" << (q8_mlp ? "dp4a_mlp_grouped_gemv_mixers" : "grouped_gemv")
+           << "\",\"fallback\":null}";
+  if (q8_mlp) identity << ",\"mlp_dispatch\":{\"m1\":\"q4k_q8_dp4a\",\"m_ge_2\":\"q4k_q8_integer_mma\",\"group_k\":32,\"scale_dtype\":\"fp32\",\"sum_dtype\":\"int32\",\"gate_up_pack_reused\":true,\"weight_view\":\"cuda_q4_k_candidate_v2\"}";
   if (quantizer_counts[6]) identity <<
       ",\"mlp_gate_up_dispatch\":{\"m1\":\"nvfp4_weight_bf16_activation_gemv\","
       "\"m_ge_2\":\"native_nvfp4_w4a4\",\"activation_factor\":1,"

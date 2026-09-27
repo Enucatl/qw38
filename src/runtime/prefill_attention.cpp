@@ -35,7 +35,7 @@ std::expected<PrefillAttentionLayerPlan, Error> bind_prefill_attention_layer(
                                       "prefill attention requires an attention layer"));
   auto prep = bind_attention_prep_plan(model, session, layer, stream);
   if (!prep) return std::unexpected(prep.error());
-  auto projections = bind_prefill_layer_projections(model, layer, stream);
+  auto projections = bind_prefill_layer_projections(model, layer, stream, &session);
   if (!projections) return std::unexpected(projections.error());
   // This policy shares FP8 producer storage across the complete mixer.
   // Reject a partial FP8 mixer before any KV or scratch mutation.

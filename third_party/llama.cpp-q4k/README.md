@@ -1,5 +1,15 @@
 # Pinned Q4_K reference
 
+`cuda/q4k_q8.cu` adapts the integer MMQ/MMVQ structure from the same full
+revision `e6ab7c1a41054a888ada952eab4c886444c2f5ad`: `mmq-config-blackwell.cuh`
+falls through to `mmq-config-ampere.cuh` for Q4_K. We select I128/J32/K256,
+256 threads, stage nibbles as INT8, use the `mma.cuh` m16n8k32 instruction,
+and apply each K32 affine correction as in `mmq-vec-dot.cuh` and `vecdotq.cuh`.
+The existing QW38 physical nibble order is retained. Activation scales,
+weight scale products and corrections remain FP32, and activation sums are
+exact INT32, as required by policy 1030. DP4A and MMA accumulators reset every
+K32 group (absolute bound 60960); no scale factor enters an integer dot.
+
 Source: [llama.cpp commit e6ab7c1a4](https://github.com/ggml-org/llama.cpp/tree/e6ab7c1a4).
 Copyright (c) 2023-2026 The ggml authors; MIT license in `LICENSE`.
 

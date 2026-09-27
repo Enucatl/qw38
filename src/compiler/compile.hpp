@@ -135,4 +135,10 @@ struct SyntheticTensor {
 
 [[nodiscard]] std::uint64_t current_peak_rss_bytes();
 
+// Change only the execution policy/recipe of an existing FP8 mixer artifact.
+// Streams unchanged spans, then checks byte equality (never payload digests).
+[[nodiscard]] std::expected<qw38::format::ArtifactIdentity, CompilerError>
+convert_fp8_q8_mlp(std::filesystem::path const& source,
+                  std::filesystem::path const& destination);
+
 }  // namespace qw38::compiler

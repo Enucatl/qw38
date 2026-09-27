@@ -7,6 +7,10 @@
 #include <expected>
 
 namespace qw38::cuda {
+[[nodiscard]] std::expected<void, Error> launch_hidden_rms_q8(
+    float const* residual, std::uint16_t const* gamma, float eps,
+    unsigned m, std::int8_t* codes, float* scales, std::int32_t* sums,
+    int* failure, Stream const& stream);
 // Internal producer boundary; its plan validates spans and lifetime.
 [[nodiscard]] std::expected<void, Error> launch_hidden_rms_fp8(
     float const* residual, std::uint16_t const* gamma, float eps,

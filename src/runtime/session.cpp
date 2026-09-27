@@ -2,6 +2,7 @@
 
 #include "cuda/copy.hpp"
 #include "cuda/stream.hpp"
+#include "cuda/q4k_q8.hpp"
 #include "runtime/model.hpp"
 
 #include <limits>
@@ -318,6 +319,12 @@ std::expected<Session, Error> Session::create(
     return std::unexpected(from_cuda(scratch.error()));
   }
   s.scratch_ = std::move(*scratch);
+  if (model.schema().precision.id == qw38::format::PrecisionPolicyId::Fp8MixerQ8MlpV1) {
+    auto pack = qw38::cuda::DeviceBuffer::allocate(
+        qw38::cuda::q8_mlp_workspace_bytes(kArenaTokenCapacity), device);
+    if (!pack) return std::unexpected(from_cuda(pack.error()));
+    s.q8_mlp_ = std::move(*pack);
+  }
 
   if (auto st = qw38::cuda::zero(s.gdn_s_, *s.stream_); !st) {
     return std::unexpected(from_cuda(st.error()));
@@ -367,6 +374,7 @@ std::expected<void, Error> Session::shutdown() {
 
   // Reverse allocation order keeps the explicit path consistent with member
   // destruction and attempts every release after an error.
+  close(q8_mlp_);
   close(scratch_);
   close(residual_h_mid_);
   close(residual_h_);

@@ -86,7 +86,8 @@ bool is_known(PrecisionPolicyId value) noexcept {
   return value == PrecisionPolicyId::V0 ||
          value == PrecisionPolicyId::CandidateV1 ||
          value == PrecisionPolicyId::CandidateV2 ||
-         value == PrecisionPolicyId::NvFp4MlpV1 || value == PrecisionPolicyId::Fp8MixerV1;
+         value == PrecisionPolicyId::NvFp4MlpV1 || value == PrecisionPolicyId::Fp8MixerV1 ||
+         value == PrecisionPolicyId::Fp8MixerQ8MlpV1;
 }
 
 bool is_known(SemanticScope value) noexcept {
@@ -300,6 +301,7 @@ char const* name_of(PrecisionPolicyId value) noexcept {
     case PrecisionPolicyId::CandidateV2:
       return "precision_candidate_v2";
     case PrecisionPolicyId::Fp8MixerV1: return "precision_fp8_mixer_v1";
+    case PrecisionPolicyId::Fp8MixerQ8MlpV1: return "precision_fp8_mixer_q8_mlp_v1";
     case PrecisionPolicyId::NvFp4MlpV1:
       return "precision_nvfp4_mlp_v1";
   }

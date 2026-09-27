@@ -25,11 +25,21 @@ struct PrefillLayerProjectionPlan {
   qw38::cuda::PrefillWeight mlp_up{};
   qw38::cuda::PrefillWeight mlp_down{};
   std::uint16_t const* mlp_gamma{};
+ private:
+  friend std::expected<PrefillLayerProjectionPlan, Error> bind_prefill_layer_projections(
+      Model const&, std::uint32_t, qw38::cuda::Stream const&, Session*);
+  friend std::expected<void, Error> execute_prefill_mlp(
+      PrefillLayerProjectionPlan const&, qw38::cuda::PrefillEngine&, float const*,
+      float*, std::uint32_t, std::uint64_t, float);
+  std::span<std::byte> q8_workspace_{};
+  SessionExecutionState* q8_state_{};
+  qw38::cuda::Stream const* q8_stream_{};
 };
 
 [[nodiscard]] std::expected<PrefillLayerProjectionPlan, Error>
 bind_prefill_layer_projections(Model const& model, std::uint32_t layer,
-                               qw38::cuda::Stream const& stream);
+                               qw38::cuda::Stream const& stream,
+                               Session* session = nullptr);
 
 [[nodiscard]] std::expected<qw38::cuda::PrefillWeight, Error>
 bind_prefill_head(Model const& model, qw38::cuda::Stream const& stream);

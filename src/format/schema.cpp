@@ -1257,7 +1257,8 @@ std::expected<void, FormatError> validate_precision(
   if (policy.id != PrecisionPolicyId::V0 &&
       policy.id != PrecisionPolicyId::CandidateV1 &&
       policy.id != PrecisionPolicyId::CandidateV2 &&
-      policy.id != PrecisionPolicyId::NvFp4MlpV1 && policy.id != PrecisionPolicyId::Fp8MixerV1) {
+      policy.id != PrecisionPolicyId::NvFp4MlpV1 && policy.id != PrecisionPolicyId::Fp8MixerV1 &&
+      policy.id != PrecisionPolicyId::Fp8MixerQ8MlpV1) {
     return std::unexpected(make_error(FormatErrorCode::InvalidPrecisionPolicy,
                                       offset, "precision.id",
                                       "only precision policy V0 is defined"));
@@ -2532,14 +2533,34 @@ static std::expected<void, FormatError> validate_schema_at_offsets(
         record_offset(&SchemaRecordOffsets::tensors, i);
     if (schema.tensors[i].quantizer == LogicalQuantizerId::Q4KCandidateV2 &&
         schema.precision.id != PrecisionPolicyId::CandidateV2 &&
-        schema.precision.id != PrecisionPolicyId::NvFp4MlpV1 && schema.precision.id != PrecisionPolicyId::Fp8MixerV1) {
+        schema.precision.id != PrecisionPolicyId::NvFp4MlpV1 && schema.precision.id != PrecisionPolicyId::Fp8MixerV1 &&
+        schema.precision.id != PrecisionPolicyId::Fp8MixerQ8MlpV1) {
       return std::unexpected(make_error(
           FormatErrorCode::InvalidPrecisionPolicy, tensor_offset,
           schema.tensors[i].logical_name + ".tensor.quantizer",
           "Q4_K requires candidate V2 precision policy"));
     }
-    if (schema.tensors[i].quantizer == LogicalQuantizerId::Fp8V1 && schema.precision.id != PrecisionPolicyId::Fp8MixerV1)
+    if (schema.tensors[i].quantizer == LogicalQuantizerId::Fp8V1 && schema.precision.id != PrecisionPolicyId::Fp8MixerV1 &&
+        schema.precision.id != PrecisionPolicyId::Fp8MixerQ8MlpV1)
       return std::unexpected(make_error(FormatErrorCode::InvalidPrecisionPolicy, tensor_offset, "fp8.policy", "FP8 requires its precision policy"));
+    if (schema.precision.id == PrecisionPolicyId::Fp8MixerQ8MlpV1) {
+      auto const& t = schema.tensors[i];
+      auto const& name = t.logical_name;
+      bool const primary = name.starts_with("model.language_model.layers.");
+      bool const mlp = primary && (name.ends_with(".mlp.gate_proj.weight") ||
+          name.ends_with(".mlp.up_proj.weight") || name.ends_with(".mlp.down_proj.weight"));
+      bool const mixer = primary && (name.ends_with(".linear_attn.in_proj_qkv.weight") ||
+          name.ends_with(".linear_attn.in_proj_z.weight") || name.ends_with(".linear_attn.out_proj.weight") ||
+          name.ends_with(".self_attn.q_proj.weight") || name.ends_with(".self_attn.k_proj.weight") ||
+          name.ends_with(".self_attn.v_proj.weight") || name.ends_with(".self_attn.o_proj.weight"));
+      if ((mlp && t.quantizer != LogicalQuantizerId::Q4KCandidateV2) ||
+          (mixer && t.quantizer != LogicalQuantizerId::Fp8V1) ||
+          (name == "lm_head.weight" && t.quantizer != LogicalQuantizerId::Q8G32CandidateV1) ||
+          (t.quantizer == LogicalQuantizerId::Fp8V1 && !mixer) ||
+          (t.quantizer == LogicalQuantizerId::Q4KCandidateV2 && !mlp))
+        return std::unexpected(make_error(FormatErrorCode::InvalidPrecisionPolicy,
+            tensor_offset, name + ".policy", "mixed or mislabeled FP8 mixer/Q8 MLP policy"));
+    }
     if (schema.tensors[i].quantizer == LogicalQuantizerId::NvFp4V1 &&
         (schema.precision.id != PrecisionPolicyId::NvFp4MlpV1 ||
          (!schema.tensors[i].logical_name.ends_with(".mlp.gate_proj.weight") &&

@@ -2,7 +2,7 @@
 
 ## Status
 
-TODO
+DONE
 
 ## Milestone and dependency
 
@@ -113,11 +113,105 @@ before mutation; the real Session-backed binders must exercise the new path.
    Record actual workspace and projected final capacity with the 2 GiB reserve.
 
 Completion requires both integer consumers integrated, passing correctness,
-development quality and state checks, and lower observed complete MLP cost
-at both M=1 and M=256 without an observed matched integrated phase regression.
-Use FAST-02's one-run comparison policy; these are development selection
-observations, not statistical claims or full-model promotion. A failed path
-may remain disabled while repaired, but merely retaining the old fallback
-does not complete this task. If the specified consumer cannot qualify, record
-the concrete blocker and stop; do not silently mark DONE or start a format
-contest. TASK-040 owns final quality, capacity and performance acceptance.
+development quality and state checks, lower observed complete MLP cost at
+M=256, and no regression in the matched integrated prefill or decode phases.
+The user-directed retention decision dated 2026-09-27 supersedes the original
+M=1 complete-cost win requirement: retain policy 1030 and defer the observed
+M=1 MLP regression as decode optimization work. This is an explicit acceptance
+change; the M=1 regression remains visible and is not counted as a pass. Use
+FAST-02's one-run comparison policy; these development observations are not
+statistical claims or full-model promotion. TASK-040 owns final quality,
+capacity and performance acceptance.
+
+## Blocked execution record — 2026-09-27
+
+GPT-6 Codex implemented the candidate in the main thread against `2ac6c44`.
+Independent GPT-6 Astra high review used both permitted passes: the first
+requested changes; the second returned `BLOCKED`. Both code findings were
+resolved, with no further material code findings. The required complete M=1
+MLP cost win remains unmet. This is an observed performance failure; its
+root cause is not established by the aggregate measurements.
+
+The final candidate's once-per-arm comparison, including RMS, packing,
+gate/up, SwiGLU, down, residual and first-use costs, was:
+
+| Rows | Parent GPU ms | Candidate GPU ms | Parent host ms | Candidate host ms | Required win |
+|---|---:|---:|---:|---:|---|
+| 1 | 0.794336020947 | 1.61561596394 | 0.794248 | 1.614748 | FAIL |
+| 256 | 79.9333724976 | 2.82448005676 | 79.935111 | 2.823906 | PASS |
+
+Both arms used identical nonzero inputs and unchanged Q4_K weight values,
+with one execution, zero warmups and zero hot allocations. These refreshed
+measurements supersede the earlier favorable MLP observations. Successful
+command exits do not establish the comparative performance gate. No timing
+selection or unchanged rerun was used to override the failure.
+
+Implemented work retained for review includes policy 1030, streaming artifact
+conversion with byte equality checks, local BF16-RNE Q8 producers, K32-bounded
+DP4A/MMQ consumers, shared gate/up packs, fresh down packs, Session-owned
+41,222,148-byte workspace, schema/runtime/report admission and independent
+arithmetic and real Session checks. No payload or scale digests were computed.
+
+Review finding R37-01 was repaired with submission tracking at the shared CUDA
+MLP boundary: prelaunch validation failures preserve Session health, device
+state and host metadata; failures after submission poison. Production-caller
+tests cover rejection followed by valid continuation and deferred failure
+followed by reset and continuation. R37-02 was repaired by translating
+`bad_alloc` and `length_error` in the conversion API through the existing typed
+allocation-error mapping.
+
+Exact final repair command:
+`bash .cache/evaluation/qw38-language-v2/task037-support/repair-checks.sh`.
+The same script was launched from `.cache/task037/repair-checks.sh`; the retained
+copy contains the pinned-container build, focused CTest invocation and all four
+benchmark commands. The build passed; `q4k_q8` and `q8_mlp_integration` passed.
+The comparison failed acceptance as recorded above. `git diff --check` passed.
+
+Earlier supporting checks passed: five focused arithmetic/schema/reader/MLP/
+prefill tests, real Session integration, full-language state/replay/recovery
+integration and 13 report tests. The frozen eight-window screen measured NLL
+delta +0.0017427048138420886 against the +0.03 limit. Matched short-request
+prefill measured 279.477598 → 265.306956 ms and decode 220.447424 → 169.278664 ms.
+These observations remain supporting evidence because the repairs changed
+neither arithmetic nor the successful submission sequence; they cannot satisfy
+the failed M=1 criterion. Projected final-capacity free memory was 8,755,609,600
+bytes, above the 2 GiB reserve; this is a projection, not final capacity proof.
+
+Evidence is preserved under
+`.cache/evaluation/qw38-language-v2/task037-support/`: `evidence-notes.md`,
+`wake-ea6ba1321aae.log`, `repair-checks.sh`, `repair-tests.log`,
+`repaired-{parent,candidate}-mlp-{1,256}.log`, `review-candidate.diff`,
+`candidate-files.json`, `binary-identities.json`, `astra-review-2.md`,
+`development-report.json`, `capacity-projection.json` and earlier command logs.
+Hardware was NVIDIA GeForce RTX 5090, driver 590.48.01, with pinned CUDA 13.4.1
+and GCC 14.2; full container and hardware identities are in `hardware.txt`.
+
+The second Astra review returned `BLOCKED` solely because the original M=1
+performance requirement failed; it recorded no remaining material code
+findings after the first-review repairs. The user then explicitly accepted the
+candidate under the revised criterion above. This historical review result is
+not relabeled as PASS. TASK-038–040 remain subject to their existing contracts.
+
+## Completion report — 2026-09-27
+
+Retained policy 1030 for prefill and decode under the user-directed decision in
+the implementation ledger. Correctness/arithmetic, Session state/recovery,
+policy admission and development quality checks passed. The frozen eight-window
+screen NLL delta was +0.0017427048 against the +0.03 limit. The matched short
+request measured prefill 279.477598 → 265.306956 ms, eight-token decode
+220.447424 → 169.278664 ms, and total 499.925053 → 434.585710 ms. The refreshed
+complete MLP comparison measured M=256 at 79.933372 → 2.824480 ms and M=1 at
+0.794336 → 1.615616 ms. The latter is deferred work, not a passed gate.
+
+The focused build, `q4k_q8` and `q8_mlp_integration` tests, full-language
+state/replay/recovery integration, and report tests are recorded in the blocked
+execution evidence above and `.cache/evaluation/qw38-language-v2/task037-support/`.
+The second Astra review found no remaining material code issue but blocked on
+the superseded M=1 criterion. Final quality, measured 32K capacity, replay and
+PERF-01 acceptance remain TASK-040. The 8,755,609,600-byte final-capacity value
+is only a projection; no production promotion is claimed.
+
+Deferred follow-up: use TASK-040's measured populated-decode costs to determine
+whether the Q4_K×Q8 M=1 MLP kernel warrants a targeted optimization. TASK-038's
+attention schedule and TASK-039's submission/graph work do not directly change
+that kernel.

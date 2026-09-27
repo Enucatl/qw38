@@ -11,6 +11,7 @@ find_package(CUDAToolkit REQUIRED)
   activation.cu
   decode_mmv.cu
   prefill.cu
+  q4k_q8.cu
   gdn.cu
   attention.cu
 )

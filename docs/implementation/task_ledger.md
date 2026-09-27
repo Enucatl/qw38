@@ -113,9 +113,10 @@ Run affected arithmetic/state/boundary checks once. Repeat only for a code
 change, failure or stated unresolved concern; no complete suite after each
 kernel, comparator rerun, tile/format contest or new evidence framework.
 Report complete operation costs including packing/epilogues, actual workspace
-and observed single-run comparisons without statistical claims. TASK-037/038
-require their selected paths and observed complete-cost wins; an unchanged
-fallback is not completion. TASK-039 specifies its tested graph/eager selection.
+and observed single-run comparisons without statistical claims. TASK-037
+follows the user-directed retention criteria below. TASK-038 requires its
+selected path and observed complete-cost wins; an unchanged fallback is not
+completion. TASK-039 specifies its tested graph/eager selection.
 An inability to meet those contracts is a recorded blocker, not permission
 to silently weaken them. No new benchmark was run for this planning amendment.
 
@@ -127,6 +128,26 @@ Manifest-only artifact digests and `wake-run` rules remain binding. Full
 quality/capacity/replay gates decide promotion; all nine latency ratios >=1
 additionally decide the fast-engine goal. A complete final retention decision
 does not mean that goal has been achieved.
+
+### User-directed TASK-037 retention decision — 2026-09-27
+
+The user directs retention of the TASK-037 policy-1030 candidate, accepting the
+measured M=1 complete-MLP regression as deferred decode work because the
+complete M=256 MLP cost improves and the matched integrated prefill and decode
+phases both improve. This addendum supersedes TASK-037's requirement that the
+isolated complete MLP cost improve at both M=1 and M=256. It does not relabel
+the M=1 result as a pass or waive final TASK-040 quality, replay, capacity, or
+performance obligations.
+
+TASK-037 is complete when its arithmetic, state, policy, and development
+quality checks pass; complete M=256 MLP cost improves; and the existing matched
+integrated prefill/decode phases show no regression. The recorded results meet
+these conditions: M=256 MLP 79.933372 → 2.824480 ms; 256-token prefill
+279.477598 → 265.306956 ms; eight-token decode 220.447424 → 169.278664 ms.
+The separate M=1 complete MLP result, 0.794336 → 1.615616 ms, remains deferred
+decode optimization. TASK-038 attention reuse and TASK-039 submission changes
+do not themselves resolve this Q4_K×Q8 MLP cost; TASK-040 should rank it against
+measured end-to-end decode costs before any further task is created.
 
 ## Fast-engine amendment — FAST-01 (2026-09-26)
 
@@ -371,7 +392,7 @@ Correctness and quality criteria remain unchanged; execute applicable checks onc
   existing ablations; new ablations need a specific diagnostic question.
 - Keep benchmarks separate from correctness tests. Preserve exact commands, results, artifact/binary identities, and hardware context in each completion report.
 - Executable status values are `TODO`, `IN_PROGRESS`, `BLOCKED`, and `DONE`.
-  TASK-001–030 and TASK-033–036 are `DONE`; TASK-037–040 are `TODO`.
+  TASK-001–030 and TASK-033–037 are `DONE`; TASK-038–040 are `TODO`.
   `SUPERSEDED` denotes
   retired TASK-031/032 cross-references, never implementation completion.
 - A rejected candidate is a useful experiment result. Record the reason and
@@ -570,10 +591,14 @@ an achieved performance target.
 | TASK-034 | Compact projection consumers without global weight expansion | M13 | TASK-033 | Full-width native gate/up, efficient phase dispatch, local Q4_K unpack and readout reuse; Q4_K/Q8 selected after rejecting slower native M=1 and integrated local-unpack regression; bounded-unpack/cuBLAS retained | DONE |
 | TASK-035 | Prepared FP8 weights and activation reuse | M14 | TASK-034 | Versioned FP8 large Q8-family weights, shared codes/scales and direct narrow producer outputs | DONE |
 | TASK-036 | Fast-engine validation and delivery decision | M15 | TASK-035 | New core-54/replay/capacity/PERF-01 decision and explicit speed-goal status | DONE |
-| TASK-037 | Integer Q4_K MLP consumers for prefill and decode | M16 | TASK-036 | Versioned Q8 activation packs and full-width integer prefill/decode MLP without global BF16 weight expansion | TODO |
+| TASK-037 | Integer Q4_K MLP consumers for prefill and decode | M16 | TASK-036 | Retained policy-1030 candidate; complete M=256 MLP and matched integrated prefill/decode improve; M=1 regression deferred by user-directed amendment | DONE |
 | TASK-038 | Pipelined attention with shared KV reuse | M17 | TASK-037 | Register-resident PV, asynchronous KV staging, grouped-head decode and deterministic cooperative merge | TODO |
 | TASK-039 | Token-boundary submission and decode graph replay | M18 | TASK-038 | Internal enqueue with safe completion commits, reduced waits and bounded graph/eager dispatch | TODO |
 | TASK-040 | Quantized engine validation and delivery decision | M19 | TASK-039 | Frozen core-54/replay/capacity/PERF-01 evidence and promotion/retention with explicit speed gaps | TODO |
+
+TASK-037's original M=1 gate was superseded by the user-directed retention
+decision above. Its M=1 regression and review history remain recorded; TASK-038
+is now eligible. See the [TASK-037 completion report](tasks/TASK-037.md#completion-report).
 
 TASK-024 completed on 2026-09-25. The selected ordered FP32 state-resident
 recurrence uses 64-token intervals, supported by complete-layer measurements;
@@ -979,6 +1004,7 @@ and gate required fixed-key answers. See
 | DELIVERY-01 | 2026-09-26 | Remaining TASK-028–032 ordering, representation/dataflow and validation cadence | Attention first, integrated NVFP4 gate/up second, consolidated promotion in TASK-030; TASK-031/032 retired without completion. Retains historical evidence, semantics and quality thresholds; removes mandatory format contests and repeated full gates. |
 | FAST-01 | 2026-09-26 | Q-01/Q-02, projection operands in P-02, A-01/L-01, M-01/T-01–03; local attention P precision and future validation ownership | TASK-033–036 extend the completed milestone with attention reuse/PV, compact projection consumers, prepared FP8/shared activations and one final decision. Preserves completed evidence, model/state semantics and quality criteria; see the detailed post-TASK-030 plan. |
 | FAST-02 | 2026-09-27 | Q-01/Q-02, bounded INT32 partials in P-01, MLP/decode-P operands in P-02, A-01/A-02/L-01, G-02/M-01/T-01–03 and final validation ownership | TASK-037–040 integrate Q4_K×Q8 MLP arithmetic, pipelined/grouped attention and token-boundary submission/graphs, then one final gate. Explicitly supersedes per-weight BF16 rounding for the new policy, upstream-kernel exclusion and graph deferral; preserves model/state semantics, historical results and quality standards. |
+| TASK-037 retention decision | 2026-09-27 | TASK-037 completion criterion | User accepts the M=1 component regression as deferred decode optimization because M=256 complete MLP and matched integrated prefill/decode improve; final TASK-040 gates remain unchanged. |
 
 ## Repair index
 

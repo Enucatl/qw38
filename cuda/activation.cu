@@ -1,6 +1,7 @@
 #include "cuda/activation.hpp"
 #include "cuda/nvfp4_device.cuh"
 #include "cuda/fp8_device.cuh"
+#include "cuda/q8_device.cuh"
 
 #include "cuda/copy.hpp"
 
@@ -131,7 +132,8 @@ __global__ void hidden_rms_kernel(float const* residual,
                                   std::uint16_t const* gamma, float eps,
                                   std::uint16_t* out_bf16,
                                   unsigned n_tokens = 0, std::uint8_t* codes = nullptr,
-                                  std::uint8_t* scales = nullptr, float* fp8_scales = nullptr) {
+                                  std::uint8_t* scales = nullptr, float* fp8_scales = nullptr,
+                                  std::int32_t* q8_sums = nullptr, int* failure = nullptr) {
   if constexpr (Pack) {
     if (blockIdx.x >= n_tokens) {
       if constexpr (Pack == 1)
@@ -173,8 +175,13 @@ __global__ void hidden_rms_kernel(float const* residual,
     __syncthreads();
     if constexpr (Pack == 1)
       nvfp4_pack_row(rounded,codes,scales,blockIdx.x,kHidden,kHidden,true);
-    else
+    else if constexpr (Pack == 2)
       fp8_pack_row(rounded,blockIdx.x,gridDim.x,kHidden,codes,fp8_scales);
+    else {
+      for (unsigned i = threadIdx.x; i < kHidden; i += blockDim.x)
+        q8_pack_warp(bf16_to_fp32(rounded[i]), reinterpret_cast<std::int8_t*>(codes),
+            fp8_scales, q8_sums, (blockIdx.x * kHidden + i) / 32, failure);
+    }
   }
 }
 
@@ -510,6 +517,18 @@ std::expected<void, Error> launch_hidden_rms_fp8(float const* residual,
   hidden_rms_kernel<2><<<((n_tokens+127)/128)*128,kHiddenRmsThreads,0,stream.native()>>>(
       residual,gamma,eps,companion,n_tokens,codes,nullptr,scales);
   return check(cudaGetLastError(),"fp8.rms_pack");
+}
+
+std::expected<void, Error> launch_hidden_rms_q8(float const* residual,
+    std::uint16_t const* gamma, float eps, unsigned m, std::int8_t* codes,
+    float* scales, std::int32_t* sums, int* failure, Stream const& stream) {
+  if (!residual || !gamma || !codes || !scales || !sums || !failure ||
+      !m || m > 256 || !finite_pos(eps) || stream.empty())
+    return std::unexpected(make_error(ErrorCode::InvalidArgument, "q8.rms", "invalid operands"));
+  auto guard = stream.activate(); if (!guard) return std::unexpected(guard.error());
+  hidden_rms_kernel<3><<<m,kHiddenRmsThreads,0,stream.native()>>>(residual,gamma,eps,
+      nullptr,m,reinterpret_cast<std::uint8_t*>(codes),nullptr,scales,sums,failure);
+  return check(cudaGetLastError(), "q8.rms_pack");
 }
 
 std::expected<void, Error> launch_qk_rms_rope(

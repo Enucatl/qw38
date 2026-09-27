@@ -324,7 +324,8 @@ std::expected<void, Error> LanguageModelPlan::initialize_prefill() {
     constexpr auto capacity = static_cast<std::uint32_t>(kArenaTokenCapacity);
     auto engine = qw38::cuda::PrefillEngine::create(*stream_, capacity,
         qw38::cuda::kPrefillDefaultWeightRows, qw38::cuda::PrefillDispatch::BoundedUnpackBf16Cublas,
-        model_->schema().precision.id == qw38::format::PrecisionPolicyId::Fp8MixerV1);
+        model_->schema().precision.id == qw38::format::PrecisionPolicyId::Fp8MixerV1 ||
+        model_->schema().precision.id == qw38::format::PrecisionPolicyId::Fp8MixerQ8MlpV1);
     if (!engine) return std::unexpected(from_cuda(engine.error()));
     state.engine = std::move(*engine);
     auto gdn = PrefillGdnWorkspace::create(capacity, stream_->device());

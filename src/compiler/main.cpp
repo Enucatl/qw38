@@ -14,8 +14,9 @@ namespace {
 
 void usage() {
   std::cerr << "Usage: qw38-compile --checkpoint DIR --output FILE "
-               "[--format identity|production|candidate|candidate-q4k|nvfp4-mlp] "
+               "[--format identity|production|candidate|candidate-q4k|nvfp4-mlp|fp8-mixer|fp8-mixer-q8-mlp] "
                "[--verify-reconstruction|--verify-only]\n";
+  std::cerr << "       qw38-compile --from-fp8 FILE --output FILE --format fp8-mixer-q8-mlp\n";
 }
 
 std::string hex(qw38::format::Hash256 const& hash) {
@@ -31,12 +32,15 @@ std::string hex(qw38::format::Hash256 const& hash) {
 
 int main(int argc, char** argv) {
   std::filesystem::path checkpoint;
+  std::filesystem::path from_fp8;
   std::filesystem::path output;
   qw38::compiler::CompileOptions options{};
   bool verify_only = false;
   for (int i = 1; i < argc; ++i) {
     std::string_view arg{argv[i]};
-    if (arg == "--checkpoint" && i + 1 < argc) {
+    if (arg == "--from-fp8" && i + 1 < argc) {
+      from_fp8 = argv[++i];
+    } else if (arg == "--checkpoint" && i + 1 < argc) {
       checkpoint = argv[++i];
     } else if (arg == "--output" && i + 1 < argc) {
       output = argv[++i];
@@ -55,6 +59,9 @@ int main(int argc, char** argv) {
       } else if (mode == "candidate") {
         options.format_policy = qw38::compiler::WeightFormatPolicy::CandidateV1;
         options.revision.ident = qw38::compiler::kCandidateCompilerIdent;
+      } else if (mode == "fp8-mixer-q8-mlp") {
+        options.format_policy = qw38::compiler::WeightFormatPolicy::Fp8MixerQ8MlpV1;
+        options.revision.ident = qw38::compiler::kFp8Q8MlpCompilerIdent;
       } else if (mode == "fp8-mixer") {
         options.format_policy = qw38::compiler::WeightFormatPolicy::Fp8MixerV1;
         options.revision.ident = qw38::compiler::kFp8CompilerIdent;
@@ -78,6 +85,17 @@ int main(int argc, char** argv) {
       return 2;
     }
   }
+  if (!from_fp8.empty()) {
+    if (!checkpoint.empty() || output.empty() || verify_only || options.verify_reconstruction ||
+        options.format_policy != qw38::compiler::WeightFormatPolicy::Fp8MixerQ8MlpV1) {
+      usage(); return 2;
+    }
+    auto result=qw38::compiler::convert_fp8_q8_mlp(from_fp8,output);
+    if(!result){std::cerr<<qw38::compiler::error_message(result.error())<<'\n';return 1;}
+    std::cout<<"converted "<<output<<" policy=precision_fp8_mixer_q8_mlp_v1 manifest="
+             <<hex(result->manifest_digest)<<" unchanged_payload_and_scale_bytes=true\n";
+    return 0;
+  }
   if (checkpoint.empty() || output.empty()) {
     usage();
     return 2;
@@ -97,7 +115,7 @@ int main(int argc, char** argv) {
               << " peak_rss_bytes="
               << qw38::compiler::current_peak_rss_bytes()
               << " policy="
-              << (options.format_policy == qw38::compiler::WeightFormatPolicy::Fp8MixerV1 ? "fp8-mixer" : options.format_policy == qw38::compiler::WeightFormatPolicy::NvFp4MlpV1
+              << (options.format_policy == qw38::compiler::WeightFormatPolicy::Fp8MixerQ8MlpV1 ? "fp8-mixer-q8-mlp" : options.format_policy == qw38::compiler::WeightFormatPolicy::Fp8MixerV1 ? "fp8-mixer" : options.format_policy == qw38::compiler::WeightFormatPolicy::NvFp4MlpV1
                     ? "nvfp4-mlp" : options.format_policy == qw38::compiler::WeightFormatPolicy::CandidateV2
                       ? "candidate-q4k" : options.format_policy ==
                           qw38::compiler::WeightFormatPolicy::CandidateV1
@@ -136,7 +154,7 @@ int main(int argc, char** argv) {
             << result->identity.compiler.minor << '.'
             << result->identity.compiler.patch
             << " policy="
-            << (result->format_policy == qw38::compiler::WeightFormatPolicy::Fp8MixerV1 ? "fp8-mixer" : result->format_policy == qw38::compiler::WeightFormatPolicy::NvFp4MlpV1
+            << (result->format_policy == qw38::compiler::WeightFormatPolicy::Fp8MixerQ8MlpV1 ? "fp8-mixer-q8-mlp" : result->format_policy == qw38::compiler::WeightFormatPolicy::Fp8MixerV1 ? "fp8-mixer" : result->format_policy == qw38::compiler::WeightFormatPolicy::NvFp4MlpV1
                     ? "nvfp4-mlp" : result->format_policy == qw38::compiler::WeightFormatPolicy::CandidateV2
                     ? "candidate-q4k" : result->format_policy ==
                         qw38::compiler::WeightFormatPolicy::IdentityBf16

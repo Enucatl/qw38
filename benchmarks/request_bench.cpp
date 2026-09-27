@@ -229,17 +229,20 @@ struct Engine {
       digest << std::hex << std::setw(2) << std::setfill('0') << unsigned(byte);
     bool const nvfp4 = model.schema().precision.id == qw38::format::PrecisionPolicyId::NvFp4MlpV1;
     bool const fp8 = model.schema().precision.id == qw38::format::PrecisionPolicyId::Fp8MixerV1;
+    bool const q8_mlp = model.schema().precision.id == qw38::format::PrecisionPolicyId::Fp8MixerQ8MlpV1;
     check(digest.str() == "41c1f5e673bb24eb2fb283aa6044dbccdebecc7cd85f847815b3c02a6763fc43" ||
           (nvfp4 && digest.str() == "3904394f34a9d551d400956c6a97bd1c405c990f4461b5b5625df85b625ff786") ||
-          (fp8 && digest.str() == "7fd0f81bfb7a4e6bd5ebaacda532d2992fde64ce136fef55116e7e4f292d10c7"),
+          (fp8 && digest.str() == "7fd0f81bfb7a4e6bd5ebaacda532d2992fde64ce136fef55116e7e4f292d10c7") ||
+          (q8_mlp && digest.str() == "6ebcc402487aa92d4a6bb7d64ccfff00c20d74a738ac7e3fa2166522f4b35ff5"),
           "artifact differs from the accepted control or frozen candidate");
     out << "\"manifest_digest\":\"" << digest.str() << "\",\"capacity_requested\":" << capacity
         << ",\"capacity_allocated\":" << session.kv_capacity()
         << ",\"model_device_bytes\":" << model.device_bytes()
+        << ",\"q8_mlp_workspace_bytes\":" << session.q8_mlp_workspace().size()
         << ",\"persistent_bytes\":" << session.persistent_bytes()
         << ",\"scratch_bytes\":" << session.arena_plan().total_bytes
         << ",\"chunk\":256,\"kv_type\":\"BF16\",\"state_type\":\"FP32\""
-        << ",\"activation_type\":\"" << (fp8 ? "BF16;E4M3 mixer prefill" :
+        << ",\"activation_type\":\"" << (q8_mlp ? "BF16;E4M3 mixer prefill;Q8 K32 MLP" : fp8 ? "BF16;E4M3 mixer prefill" :
             nvfp4 ? "BF16;NVFP4 gate/up prefill" : "BF16")
         << "\",\"graph_mode\":\"none\"";
   }
@@ -266,12 +269,13 @@ int main(int argc, char** argv) {
     return vocabulary(argv[2], argv[3], argv[4]);
 #endif
   if (argc != 6) {
-    std::cerr << "usage: request_bench MODEL INPUT_U32LE prefill|decode|request T OUTPUT_JSONL\n";
+    std::cerr << "usage: request_bench MODEL INPUT_U32LE prefill|decode|request|development T OUTPUT_JSONL\n";
     return 2;
   }
   std::string const mode(argv[3]);
   auto const depth = number(argv[4]);
-  check(mode == "prefill" || mode == "decode" || mode == "request", "invalid workload");
+  check(mode == "prefill" || mode == "decode" || mode == "request" || mode == "development", "invalid workload");
+  check(mode != "development" || depth == 256, "development check requires frozen 256-token prompt");
   check(depth > 0 && depth <= 32768, "invalid depth");
   auto tokens = read_ids(argv[2], depth + 128);
   auto prompt = std::span<std::uint32_t const>{tokens}.first(depth);
@@ -300,8 +304,8 @@ int main(int argc, char** argv) {
     check(engine.position == depth, "incorrect incoming decode population");
   }
   qw38::runtime::profiling::enabled = std::getenv("QW38_PROFILE") != nullptr;
-  std::vector<unsigned> outputs(mode == "prefill" ? 1u : 128u);
-  std::vector<double> steps(mode == "decode" ? 128u : mode == "request" ? 127u : 0u);
+  std::vector<unsigned> outputs(mode == "prefill" ? 1u : mode == "development" ? 9u : 128u);
+  std::vector<double> steps(mode == "decode" ? 128u : mode == "request" ? 127u : mode == "development" ? 8u : 0u);
   synchronize_gpu();
   qw38::runtime::profiling::ScopedRange measured_range("perf01_measured");
   start = Clock::now();
@@ -315,7 +319,7 @@ int main(int argc, char** argv) {
   for (unsigned i = 0; i < steps.size(); ++i) {
     auto const step_start = Clock::now();
     outputs[mode == "decode" ? i : i + 1] = engine.decode(
-        mode == "decode" ? tokens[depth + i] : outputs[i]);
+        mode == "decode" || mode == "development" ? tokens[depth + i] : outputs[i]);
     synchronize_gpu();
     steps[i] = elapsed(step_start);
   }

@@ -68,6 +68,8 @@ inline constexpr char const kCandidateCompilerIdent[] =
 inline constexpr std::uint32_t kCompilerMajor = 0;
 inline constexpr char const kFp8CompilerIdent[] =
     "qw38-fp8-mixer-v1-cutlass-098de2a6-e4m3-rne-absmax448-m1n128k128";
+inline constexpr char const kFp8Q8MlpCompilerIdent[] =
+    "qw38-fp8-mixer-q8-mlp-v1-cutlass-098de2a6-llama-e6ab7c1a4-k32-bf16-rne-absmax127-f32-affine";
 inline constexpr char const kNvFp4CompilerIdent[] =
     "qw38-nvfp4-mlp-v1-cutlass-098de2a6-factor-pow2-rne-activation1";
 

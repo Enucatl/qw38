@@ -2,6 +2,8 @@
 
 #include "cuda/activation.hpp"
 #include "cuda/decode_mmv.hpp"
+#include "cuda/prefill.hpp"
+#include "cuda/q4k_q8.hpp"
 
 #include "format/constants.hpp"
 #include "format/layout.hpp"
@@ -490,7 +492,7 @@ std::expected<MlpPlan, Error> bind_mlp_plan(MlpBindViews const& views,
 }
 
 std::expected<MlpPlan, Error> bind_mlp_plan(Model const& model,
-                                            Session const& session,
+                                            Session& session,
                                             std::uint32_t layer,
                                             qw38::cuda::Stream const& stream,
                                             float eps) {
@@ -503,7 +505,7 @@ std::expected<MlpPlan, Error> bind_mlp_plan(Model const& model,
     return std::unexpected(arg_error(
         "stream", "model and plan must use the session device and stream"));
   }
-  auto const* session_state = detail::SessionPlanAccess::execution_state(session);
+  auto* session_state = detail::SessionPlanAccess::execution_state(session);
   if (session_state == nullptr || session_state->is_poisoned()) {
     return std::unexpected(arg_error("session", "session is poisoned or closed"));
   }
@@ -582,6 +584,11 @@ std::expected<MlpPlan, Error> bind_mlp_plan(Model const& model,
   auto plan = bind_mlp_plan(views, stream, eps);
   if (!plan) return std::unexpected(plan.error());
   plan->session_state = session_state;
+  if (model.schema().precision.id == qw38::format::PrecisionPolicyId::Fp8MixerQ8MlpV1) {
+    plan->q8_workspace_ = session.q8_mlp_workspace();
+    if (plan->q8_workspace_.size() < qw38::cuda::q8_mlp_workspace_bytes(1))
+      return std::unexpected(arg_error("q8.workspace", "missing session Q8 MLP workspace"));
+  }
   return plan;
 }
 
@@ -600,6 +607,20 @@ std::expected<void, Error> execute_decode_mlp(MlpPlan const& plan) {
   if (h_mid == nullptr || next_h == nullptr || gamma == nullptr ||
       normalized == nullptr || swiglu == nullptr) {
     return std::unexpected(arg_error("mlp", "plan views are null"));
+  }
+  if (!plan.q8_workspace_.empty()) {
+    auto weight = [](MlpWeightBinding const& w) {
+      return qw38::cuda::PrefillWeight{w.codes.pointer,w.scales.pointer,w.layout,w.quantizer,
+          w.n,w.k,w.padded_n,w.padded_k,w.codes_bytes,w.scales_bytes};
+    };
+    bool submitted = false;
+    auto st = qw38::cuda::q4k_q8_mlp(weight(plan.gate),weight(plan.up),weight(plan.down),
+        h_mid,gamma,plan.eps,next_h,1,plan.q8_workspace_,*plan.stream,submitted);
+    if (!st) {
+      if (submitted && plan.session_state) plan.session_state->poison();
+      return std::unexpected(from_cuda(st.error()));
+    }
+    return {};
   }
 
   // Region 1: post-mixer zero-centered RMS → BF16 normalized h_mid.

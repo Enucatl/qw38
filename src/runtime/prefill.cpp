@@ -7,6 +7,7 @@
 #include "runtime/sizes.hpp"
 
 #include "format/constants.hpp"
+#include "cuda/q4k_q8.hpp"
 
 #include <string_view>
 #include <string>
@@ -110,13 +111,23 @@ std::expected<std::uint16_t const*, Error> bind_gamma(Model const& model,
 
 std::expected<PrefillLayerProjectionPlan, Error> bind_prefill_layer_projections(
     Model const& model, std::uint32_t layer,
-    qw38::cuda::Stream const& stream) {
+    qw38::cuda::Stream const& stream, Session* session) {
   if (layer >= kLanguageLayers || stream.empty() ||
       model.device() != stream.device()) {
     return std::unexpected(make_error(ErrorCode::InvalidArgument, "prefill.layer",
                                       "layer or device mismatch"));
   }
   PrefillLayerProjectionPlan p;
+  if (model.schema().precision.id == qw38::format::PrecisionPolicyId::Fp8MixerQ8MlpV1) {
+    if (!session || detail::SessionPlanAccess::stream(*session) != &stream ||
+        session->q8_mlp_workspace().size() < qw38::cuda::q8_mlp_workspace_bytes(kArenaTokenCapacity))
+      return std::unexpected(make_error(ErrorCode::InvalidArgument,"q8.workspace","session workspace/stream required"));
+    p.q8_workspace_ = session->q8_mlp_workspace();
+    p.q8_state_ = detail::SessionPlanAccess::execution_state(*session);
+    p.q8_stream_ = &stream;
+    if (!p.q8_state_ || p.q8_state_->is_poisoned())
+      return std::unexpected(make_error(ErrorCode::InvalidArgument,"q8.session","closed or poisoned session"));
+  }
   p.layer = layer;
   p.gdn = is_gdn_language_layer(layer);
   SemanticNodeKind const kind = p.gdn ? SemanticNodeKind::GatedDeltaNet
@@ -223,6 +234,20 @@ std::expected<void, Error> execute_prefill_mlp(
     PrefillLayerProjectionPlan const& plan, qw38::cuda::PrefillEngine& engine,
     float const* h_mid, float* next_h, std::uint32_t valid_tokens,
     std::uint64_t first_position, float eps) {
+  if (!plan.q8_workspace_.empty()) {
+    if (engine.stream() != plan.q8_stream_ || !plan.q8_state_ || plan.q8_state_->is_poisoned() ||
+        valid_tokens > engine.token_capacity() ||
+        first_position > UINT64_MAX - valid_tokens)
+      return std::unexpected(make_error(ErrorCode::InvalidArgument,"q8.prefill","invalid engine or token range"));
+    bool submitted = false;
+    auto st = qw38::cuda::q4k_q8_mlp(plan.mlp_gate,plan.mlp_up,plan.mlp_down,
+        h_mid,plan.mlp_gamma,eps,next_h,valid_tokens,plan.q8_workspace_,*engine.stream(),submitted);
+    if (!st) {
+      if (submitted) plan.q8_state_->poison();
+      return std::unexpected(from_cuda(st.error()));
+    }
+    return {};
+  }
   auto st = engine.mlp(plan.mlp_gate, plan.mlp_up, plan.mlp_down,
                        h_mid, plan.mlp_gamma, eps, next_h,
                        valid_tokens, first_position);

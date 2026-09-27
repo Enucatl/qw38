@@ -21,12 +21,68 @@
 #include <fstream>
 #include <initializer_list>
 #include <limits>
+#include <new>
+#include <stdexcept>
 #include <string>
 #include <unordered_map>
 #include <tuple>
 #include <unordered_set>
 
 namespace qw38::compiler {
+std::expected<qw38::format::ArtifactIdentity, CompilerError> convert_fp8_q8_mlp(
+    std::filesystem::path const& source, std::filesystem::path const& destination) {
+  try {
+  std::error_code ec;
+  if (source == destination || std::filesystem::equivalent(source,destination,ec))
+    return std::unexpected(make_error(CompilerErrorCode::ArchitectureMismatch,"output","source and destination must differ"));
+  auto input = qw38::format::Artifact::open(source);
+  if (!input) return std::unexpected(from_format(input.error()));
+  if (input->precision().id != qw38::format::PrecisionPolicyId::Fp8MixerV1 ||
+      input->schema().compiler.ident != kFp8CompilerIdent)
+    return std::unexpected(make_error(CompilerErrorCode::ArchitectureMismatch,"source","frozen FP8 mixer recipe required"));
+  auto schema = input->schema();
+  schema.precision.id = qw38::format::PrecisionPolicyId::Fp8MixerQ8MlpV1;
+  schema.compiler.ident = kFp8Q8MlpCompilerIdent;
+  schema.integrity.clear();
+  for (auto& t : schema.tensors) { t.payload = {}; t.scales = {}; }
+  auto writer = qw38::format::ArtifactWriter::create(destination,schema);
+  if (!writer) return std::unexpected(from_format(writer.error()));
+  for (auto const& t : schema.tensors) {
+    if (std::ranges::any_of(schema.shared_bindings,[&](auto const& b){return b.alias_tensor_id==t.tensor_id;})) continue;
+    for (auto kind : {qw38::format::SpanKind::Payload,qw38::format::SpanKind::Scales}) {
+      auto bytes = kind == qw38::format::SpanKind::Payload ? input->payload(t.logical_name) : input->scales(t.logical_name);
+      if (!bytes) return std::unexpected(from_format(bytes.error()));
+      for (std::size_t off=0;off<bytes->size();) {
+        auto count=std::min<std::size_t>(8*1024*1024,bytes->size()-off);
+        auto st=writer->write_span(t.logical_name,kind,bytes->subspan(off,count));
+        if (!st) return std::unexpected(from_format(st.error()));
+        off+=count;
+      }
+    }
+  }
+  auto result=writer->finalize();
+  if(!result)return std::unexpected(from_format(result.error()));
+  auto output=qw38::format::Artifact::open(destination);
+  if(!output)return std::unexpected(from_format(output.error()));
+  for(auto const& t:schema.tensors) {
+    for(auto kind:{qw38::format::SpanKind::Payload,qw38::format::SpanKind::Scales}) {
+      auto a=kind==qw38::format::SpanKind::Payload?input->payload(t.logical_name):input->scales(t.logical_name);
+      auto b=kind==qw38::format::SpanKind::Payload?output->payload(t.logical_name):output->scales(t.logical_name);
+      if(!a)return std::unexpected(from_format(a.error()));
+      if(!b)return std::unexpected(from_format(b.error()));
+      if(!std::ranges::equal(*a,*b))return std::unexpected(make_error(CompilerErrorCode::ArchitectureMismatch,t.logical_name,"conversion changed weight bytes"));
+    }
+  }
+  return *result;
+  } catch (std::bad_alloc const&) {
+    return std::unexpected(from_format(qw38::format::make_error(
+        qw38::format::FormatErrorCode::AllocationFailure,0,"convert_fp8_q8_mlp","host allocation failed")));
+  } catch (std::length_error const&) {
+    return std::unexpected(from_format(qw38::format::make_error(
+        qw38::format::FormatErrorCode::AllocationFailure,0,"convert_fp8_q8_mlp","host allocation size is invalid")));
+  }
+}
+
 namespace {
 
 using qw38::format::ArithmeticDtype;
@@ -639,6 +695,9 @@ std::expected<ArtifactSchema, CompilerError> build_schema(
   if (policy == WeightFormatPolicy::Fp8MixerV1 && revision.ident != kFp8CompilerIdent)
     return std::unexpected(make_error(CompilerErrorCode::ArchitectureMismatch,
         "compiler.ident", "FP8 requires its frozen compiler recipe"));
+  if (policy == WeightFormatPolicy::Fp8MixerQ8MlpV1 && revision.ident != kFp8Q8MlpCompilerIdent)
+    return std::unexpected(make_error(CompilerErrorCode::ArchitectureMismatch,
+        "compiler.ident", "FP8/Q8 MLP requires its frozen compiler recipe"));
   ArtifactSchema schema{};
   if (policy == WeightFormatPolicy::CandidateV2 &&
       revision.ident != kQ4KCandidateCompilerIdent) {
@@ -663,6 +722,10 @@ std::expected<ArtifactSchema, CompilerError> build_schema(
   if (policy == WeightFormatPolicy::Fp8MixerV1) {
     schema.precision = qw38::format::candidate_v2_precision_policy();
     schema.precision.id = qw38::format::PrecisionPolicyId::Fp8MixerV1;
+  }
+  if (policy == WeightFormatPolicy::Fp8MixerQ8MlpV1) {
+    schema.precision = qw38::format::candidate_v2_precision_policy();
+    schema.precision.id = qw38::format::PrecisionPolicyId::Fp8MixerQ8MlpV1;
   }
   schema.scope = SemanticScope::LanguagePlusMtpDescriptors;
   schema.state = language_state_schema();

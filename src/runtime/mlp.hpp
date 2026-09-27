@@ -43,8 +43,13 @@ struct MlpPlan {
   TensorView normalized{};   // BF16 [5120]
   TensorView swiglu{};       // BF16 [17408]; only globally materialized gate/up value
   qw38::cuda::Stream const* stream{nullptr};
-  SessionExecutionState const* session_state{};
+  SessionExecutionState* session_state{};
   float eps{kMlpRmsEps};
+ private:
+  friend std::expected<MlpPlan, Error> bind_mlp_plan(
+      Model const&, Session&, std::uint32_t, qw38::cuda::Stream const&, float);
+  friend std::expected<void, Error> execute_decode_mlp(MlpPlan const&);
+  std::span<std::byte> q8_workspace_{};
 };
 
 struct MlpBindViews {
@@ -71,7 +76,7 @@ struct MlpBindViews {
     float eps = kMlpRmsEps);
 
 [[nodiscard]] std::expected<MlpPlan, Error> bind_mlp_plan(
-    Model const& model, Session const& session, std::uint32_t layer,
+    Model const& model, Session& session, std::uint32_t layer,
     qw38::cuda::Stream const& stream, float eps = kMlpRmsEps);
 
 // Three launches: hidden RMS, paired Q4/BF16 gate/up + SwiGLU, down residual-add.
