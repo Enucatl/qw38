@@ -10,6 +10,7 @@
 #include "cuda/copy.hpp"
 #include "cuda/q4k_q8.hpp"
 #include "cuda/alloc.hpp"
+#include "cuda/activation.hpp"
 #include <charconv>
 #include <chrono>
 #include <cmath>
@@ -111,7 +112,73 @@ int real_mlp(char const* artifact, char const* rows, char const* saved_path=null
   return allocations?1:0;
 }
 
+// Isolate the complete producer, including its output/pack and completion.
+int rms_bench(char const* mode, char const* rows, char const* saved_path) {
+  using namespace qw38;
+  unsigned m = 0;
+  std::string_view text(rows), kind(mode);
+  auto parsed = std::from_chars(text.data(), text.data() + text.size(), m);
+  if (parsed.ec != std::errc{} || parsed.ptr != text.end() ||
+      (m != 1 && m != 512) || (kind != "plain" && kind != "q8")) return 2;
+  auto const setup_start = std::chrono::steady_clock::now();
+  auto stream = Stream::create();
+  if (!stream) return 1;
+  std::vector<float> input(m * kHidden);
+  std::vector<std::uint16_t> gamma(kHidden);
+  for (unsigned i = 0; i < input.size(); ++i)
+    input[i] = (int((i * 17 + i / kHidden * 23) % 97) - 48) * .03125f;
+  for (unsigned i = 0; i < gamma.size(); ++i) gamma[i] = 0x3d00u + i % 127u;
+  auto x = DeviceBuffer::allocate(input.size() * 4);
+  auto g = DeviceBuffer::allocate(gamma.size() * 2);
+  auto y = DeviceBuffer::allocate(input.size() * (kind == "plain" ? 2 : 1));
+  auto scales = DeviceBuffer::allocate(input.size() / 32 * 4);
+  auto sums = DeviceBuffer::allocate(input.size() / 32 * 4);
+  auto failure = DeviceBuffer::allocate(4);
+  if (!x || !g || !y || !scales || !sums || !failure ||
+      !cuda::copy_h2d(x->data(), std::as_bytes(std::span(input)), *stream) ||
+      !cuda::copy_h2d(g->data(), std::as_bytes(std::span(gamma)), *stream) ||
+      !zero(*failure, *stream) || !stream->sync()) return 1;
+  std::vector<std::byte> result(y->bytes() + (kind == "q8" ? scales->bytes() + sums->bytes() : 0));
+  auto begin = Event::create_timing(), end = Event::create_timing();
+  if (!begin || !end) return 1;
+  double const setup_ms = std::chrono::duration<double, std::milli>(
+      std::chrono::steady_clock::now() - setup_start).count();
+  auto const count = cuda::malloc_count();
+  int failed = 0;
+  if (!begin->record(*stream)) return 1;
+  auto const start = std::chrono::steady_clock::now();
+  auto status = kind == "plain"
+      ? cuda::launch_hidden_rms(static_cast<float const*>(x->data()),
+          static_cast<std::uint16_t const*>(g->data()), 1e-6f, m,
+          static_cast<std::uint16_t*>(y->data()), *stream)
+      : cuda::launch_hidden_rms_q8(static_cast<float const*>(x->data()),
+          static_cast<std::uint16_t const*>(g->data()), 1e-6f, m,
+          static_cast<std::int8_t*>(y->data()), static_cast<float*>(scales->data()),
+          static_cast<std::int32_t*>(sums->data()), static_cast<int*>(failure->data()), *stream);
+  if (!status || !cuda::copy_d2h(result.data(), y->data(), y->bytes(), *stream)) return 1;
+  if (kind == "q8" &&
+      (!cuda::copy_d2h(result.data() + y->bytes(), scales->data(), scales->bytes(), *stream) ||
+       !cuda::copy_d2h(result.data() + y->bytes() + scales->bytes(), sums->data(), sums->bytes(), *stream) ||
+       !cuda::copy_d2h(&failed, failure->data(), 4, *stream))) return 1;
+  if (!end->record(*stream) || !stream->sync() || failed) return 1;
+  double const host_ms = std::chrono::duration<double, std::milli>(
+      std::chrono::steady_clock::now() - start).count();
+  auto gpu_ms = elapsed_ms(*begin, *end);
+  if (!gpu_ms) return 1;
+  std::ofstream saved(saved_path, std::ios::binary);
+  saved.write(reinterpret_cast<char const*>(result.data()), result.size());
+  if (!saved) return 1;
+  auto const hot = cuda::malloc_count() - count;
+  std::cout << std::setprecision(12) << "rms=" << kind << " m=" << m
+            << " setup_ms=" << setup_ms << " gpu_ms=" << *gpu_ms
+            << " host_ms=" << host_ms << " hot_allocations=" << hot
+            << " runs=1 warmups=0 first_use=true readout_included=true\n";
+  return hot ? 1 : 0;
+}
+
 int main(int argc,char** argv) {
+  if (argc == 5 && std::string_view(argv[1]) == "--rms")
+    return rms_bench(argv[2], argv[3], argv[4]);
   if(argc==3 || argc==4)return real_mlp(argv[1],argv[2],argc==4?argv[3]:nullptr);
   if(argc!=1)return 2;
   cudaDeviceProp prop{};

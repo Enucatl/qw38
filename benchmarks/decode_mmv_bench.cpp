@@ -3,6 +3,8 @@
 #include "cuda/error.hpp"
 #include "cuda/event.hpp"
 #include "cuda/stream.hpp"
+#include "cuda/copy.hpp"
+#include "cuda/alloc.hpp"
 
 #include <cuda_runtime.h>
 
@@ -12,6 +14,9 @@
 #include <cstdint>
 #include <expected>
 #include <iostream>
+#include <fstream>
+#include <iomanip>
+#include <cmath>
 #include <span>
 #include <string>
 #include <utility>
@@ -110,7 +115,10 @@ std::expected<float, qw38::cuda::Error> time_launch(Stream const& stream,
 
 }  // namespace
 
-int main() {
+int main(int argc, char** argv) {
+  bool const head = argc == 3 && std::string_view(argv[1]) == "--head";
+  if (argc != 1 && !head) return 2;
+  auto const setup_start = std::chrono::steady_clock::now();
   cudaDeviceProp prop{};
   if (auto st = qw38::cuda::check(cudaGetDeviceProperties(&prop, 0),
                                   "cudaGetDeviceProperties");
@@ -166,6 +174,7 @@ int main() {
   };
 
   for (auto const& c : cases) {
+    if (head && std::string_view(c.name) != "q8-head-248320x5120") continue;
     auto const pn = c.n;
     auto const pk = c.k;
     auto const code_n = decode_code_bytes(c.layout, pn, pk);
@@ -268,6 +277,43 @@ int main() {
       d.output = qw38::cuda::decode_vector_view(
           out->data(), DecodeDtype::Bf16, qw38::cuda::kDecodeLayoutBf16VectorV0,
           c.n, static_cast<std::uint64_t>(c.n) * 2u, 2, true);
+    }
+
+    if (head) {
+      std::vector<std::uint16_t> host_input(c.k), host_scales(scale_n / 2);
+      for (std::size_t i = 0; i < host_input.size(); ++i)
+        host_input[i] = static_cast<std::uint16_t>(0x3e80u + i % 257u);
+      for (std::size_t i = 0; i < host_scales.size(); ++i)
+        host_scales[i] = static_cast<std::uint16_t>(0x2001u + i % 127u);
+      if (!qw38::cuda::fill_pattern(codes->data(), code_n, 17, *stream) ||
+          !qw38::cuda::copy_h2d(input->data(), std::as_bytes(std::span(host_input)), *stream) ||
+          !qw38::cuda::copy_h2d(scales->data(), std::as_bytes(std::span(host_scales)), *stream) ||
+          !stream->sync()) return 1;
+      std::vector<float> logits(c.n);
+      auto begin = Event::create_timing(), end = Event::create_timing();
+      if (!begin || !end) return 1;
+      double const setup_ms = std::chrono::duration<double, std::milli>(
+          std::chrono::steady_clock::now() - setup_start).count();
+      auto const allocations = qw38::cuda::malloc_count();
+      if (!begin->record(*stream)) return 1;
+      auto const start = std::chrono::steady_clock::now();
+      if (!launch_decode_mmv(d, *stream) ||
+          !qw38::cuda::copy_d2h(logits.data(), out->data(), out->bytes(), *stream) ||
+          !end->record(*stream) || !stream->sync()) return 1;
+      double const host_ms = std::chrono::duration<double, std::milli>(
+          std::chrono::steady_clock::now() - start).count();
+      auto gpu_ms = elapsed_ms(*begin, *end);
+      if (!gpu_ms) return 1;
+      for (float value : logits) if (!std::isfinite(value)) return 1;
+      std::ofstream saved(argv[2], std::ios::binary);
+      saved.write(reinterpret_cast<char const*>(logits.data()), out->bytes());
+      if (!saved) return 1;
+      auto const hot = qw38::cuda::malloc_count() - allocations;
+      std::cout << std::setprecision(12) << "head n=" << c.n << " k=" << c.k
+                << " setup_ms=" << setup_ms << " gpu_ms=" << *gpu_ms
+                << " host_ms=" << host_ms << " hot_allocations=" << hot
+                << " runs=1 warmups=0 first_use=true readout_included=true\n";
+      return hot ? 1 : 0;
     }
 
     float ms = 0.0f;

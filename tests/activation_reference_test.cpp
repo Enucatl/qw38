@@ -2,9 +2,12 @@
 #include "cuda/activation.hpp"
 #include "cuda/buffer.hpp"
 #include "cuda/stream.hpp"
+#include "cuda/copy.hpp"
 #include "format/floatcvt.hpp"
 #include "reference/math.hpp"
 
+#include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstdint>
 #include <iostream>
@@ -248,6 +251,81 @@ void test_hidden_and_qk_rms(Stream const& stream) {
   }
   expect_bf16_close(*qgot, qcpu, tol::kRmsBf16Abs, "qk vs fp32");
   expect_bf16_close(*qgot, qgold, tol::kRmsBf16Abs, "qk vs f64");
+}
+
+void test_hidden_rms_rows_and_q8(Stream const& stream) {
+  // The same producer serves decode and M512 prefill. Distinct row magnitudes
+  // expose stale register values, row mixing, and unsafe sum-of-squares paths.
+  constexpr unsigned rows = 512;
+  std::vector<float> x(rows * kHidden);
+  auto gamma = ramp_h(kHidden, .25f);
+  for (unsigned r = 0; r < rows; ++r) {
+    float const magnitude = std::array{0.f, std::numeric_limits<float>::denorm_min(),
+        1e-20f, 1e18f, std::numeric_limits<float>::max() / 64.f, .03125f}[r % 6];
+    for (unsigned c = 0; c < kHidden; ++c)
+      x[r * kHidden + c] = (int((c * 17 + r * 23) % 97) - 48) * magnitude;
+  }
+  auto dx = upload_vec(x, stream), dg = upload_vec(gamma, stream);
+  auto dy = DeviceBuffer::allocate(x.size() * 2);
+  auto codes = DeviceBuffer::allocate(x.size());
+  auto scales = DeviceBuffer::allocate(x.size() / 32 * 4);
+  auto sums = DeviceBuffer::allocate(x.size() / 32 * 4);
+  auto failure = DeviceBuffer::allocate(4);
+  expect(dx && dg && dy && codes && scales && sums && failure, "RMS row fixtures allocate");
+  if (!dx || !dg || !dy || !codes || !scales || !sums || !failure) return;
+  auto pack = [&] {
+    expect(bool(qw38::cuda::zero(*failure, stream)), "clear RMS pack failure");
+    expect(bool(qw38::cuda::launch_hidden_rms_q8(static_cast<float const*>(dx->data()),
+        static_cast<std::uint16_t const*>(dg->data()), kDefaultRmsEps, rows,
+        static_cast<std::int8_t*>(codes->data()), static_cast<float*>(scales->data()),
+        static_cast<std::int32_t*>(sums->data()), static_cast<int*>(failure->data()), stream)),
+        "launch fused RMS Q8 rows");
+  };
+  expect(bool(qw38::cuda::launch_hidden_rms(static_cast<float const*>(dx->data()),
+      static_cast<std::uint16_t const*>(dg->data()), kDefaultRmsEps, rows,
+      static_cast<std::uint16_t*>(dy->data()), stream)), "launch plain RMS rows");
+  pack();
+  auto y = download_vec<std::uint16_t>(*dy, x.size(), stream);
+  auto z = download_vec<std::int8_t>(*codes, x.size(), stream);
+  auto a = download_vec<float>(*scales, x.size() / 32, stream);
+  auto s = download_vec<std::int32_t>(*sums, x.size() / 32, stream);
+  auto flag = download_vec<int>(*failure, 1, stream);
+  expect(y && z && a && s && flag, "download RMS rows");
+  if (!y || !z || !a || !s || !flag) return;
+  expect((*flag)[0] == 0, "extreme finite RMS pack succeeds");
+  std::vector<std::uint16_t> reference(kHidden);
+  for (unsigned r = 0; r < rows; ++r) {
+    expect(bool(qw38::reference::hidden_rms_norm_1p_gamma_f64(
+        std::span(x).subspan(r * kHidden, kHidden), gamma, kDefaultRmsEps, reference)),
+        "independent f64 RMS row");
+    expect_bf16_close(std::span(*y).subspan(r * kHidden, kHidden), reference,
+        tol::kRmsBf16Abs, "RMS row versus f64");
+  }
+  for (unsigned group = 0; group < x.size() / 32; ++group) {
+    float peak = 0.f;
+    for (unsigned i = 0; i < 32; ++i)
+      peak = std::max(peak, std::abs(qw38::format::bf16_to_fp32((*y)[group * 32 + i])));
+    float const scale = peak == 0.f ? 1.f : peak / 127.f;
+    int sum = 0;
+    for (unsigned i = 0; i < 32; ++i) {
+      auto const index = group * 32 + i;
+      int const code = std::clamp(int(std::nearbyint(
+          qw38::format::bf16_to_fp32((*y)[index]) / scale)), -127, 127);
+      expect((*z)[index] == code, "fused RMS uses exact BF16 RNE Q8 recipe");
+      sum += code;
+    }
+    expect((*a)[group] == scale && (*s)[group] == sum, "exact RMS Q8 scales and sums");
+  }
+  for (float value : {std::numeric_limits<float>::infinity(),
+                     -std::numeric_limits<float>::infinity(),
+                     std::numeric_limits<float>::quiet_NaN()}) {
+    x[kHidden + 17] = value;
+    expect(bool(qw38::cuda::copy_h2d(dx->data(), std::as_bytes(std::span(x)), stream)),
+        "upload nonfinite residual");
+    pack();
+    flag = download_vec<int>(*failure, 1, stream);
+    expect(flag && (*flag)[0] == 1, "nonfinite RMS pack signals failure");
+  }
 }
 
 void test_gdn_gated(Stream const& stream) {
@@ -643,6 +721,7 @@ int main() {
   test_invalid_launches(*stream);
   test_embed(*stream);
   test_hidden_and_qk_rms(*stream);
+  test_hidden_rms_rows_and_q8(*stream);
   test_gdn_gated(*stream);
   test_silu_sigmoid(*stream);
   test_rope(*stream);

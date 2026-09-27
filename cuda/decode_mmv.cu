@@ -601,6 +601,12 @@ std::expected<void, Error> launch_layout(DecodeMmvDesc const& a,
   }
   if (a.layout == kDecodeLayoutQ8G32V0 ||
       a.layout == kDecodeLayoutQ8G32CandidateV1) {
+    if constexpr (!Paired) {
+      // The vocabulary head reuses one small input across 31,040 CTAs.
+      if (a.n == 248320 && a.k == 5120) {
+        return launch_kind<WeightKind::Q8, false, true>(a, b, stream, op);
+      }
+    }
     return launch_kind<WeightKind::Q8, Paired>(a, b, stream, op);
   }
   return launch_kind<WeightKind::Bf16, Paired>(a, b, stream, op);
