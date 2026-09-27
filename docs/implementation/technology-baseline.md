@@ -1,6 +1,6 @@
 # Technology baseline
 
-This document is the normative V0 reference development, build, and runtime environment. [Architecture V0](../architecture/architecture-v0.md) defines retained semantics and controls; OVERALL-01, FP4-01, DELIVERY-01, FAST-01 and [the task ledger](task_ledger.md) govern candidate selection and implementation order through TASK-036. [Code standards](code-standards.md) define how its C++ and CUDA implementation is written.
+This document is the normative V0 reference development, build, and runtime environment. [Architecture V0](../architecture/architecture-v0.md) defines retained semantics and controls; OVERALL-01, FP4-01, DELIVERY-01, FAST-01, FAST-02 and [the task ledger](task_ledger.md) govern candidate selection and implementation order through TASK-040. [Code standards](code-standards.md) define how its C++ and CUDA implementation is written.
 
 # Reference platform
 
@@ -109,4 +109,4 @@ Future implementation task specifications must treat:
 - this technology baseline as authority for platform, toolchain, build, and container assumptions;
 - [Code standards](code-standards.md) as authority for C++/CUDA implementation conventions.
 
-If a task conflicts with the platform or toolchain requirements here, report the conflict. For candidate architecture and task ordering through TASK-036, follow OVERALL-01, FP4-01, DELIVERY-01, FAST-01 and their revised ledger contracts; this baseline does not require the historical Q4/Q8 implementation to be completed as a quality/performance gate first.
+If a task conflicts with the platform or toolchain requirements here, report the conflict. For candidate architecture and task ordering through TASK-040, follow OVERALL-01, FP4-01, DELIVERY-01, FAST-01, FAST-02 and their revised ledger contracts; this baseline does not require the historical Q4/Q8 implementation to be completed as a quality/performance gate first.

@@ -73,3 +73,16 @@ uncertainty, provenance and manual-only full-216 rules above remain binding.
 Early diagnosis of the lost C92 case is not calibration or acceptance evidence
 for the complete core. Repeating deterministic cases cannot waive the point-loss
 gate. Missing, failed or inconclusive evidence still blocks promotion.
+
+## FAST-02 timing amendment — 2026-09-27
+
+Preserve TASK-030/036 retention decisions and their recorded quality gaps.
+[FAST-02](../implementation/task_ledger.md#fast-engine-amendment--fast-02-2026-09-27)
+assigns affected numerical/state and small precision development checks to
+TASK-037–039. TASK-040 owns one new frozen core-54, all output-bound selected
+P100 reviews, the fixed 32K case and final replay/capacity/performance gates.
+Selection, thresholds, grading, uncertainty and provenance are unchanged.
+Exact-identity focused evidence and authenticated matching comparator rows
+may be reused; historical candidate outputs cannot validate a new policy.
+Passing development checks does not resolve TASK-036's C92 uncertainty/P100
+failure or authorize promotion. Full-216 remains optional human-only work.

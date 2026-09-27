@@ -1,5 +1,11 @@
 # Q4_K MLP candidate, existing Quartz runtime precision
 
+This records the retained CandidateV2 control. Its per-weight BF16 operand
+rounding remains binding for existing policies. [FAST-02 TASK-037](tasks/TASK-037.md)
+plans policy 0x0406 with the same logical Q4_K weights but Q8 MLP activations
+and blockwise integer/FP32 affine arithmetic without that rounding. This does
+not change the historical control or declare the new policy implemented.
+
 This candidate replaces only the 192 primary-language MLP gate, up, and down
 matrices with the no-imatrix reference Q4_K fitting algorithm from
 [llama.cpp e6ab7c1a4](https://github.com/ggml-org/llama.cpp/tree/e6ab7c1a4).

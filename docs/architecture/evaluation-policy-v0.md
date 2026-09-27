@@ -10,6 +10,17 @@ and 32768 acceptance to TASK-026, and matched performance to TASK-027. This
 document selects the evaluation and measurement contracts; it contains no
 model-quality measurements.
 
+**Current validation owner (FAST-02, 2026-09-27):**
+[TASK-040](../implementation/tasks/TASK-040.md) owns the next frozen candidate's
+core-54, selected P100 reviews, fixed 32K case, replay, capacity and six
+single-run PERF-01 executions yielding nine rows. TASK-037–039 use affected
+development checks. TASK-030/036 decisions and earlier ownership below remain
+historical; no thresholds, measurement boundaries or human-only full-216
+rules change. Include graph/library first use within its actual timing
+boundary and use no warmup inference. Reuse authenticated matching comparator
+evidence; do not automatically rerun it. See
+[FAST-02](../implementation/task_ledger.md#fast-engine-amendment--fast-02-2026-09-27).
+
 ## Decision and authority
 
 Adopt DS4's combination of component correctness, reference-continuation

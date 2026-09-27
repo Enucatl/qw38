@@ -1,15 +1,35 @@
 # Architecture thesis
 
+**FAST-02 (2026-09-27), post-TASK-036 authority:** the
+[ledger amendment](../implementation/task_ledger.md#fast-engine-amendment--fast-02-2026-09-27)
+and TASK-037–040 contracts govern the next batch. TASK-037 selects existing
+Q4_K weights with signed Q8 K32 MLP activations under new policy 0x0406:
+bounded exact INT32 dot partials, FP32 scale/minimum correction and final
+accumulation, without per-weight BF16 reconstruction rounding. This is an
+explicit P-01/P-02 exception for those contractions, not permission to narrow
+residuals, nonlinearities, recurrence, state or other accumulators. Q-01/Q-02,
+A-01/A-02/L-01 permit the versioned policy and any required lossless offline
+layout change, with one resident weight view. TASK-038 changes attention
+fragments, KV staging, GQA reuse and split scheduling; it retains two-component
+BF16 P in prefill and authorizes that recipe for grouped MMA decode, with FP32
+statistics/PV accumulation and BF16 KV. TASK-039 changes G-02/M-01 submission
+and commit timing: private enqueue, successful token/chunk completion before
+host commit, and static session-owned CUDA graphs; poison/reset/restore and
+public completion guarantees remain. T-01–03 are tuning choices; chunks stay
+256 for this batch. Reusing attributed kernels/patterns from pinned llama.cpp
+is authorized, superseding the historical exclusion below. TASK-040 owns the
+new final gate; no completed result or quality threshold is reclassified.
+
 **FAST-01 (2026-09-26), post-TASK-030 authority:** the
 [new plan](../implementation/post-task030-plan.md) and
 [ledger](../implementation/task_ledger.md#fast-engine-amendment--fast-01-2026-09-26)
-govern future TASK-033–036. They explicitly reopen local BF16 attention-P
+govern completed TASK-033–036. They explicitly reopen local BF16 attention-P
 operands, prepared groupwise FP8 projection weights/activations and compact
 consumer layouts/fusion under Q-01/Q-02, P-02, A-01/L-01 and M-01/T-01–03.
 Below, earlier V0/OVERALL-01/DELIVERY-01 choices remain historical controls
 where superseded. FP32 residual/reduction/accumulation/recurrence and BF16
 KV/history remain defaults; model/session semantics and quality gates are
-unchanged. TASK-030 retained control, and TASK-036 owns the next final decision.
+unchanged. TASK-030 and TASK-036 both retained control; FAST-02 owns future work.
 
 - Build a single-GPU, single-sequence Qwen3.8-27B language inference engine, compiling the BF16 Transformers checkpoint in `.cache/authorities/qwen3.8-27b-transformers` offline. Preserve MTP weights and semantic descriptors, but enable its execution only after its unresolved forward semantics are established.
 - Emit a versioned, **CUDA-oriented custom artifact**, with one physical weight view shared by decode and prefill. Keep equations, tensor identities, and semantic graph contracts independent of CUDA; specialize packed bytes and execution plans.
@@ -50,10 +70,12 @@ remains the control. Intermediate development checks do not confer acceptance.
 
 # Implementation baseline
 
-The [TASK-030 delivery record](../implementation/task030-delivery.md) describes
-the actual Q4_K/Q8 candidate, measured context limits, and retained production
-control. Its combined attention candidate is not promoted because final C92
-quality is inconclusive. The V0 choices below remain historical controls.
+The [TASK-036 delivery record](../implementation/task036-delivery.md) describes
+the current FP8 mixer development candidate, measured context limits and
+retained TASK-026/027 production control. It is not promoted: C92 is
+inconclusive and P100 fails. TASK-037–040 start from that development runtime
+without declaring quality acceptance. The V0 choices below remain historical
+controls except where the amendments explicitly retain their semantics.
 
 V0's reference backend is NVIDIA CUDA. Its reference GPU is the NVIDIA GeForce RTX 5090, a Blackwell device with compute capability 12.0, and the native reference target is `sm_120`. V0 may optimize specifically for that GPU and architecture. The reference deployment is a Linux container environment using Docker and the NVIDIA Container Toolkit. Implementation uses C++23 for host code and CUDA C++23 for device code.
 
@@ -79,8 +101,8 @@ This register is normative. Every V0 decision that changes on-disk bytes, numeri
 | Q-01 | Historical V0 control: main dense projections use Q4G64; compute-compatible formats are reopened by OVERALL-01 | BF16 statistics, weight traffic, quantization study | MEASURED + DERIVED + HYPOTHESIS | Largest byte reduction with one simple decoder | G64 preserves behavior sufficiently | TASK-019/020 candidate feasibility and screening |
 | Q-02 | Historical V0 control: `lm_head` uses Q8G32; head precision is reopened by OVERALL-01 | Vocabulary traffic and output sensitivity | DERIVED + HYPOTHESIS | Conservative head compression | Q4 is equally acceptable | TASK-019/020 candidate feasibility and screening |
 | Q-03 | Embeddings and small/sensitive families remain BF16 | Gather access class, recurrence/sensitivity analysis | DERIVED + HYPOTHESIS | Avoids low-value numerical and implementation variables | Narrowing produces material capacity/latency gain without behavior loss | Future family-specific study |
-| P-01 | FP32 residual, reductions, nonlinear/recurrent arithmetic | Numerical sensitivity analysis | DERIVED + HYPOTHESIS | Bounds accumulation and recurrence error | Narrower working paths are behaviorally sufficient | EXP-C, EXP-E |
-| P-02 | Historical V0 control: BF16 normalized/projection transport and BF16 KV/C; projection operand precision is reopened by OVERALL-01, while state semantics remain controlled | Source dtype, tensor-core path, state schema | OBSERVED + HYPOTHESIS | Reduces scratch/cache traffic and feeds prefill operands | BF16 transport changes behavior materially | TASK-019/020 operand evidence; TASK-029 native gate/up integration; state changes deferred |
+| P-01 | FP32 residual, reductions, nonlinear/recurrent arithmetic; FAST-02 permits bounded exact INT32 MLP dot partials before FP32 affine scaling and accumulation | Numerical sensitivity analysis; FAST-02 | DERIVED + HYPOTHESIS | Bounds accumulation and recurrence error while enabling quantized arithmetic | Selected partial/correction arithmetic violates its reference or quality gates | TASK-037 independent integer/FP32 reference and TASK-040 quality; EXP-C/EXP-E remain historical |
+| P-02 | Historical BF16 projection transport reopened by OVERALL-01/FAST-01; FAST-02 adds Q8 K32 MLP operands without per-weight BF16 reconstruction rounding and two-component BF16 P for grouped decode; BF16 KV/C retained | Source dtype, tensor-core path, state schema; FAST-02 | OBSERVED + HYPOTHESIS | Narrow operands match selected consumers while preserving state precision | Changed operand precision fails numerical or model-quality gates | TASK-037/038 affected checks and TASK-040 final gate; state changes deferred |
 | S-01 | FP32 GDN S | Recurrent equations and `mamba_ssm_dtype` intent | OBSERVED + DERIVED + HYPOTHESIS | Error crosses token boundaries; 144 MiB fixed state is affordable | BF16 state error remains bounded | EXP-C |
 | S-02 | S ABI is `[head,value,key]`, warp per value row | GDN dimensions and CUDA layout analysis | DERIVED + HYPOTHESIS | Coalesced key reduction, one read/update/write ownership | Alternate ownership wins end to end | EXP-D |
 | G-01 | Six Qwen-native semantic node families | Model semantics, dataflow, semantic graph | DERIVED | Preserves model-relevant state and boundaries | A node boundary prevents necessary optimization | EXP-F, profiling |
@@ -103,7 +125,12 @@ The [BF16 measurements](bf16-tensor-analysis.md#directional-scale-variation) sho
 
 The semantic authority is [model-semantics.md](model-semantics.md), with the [dataflow](dataflow.md) and [semantic graph](semantic-graph.md) supplying contracts. The [clean-sheet review](clean-sheet-review.md) established mechanical consistency, not independent semantic proof. In particular, [MTP token alignment, concat order, decoder behavior, and independent KV semantics remain UNKNOWN](model-semantics.md#mtp). V0 therefore chooses primary language inference as its executable contract: 130 semantic instances. It retains the six-family vocabulary and the conditional 135-instance complete map without claiming that map is validated. This intentionally changes the dossier's complete-map reporting priority; language-only results must be labeled as such.
 
-This design uses the existing dossier and checkpoint config. Quartz and llama.cpp/GGML implementation details are not design inputs. Vision encoding is outside V0. Initial hardware must support native BF16 tensor-core arithmetic and have room for the model, selected context capacity, and workspace; the actual GPU's resource limits and achievable rates remain UNKNOWN until measured.
+The original V0 design used the dossier and checkpoint config without Quartz
+or llama.cpp/GGML implementation details as design inputs. FAST-02 explicitly
+permits reuse of established pinned upstream kernels/patterns with required
+attribution; model semantics remain governed by this repository. Vision
+encoding remains outside scope. Capacity and achievable rates must be
+established for the selected candidate, not inferred from instruction support.
 
 # Artifact and offline compiler
 
@@ -148,7 +175,7 @@ Storage and arithmetic are separate decisions. The following table is the produc
 | Residual stream | FP32, including embedding output after widening | Preserve small updates through 128 residual additions for little decode scratch cost | HYPOTHESIS, conservative |
 | Normalized activation | BF16 output of FP32 RMS evaluation | Shared input for SIMT decode and BF16 tensor-core prefill | HYPOTHESIS; EXP-E |
 | Projection staging | BF16 normally; FP32 for small `a/b` outputs and residual-producing epilogues | Preserve sensitive gates and avoid rounding immediately before residual addition | HYPOTHESIS; EXP-E |
-| Dot-product accumulation | FP32 for all dense contractions, attention, convolution, and recurrence | Long reductions need a wider accumulator | HYPOTHESIS, conservative |
+| Dot-product accumulation | FP32 for attention, convolution, recurrence and floating dense contractions; FAST-02 Q4_K×Q8 MLP uses bounded exact INT32 partials then FP32 affine correction/accumulation | Long reductions need a wider accumulator; quantized integer partials have explicit overflow bounds | HYPOTHESIS, controlled FAST-02 exception |
 | Nonlinear/reduction intermediates | FP32 RMS/L2 sums, softmax max/sum, RoPE phase, gate arithmetic; round only at declared stores | Avoid accumulating narrow-format error in normalization and exponentials | HYPOTHESIS, conservative |
 | GDN recurrent state | FP32, including persistent stores | Error feeds future tokens; total state is only 144 MiB | OBSERVED config intent; HYPOTHESIS policy |
 | Convolution history | BF16 raw pre-convolution QKV, last three positions | Finite four-tap history; preserve the projection transport precision | HYPOTHESIS, conservative |

@@ -1,5 +1,11 @@
 # Fast inference after TASK-030 — FAST-01
 
+Historical plan for completed TASK-033–036. The
+[FAST-02 amendment](task_ledger.md#fast-engine-amendment--fast-02-2026-09-27)
+governs TASK-037–040 and explicitly supersedes the retained Q4_K per-weight
+BF16 rounding, fixed attention schedule and graph deferral for that new batch.
+The original plan and measured completion records remain historical evidence.
+
 Planning amendment, 2026-09-26. This applies the fast delivery principles in
 [`astraprompt.md`](../../astraprompt.md) to the completed TASK-030 milestone.
 It authorizes TASK-033–036 as future work; no implementation, build, artifact

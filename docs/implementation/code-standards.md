@@ -1,6 +1,6 @@
 # Code standards
 
-This document is normative for implementation work. [Architecture V0](../architecture/architecture-v0.md) defines retained model semantics and controls, while the [technology baseline](technology-baseline.md) defines the reference platform, toolchain, build, and container environment. OVERALL-01, FP4-01, DELIVERY-01 and [the task ledger](task_ledger.md) define candidate architecture authority and implementation order for TASK-018–032.
+This document is normative for implementation work. [Architecture V0](../architecture/architecture-v0.md) defines retained model semantics and controls, while the [technology baseline](technology-baseline.md) defines the reference platform, toolchain, build, and container environment. OVERALL-01, FP4-01, DELIVERY-01, FAST-01, FAST-02 and [the task ledger](task_ledger.md) define candidate architecture authority and implementation order through TASK-040.
 
 # Design philosophy
 
@@ -207,6 +207,15 @@ Future implementation task specifications must treat:
 - this code standard as authority for C++/CUDA implementation conventions.
 
 If task instructions conflict with platform, toolchain, or code-boundary requirements in these documents, report the conflict. For candidate architecture and task ownership in TASK-018–032, follow OVERALL-01, FP4-01, DELIVERY-01 and their revised ledger contracts; historical implementation choices do not override them.
+
+FAST-01 governs completed TASK-033–036 and FAST-02 governs TASK-037–040.
+The latter explicitly permits integer MLP dot partials, revised attention
+schedules and internal enqueue/static CUDA graphs under its precision and
+completion contracts. Existing pinned CUTLASS/CuTe and attributed upstream
+kernel adaptations are permitted; no generic inference dependency is added.
+Preserve public validation, typed errors and ownership. Deferred host commits
+must cover metadata and device-state failure handling together; a graph is
+an owned CUDA resource, not an exception to these requirements.
 # Boundary, lifetime, and evidence contracts
 
 - Validate at the public bind/launch boundary: device and memory space,

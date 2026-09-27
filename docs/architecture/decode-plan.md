@@ -1,5 +1,12 @@
 # Qwen3.8-27B decode execution plan (TASK-13)
 
+The semantic schedule below remains a historical reference. Future
+TASK-037–040 follow [FAST-02](../implementation/task_ledger.md#fast-engine-amendment--fast-02-2026-09-27):
+integer Q4_K×Q8 MLP, grouped-head attention, and private enqueue/static graph
+replay with host commits after complete-token success. These supersede
+physical staging/submission defaults, not model equations, state ABI,
+causality or poison/reset/restore. TASK-040 owns final acceptance.
+
 > **Draft status:** conclusions in this document are **unverified** until the verification stage completes.
 
 Phase 1 **hardware-independent** decode semantic schedule for one-token
